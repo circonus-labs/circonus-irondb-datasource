@@ -1,0 +1,32 @@
+{
+  "type": "datasource",
+  "name": "IRONdb",
+  "id": "circonus-irondb-datasource",
+
+  "info": {
+    "description": "Datasource plugin to pull data from an IRONdb installation.",
+    "author": {
+      "name": "Circonus",
+      "url": "https://www.circonus.com/irondb/"
+    },
+    "keywords": ["circonus", "irondb", "time series"],
+    "logos": {
+      "small": "img/irondb-logo.png",
+      "large": "img/irondb-logo.png"
+    },
+    "links": [
+      {"name": "Project site", "url": "https://www.circonus.com/irondb/"},
+      {"name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE"}
+    ],
+    "version": "0.3.1",
+    "updated": "2018-01-18"
+  },
+
+  "dependencies": {
+    "grafanaVersion": "5.0.x",
+    "plugins": [ ]
+  },
+
+  "metrics": true,
+  "annotations": false
+}
