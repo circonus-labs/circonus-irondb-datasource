@@ -150,7 +150,7 @@ export default class IrondbDatasource {
     return this.backendSrv.datasourceRequest(options).then(
       result => {
         console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
-        return result.data;
+        return this._convertIrondbDataToGrafana(result.data);
       },
       function(err) {
         console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
@@ -204,5 +204,32 @@ export default class IrondbDatasource {
     } else {
       return cleanOptions;
     }
+  }
+
+  _convertIrondbDataToGrafana(data) {
+    var cleanData = [];
+    var timestamp, origDatapoint, datapoint;
+
+    if (!data || !data.series) return { data: cleanData };
+    if (data.series && data.step && data.from && data.to) {
+      /* Report values in millisecs */
+      data.step *= 1000;
+      data.from *= 1000;
+      data.to *= 1000;
+      for (var name in data.series) {
+        timestamp = data.from - data.step;
+        origDatapoint = data.series[name];
+        datapoint = [];
+        cleanData.push({
+          target: name,
+          datapoints: datapoint
+        });
+        for (var i = 0; i < origDatapoint.length; i++) {
+          timestamp += data.step;
+          datapoint.push([ origDatapoint[i], timestamp ]);
+        }
+      }
+    }
+    return { data: cleanData };
   }
 }

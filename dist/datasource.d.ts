@@ -23,4 +23,7 @@ export default class IrondbDatasource {
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean): any;
     _irondbRequest(irondbOptions: any, start: any, end: any, isCaql?: boolean): any;
     _buildIrondbParams(options: any): {};
+    _convertIrondbDataToGrafana(data: any): {
+        data: any[];
+    };
 }

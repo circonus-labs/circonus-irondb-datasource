@@ -106,6 +106,7 @@ System.register(['lodash'], function(exports_1) {
                     return this.backendSrv.datasourceRequest(options);
                 };
                 IrondbDatasource.prototype._irondbRequest = function (irondbOptions, start, end, isCaql) {
+                    var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
                     var url = this.url;
@@ -134,7 +135,7 @@ System.register(['lodash'], function(exports_1) {
                     console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
                     return this.backendSrv.datasourceRequest(options).then(function (result) {
                         console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
-                        return result.data;
+                        return _this._convertIrondbDataToGrafana(result.data);
                     }, function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
                         if (err.status !== 0 || err.status >= 300) {
@@ -184,6 +185,32 @@ System.register(['lodash'], function(exports_1) {
                     else {
                         return cleanOptions;
                     }
+                };
+                IrondbDatasource.prototype._convertIrondbDataToGrafana = function (data) {
+                    var cleanData = [];
+                    var timestamp, origDatapoint, datapoint;
+                    if (!data || !data.series)
+                        return { data: cleanData };
+                    if (data.series && data.step && data.from && data.to) {
+                        /* Report values in millisecs */
+                        data.step *= 1000;
+                        data.from *= 1000;
+                        data.to *= 1000;
+                        for (var name in data.series) {
+                            timestamp = data.from - data.step;
+                            origDatapoint = data.series[name];
+                            datapoint = [];
+                            cleanData.push({
+                                target: name,
+                                datapoints: datapoint
+                            });
+                            for (var i = 0; i < origDatapoint.length; i++) {
+                                timestamp += data.step;
+                                datapoint.push([origDatapoint[i], timestamp]);
+                            }
+                        }
+                    }
+                    return { data: cleanData };
                 };
                 return IrondbDatasource;
             })();
