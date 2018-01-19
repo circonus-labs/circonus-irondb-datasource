@@ -226,6 +226,9 @@ export default class IrondbDatasource {
         });
         for (var i = 0; i < origDatapoint.length; i++) {
           timestamp += data.step;
+          if (null == origDatapoint[i]) {
+            continue;
+          }
           datapoint.push([ origDatapoint[i], timestamp ]);
         }
       }
