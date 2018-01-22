@@ -20,12 +20,10 @@ System.register(['lodash'], function(exports_1) {
                     this.accountId = (instanceSettings.jsonData || {}).accountId;
                     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
                     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
-                    /*    this.urls = _.map(instanceSettings.url.split(','), function(url) {
-                          return url.trim();
-                        });*/
                     this.url = instanceSettings.url;
                     this.supportAnnotations = false;
                     this.supportMetrics = true;
+                    this.appName = 'Grafana';
                 }
                 IrondbDatasource.prototype.query = function (options) {
                     console.log("options (query): " + JSON.stringify(options, null, 2));
@@ -38,20 +36,15 @@ System.register(['lodash'], function(exports_1) {
                     if (lodash_1.default.isEmpty(irondbOptions)) {
                         return this.$q.when({ data: [] });
                     }
-                    for (i = 0; i < irondbOptions['targets'].length; i++) {
-                        if (lodash_1.default.isEmpty(irondbOptions['targets'][i])) {
-                            continue;
-                        }
-                        var queryResults;
-                        queryResults = this._irondbRequest(irondbOptions['targets'][i], irondbOptions['start'], irondbOptions['end']);
-                        console.log("queryResults (query): " + JSON.stringify(queryResults, null, 2));
-                    }
+                    var queryResults = this._irondbRequest(irondbOptions);
+                    console.log("queryResults (query): " + JSON.stringify(queryResults, null, 2));
+                    return queryResults;
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query) {
-                    var queryUrl = '/graphite/' + this.accountId;
+                    var queryUrl = '';
                     console.log("query (metricFindQuery): " + JSON.stringify(query, null, 2));
                     if ('*' !== query) {
                         queryUrl = queryUrl + '/' + query.replace(/\*$/, '');
@@ -88,8 +81,14 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype._irondbSimpleRequest = function (method, url, isCaql) {
                     if (isCaql === void 0) { isCaql = false; }
                     var baseUrl = this.url;
-                    if ('hosted' == this.irondbType) {
-                        baseUrl = baseUrl + '/irondb';
+                    var headers = { "Content-Type": "application/json" };
+                    if ('hosted' == this.irondbType && !isCaql) {
+                        baseUrl = baseUrl + '/irondb/graphite/series_multi';
+                        headers['X-Circonus-Auth-Token'] = this.apiToken;
+                        headers['X-Circonus-App-Name'] = this.appName;
+                    }
+                    if ('standalone' == this.irondbType && !isCaql) {
+                        baseUrl = baseUrl + '/graphite/' + this.accountId + '/series_multi';
                     }
                     if (isCaql) {
                         baseUrl = baseUrl + '/extension/lua/caql_v1';
@@ -102,32 +101,38 @@ System.register(['lodash'], function(exports_1) {
                     var options = {
                         method: method,
                         url: baseUrl + url,
+                        headers: headers,
                     };
                     return this.backendSrv.datasourceRequest(options);
                 };
-                IrondbDatasource.prototype._irondbRequest = function (irondbOptions, start, end, isCaql) {
+                IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
                     var url = this.url;
+                    var headers = { "Content-Type": "application/json" };
                     if ('hosted' == this.irondbType) {
-                        url = url + '/irondb';
+                        url = url + '/irondb/graphite/series_multi';
+                        headers['X-Circonus-Auth-Token'] = this.apiToken;
+                        headers['X-Circonus-App-Name'] = this.appName;
+                    }
+                    if ('standalone' == this.irondbType) {
+                        url = url + '/graphite/' + this.accountId + '/series_multi';
                     }
                     if (isCaql) {
                         url = url + '/extension/lua/caql_v1';
                     }
-                    url = url + '/graphite/' + this.accountId;
-                    url = url + '/series?start=' + start + '&end=' + end + '&name=' + irondbOptions['query'];
                     console.log("baseUrl (_irondbRequest): " + JSON.stringify(this.url, null, 2));
                     var options = {
-                        method: 'GET',
+                        method: 'POST',
                         url: url,
+                        data: irondbOptions,
+                        headers: headers,
                     };
                     if (this.basicAuth || this.withCredentials) {
                         options.withCredentials = true;
                     }
                     if (this.basicAuth) {
-                        options.headers = options.headers || {};
                         options.headers.Authorization = this.basicAuth;
                     }
                     console.log("options (_irondbRequest): " + JSON.stringify(options, null, 2));
@@ -170,14 +175,14 @@ System.register(['lodash'], function(exports_1) {
                     var hasTargets = false;
                     cleanOptions['start'] = (new Date(options.range.from)).getTime() / 1000;
                     cleanOptions['end'] = (new Date(options.range.to)).getTime() / 1000;
-                    cleanOptions['targets'] = [];
+                    cleanOptions['names'] = [];
                     for (i = 0; i < options.targets.length; i++) {
                         target = options.targets[i];
                         if (target.hide) {
                             continue;
                         }
                         hasTargets = true;
-                        cleanOptions['targets'].push(target);
+                        cleanOptions['names'].push(target['query']);
                     }
                     if (!hasTargets) {
                         return [];

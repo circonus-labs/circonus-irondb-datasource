@@ -10,6 +10,7 @@ export default class IrondbDatasource {
     irondbType: string;
     url: any;
     apiToken: string;
+    appName: string;
     supportAnnotations: boolean;
     supportMetrics: boolean;
     basicAuth: any;
@@ -21,7 +22,7 @@ export default class IrondbDatasource {
     metricFindQuery(query: string): any;
     testDatasource(): any;
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean): any;
-    _irondbRequest(irondbOptions: any, start: any, end: any, isCaql?: boolean): any;
+    _irondbRequest(irondbOptions: any, isCaql?: boolean): any;
     _buildIrondbParams(options: any): {};
     _convertIrondbDataToGrafana(data: any): {
         data: any[];
