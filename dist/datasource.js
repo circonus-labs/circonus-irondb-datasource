@@ -137,9 +137,7 @@ System.register(['lodash'], function(exports_1) {
                     }
                     console.log("options (_irondbRequest): " + JSON.stringify(options, null, 2));
                     var result = this.backendSrv.datasourceRequest(options);
-                    console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
                     return this.backendSrv.datasourceRequest(options).then(function (result) {
-                        console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
                         return _this._convertIrondbDataToGrafana(result.data);
                     }, function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));

@@ -153,11 +153,9 @@ export default class IrondbDatasource {
     console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
 
     var result = this.backendSrv.datasourceRequest(options);
-    console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
 
     return this.backendSrv.datasourceRequest(options).then(
       result => {
-        console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
         return this._convertIrondbDataToGrafana(result.data);
       },
       function(err) {
