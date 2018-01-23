@@ -125,6 +125,9 @@ export default class IrondbDatasource {
     var url = this.url;
     var headers = { "Content-Type": "application/json" };
 
+    if (isCaql || irondbOptions['isCaql']) {
+      url = url + '/extension/lua/caql_v1';
+    }
     if ('hosted' == this.irondbType) {
       url = url + '/irondb/graphite/series_multi';
       headers['X-Circonus-Auth-Token'] = this.apiToken;
@@ -132,9 +135,6 @@ export default class IrondbDatasource {
     }
     if ('standalone' == this.irondbType) {
       url = url + '/graphite/' + this.accountId + '/series_multi';
-    }
-    if (isCaql) {
-      url = url + '/extension/lua/caql_v1';
     }
     console.log(`baseUrl (_irondbRequest): ${JSON.stringify(this.url, null, 2)}`);
 
@@ -194,6 +194,7 @@ export default class IrondbDatasource {
     cleanOptions['start'] = (new Date(options.range.from)).getTime() / 1000;
     cleanOptions['end'] = (new Date(options.range.to)).getTime() / 1000;
     cleanOptions['names'] = [];
+    cleanOptions['isCaql'] = false;
 
     for (i = 0; i < options.targets.length; i++) {
       target = options.targets[i];
@@ -202,6 +203,9 @@ export default class IrondbDatasource {
       }
 
       hasTargets = true;
+      if (target.isCaql) {
+        cleanOptions['isCaql'] = true;
+      }
       cleanOptions['names'].push(target['query']);
     }
 

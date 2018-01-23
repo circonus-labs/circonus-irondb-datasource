@@ -111,6 +111,9 @@ System.register(['lodash'], function(exports_1) {
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
                     var url = this.url;
                     var headers = { "Content-Type": "application/json" };
+                    if (isCaql || irondbOptions['isCaql']) {
+                        url = url + '/extension/lua/caql_v1';
+                    }
                     if ('hosted' == this.irondbType) {
                         url = url + '/irondb/graphite/series_multi';
                         headers['X-Circonus-Auth-Token'] = this.apiToken;
@@ -118,9 +121,6 @@ System.register(['lodash'], function(exports_1) {
                     }
                     if ('standalone' == this.irondbType) {
                         url = url + '/graphite/' + this.accountId + '/series_multi';
-                    }
-                    if (isCaql) {
-                        url = url + '/extension/lua/caql_v1';
                     }
                     console.log("baseUrl (_irondbRequest): " + JSON.stringify(this.url, null, 2));
                     var options = {
@@ -174,12 +174,16 @@ System.register(['lodash'], function(exports_1) {
                     cleanOptions['start'] = (new Date(options.range.from)).getTime() / 1000;
                     cleanOptions['end'] = (new Date(options.range.to)).getTime() / 1000;
                     cleanOptions['names'] = [];
+                    cleanOptions['isCaql'] = false;
                     for (i = 0; i < options.targets.length; i++) {
                         target = options.targets[i];
                         if (target.hide) {
                             continue;
                         }
                         hasTargets = true;
+                        if (target.isCaql) {
+                            cleanOptions['isCaql'] = true;
+                        }
                         cleanOptions['names'].push(target['query']);
                     }
                     if (!hasTargets) {
