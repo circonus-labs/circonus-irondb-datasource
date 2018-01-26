@@ -28,15 +28,13 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype.query = function (options) {
                     console.log("options (query): " + JSON.stringify(options, null, 2));
                     var scopedVars = options.scopedVars;
-                    var queryTargets = [];
-                    var queryModel;
                     var i;
                     var irondbOptions = this._buildIrondbParams(options);
                     console.log("irondbOptions (query): " + JSON.stringify(irondbOptions, null, 2));
                     if (lodash_1.default.isEmpty(irondbOptions)) {
                         return this.$q.when({ data: [] });
                     }
-                    return this._irondbRequest(irondbOptions);
+                    return this._irondbRequest(irondbOptions['std'], false);
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
@@ -118,7 +116,7 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-Auth-Token'] = this.apiToken;
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
-                    if (isCaql || irondbOptions['isCaql']) {
+                    if (isCaql) {
                         options.method = 'GET';
                         options.url = options.url + '/extension/lua';
                         if ('hosted' == this.irondbType) {
@@ -130,10 +128,10 @@ System.register(['lodash'], function(exports_1) {
                         options.url = options.url + '&period=60';
                         options.url = options.url + '&q=' + irondbOptions['names'][0];
                     }
-                    if ('hosted' == this.irondbType && !irondbOptions['isCaql']) {
+                    if ('hosted' == this.irondbType && !isCaql) {
                         options.url = options.url + '/graphite/series_multi';
                     }
-                    if ('standalone' == this.irondbType && !irondbOptions['isCaql']) {
+                    if ('standalone' == this.irondbType && !isCaql) {
                         options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
                     }
                     console.log("baseUrl (_irondbRequest): " + JSON.stringify(this.url, null, 2));
@@ -148,7 +146,7 @@ System.register(['lodash'], function(exports_1) {
                     console.log("options (_irondbRequest): " + JSON.stringify(options, null, 2));
                     var result = this.backendSrv.datasourceRequest(options);
                     return this.backendSrv.datasourceRequest(options).then(function (result) {
-                        if (isCaql || irondbOptions['isCaql']) {
+                        if (isCaql) {
                             return _this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
                         }
                         else {
@@ -186,10 +184,16 @@ System.register(['lodash'], function(exports_1) {
                     var intervalRegex = /'(\d+)m'/gi;
                     var i, target;
                     var hasTargets = false;
-                    cleanOptions['start'] = (new Date(options.range.from)).getTime() / 1000;
-                    cleanOptions['end'] = (new Date(options.range.to)).getTime() / 1000;
-                    cleanOptions['names'] = [];
-                    cleanOptions['isCaql'] = false;
+                    var start = (new Date(options.range.from)).getTime() / 1000;
+                    var end = (new Date(options.range.to)).getTime() / 1000;
+                    cleanOptions['std'] = {};
+                    cleanOptions['std']['start'] = start;
+                    cleanOptions['std']['end'] = end;
+                    cleanOptions['std']['names'] = [];
+                    cleanOptions['caql'] = {};
+                    cleanOptions['caql']['start'] = start;
+                    cleanOptions['caql']['end'] = end;
+                    cleanOptions['caql']['names'] = [];
                     for (i = 0; i < options.targets.length; i++) {
                         target = options.targets[i];
                         if (target.hide) {
@@ -197,9 +201,11 @@ System.register(['lodash'], function(exports_1) {
                         }
                         hasTargets = true;
                         if (target.isCaql) {
-                            cleanOptions['isCaql'] = true;
+                            cleanOptions['caql']['names'].push(target['query']);
                         }
-                        cleanOptions['names'].push(target['query']);
+                        else {
+                            cleanOptions['std']['names'].push(target['query']);
+                        }
                     }
                     if (!hasTargets) {
                         return [];

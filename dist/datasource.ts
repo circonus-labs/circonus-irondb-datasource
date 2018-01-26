@@ -33,8 +33,6 @@ export default class IrondbDatasource {
   query(options) {
     console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
-    var queryTargets = [];
-    var queryModel;
     var i;
     var irondbOptions = this._buildIrondbParams(options);
 
@@ -44,7 +42,7 @@ export default class IrondbDatasource {
       return this.$q.when({ data: [] });
     }
 
-    return this._irondbRequest(irondbOptions);
+    return this._irondbRequest(irondbOptions['std'], false);
   }
 
   annotationQuery(options) {
@@ -132,7 +130,7 @@ export default class IrondbDatasource {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
-    if (isCaql || irondbOptions['isCaql']) {
+    if (isCaql) {
       options.method = 'GET';
       options.url = options.url + '/extension/lua';
       if ('hosted' == this.irondbType) {
@@ -144,10 +142,10 @@ export default class IrondbDatasource {
       options.url = options.url + '&period=60';
       options.url = options.url + '&q=' + irondbOptions['names'][0];
     }
-    if ('hosted' == this.irondbType && !irondbOptions['isCaql']) {
+    if ('hosted' == this.irondbType && !isCaql) {
       options.url = options.url + '/graphite/series_multi';
     }
-    if ('standalone' == this.irondbType && !irondbOptions['isCaql']) {
+    if ('standalone' == this.irondbType && !isCaql) {
       options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
     }
     console.log(`baseUrl (_irondbRequest): ${JSON.stringify(this.url, null, 2)}`);
@@ -166,7 +164,7 @@ export default class IrondbDatasource {
 
     return this.backendSrv.datasourceRequest(options).then(
       result => {
-        if (isCaql || irondbOptions['isCaql']) {
+        if (isCaql) {
           return this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
         } else {
           return this._convertIrondbDataToGrafana(result.data);
@@ -204,11 +202,17 @@ export default class IrondbDatasource {
     var intervalRegex = /'(\d+)m'/gi;
     var i, target;
     var hasTargets = false;
+    var start = (new Date(options.range.from)).getTime() / 1000;
+    var end = (new Date(options.range.to)).getTime() / 1000;
 
-    cleanOptions['start'] = (new Date(options.range.from)).getTime() / 1000;
-    cleanOptions['end'] = (new Date(options.range.to)).getTime() / 1000;
-    cleanOptions['names'] = [];
-    cleanOptions['isCaql'] = false;
+    cleanOptions['std'] = {};
+    cleanOptions['std']['start'] = start;
+    cleanOptions['std']['end'] = end;
+    cleanOptions['std']['names'] = [];
+    cleanOptions['caql'] = {};
+    cleanOptions['caql']['start'] = start;
+    cleanOptions['caql']['end'] = end;
+    cleanOptions['caql']['names'] = [];
 
     for (i = 0; i < options.targets.length; i++) {
       target = options.targets[i];
@@ -218,9 +222,10 @@ export default class IrondbDatasource {
 
       hasTargets = true;
       if (target.isCaql) {
-        cleanOptions['isCaql'] = true;
+        cleanOptions['caql']['names'].push(target['query']);
+      } else {
+        cleanOptions['std']['names'].push(target['query']);
       }
-      cleanOptions['names'].push(target['query']);
     }
 
     if (!hasTargets) {
