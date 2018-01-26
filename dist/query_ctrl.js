@@ -38,6 +38,14 @@ System.register(['lodash', 'app/plugins/sdk', './css/query_editor.css!'], functi
                 IrondbQueryCtrl.prototype.getCollapsedText = function () {
                     return this.target.query;
                 };
+                IrondbQueryCtrl.prototype.getMetrics = function () {
+                    return [
+                        'graphite.test.smee.system.cpu.percent_used',
+                        'graphite.test.smee.system.load.1min',
+                        'graphite.test.smee.system.load.5min',
+                        'graphite.test.smee.system.load.15min',
+                    ];
+                };
                 IrondbQueryCtrl.templateUrl = 'partials/query.editor.html';
                 return IrondbQueryCtrl;
             })(sdk_1.QueryCtrl);

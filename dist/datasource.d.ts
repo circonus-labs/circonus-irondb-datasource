@@ -27,4 +27,7 @@ export default class IrondbDatasource {
     _convertIrondbDataToGrafana(data: any): {
         data: any[];
     };
+    _convertIrondbCaqlDataToGrafana(data: any, name: any): {
+        data: any[];
+    };
 }

@@ -36,9 +36,7 @@ System.register(['lodash'], function(exports_1) {
                     if (lodash_1.default.isEmpty(irondbOptions)) {
                         return this.$q.when({ data: [] });
                     }
-                    var queryResults = this._irondbRequest(irondbOptions);
-                    console.log("queryResults (query): " + JSON.stringify(queryResults, null, 2));
-                    return queryResults;
+                    return this._irondbRequest(irondbOptions);
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
@@ -88,7 +86,7 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
                     if ('standalone' == this.irondbType && !isCaql) {
-                        baseUrl = baseUrl + '/graphite/' + this.accountId + '/series_multi';
+                        baseUrl = baseUrl + '/graphite/' + this.accountId + '/graphite./series_multi';
                     }
                     if (isCaql) {
                         baseUrl = baseUrl + '/extension/lua/caql_v1';
@@ -111,24 +109,36 @@ System.register(['lodash'], function(exports_1) {
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
                     var url = this.url;
                     var headers = { "Content-Type": "application/json" };
-                    if (isCaql || irondbOptions['isCaql']) {
-                        url = url + '/extension/lua/caql_v1';
-                    }
+                    var options = {
+                        method: 'POST',
+                        url: this.url,
+                    };
                     if ('hosted' == this.irondbType) {
-                        url = url + '/irondb/graphite/series_multi';
+                        options.url = options.url + '/irondb';
                         headers['X-Circonus-Auth-Token'] = this.apiToken;
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
-                    if ('standalone' == this.irondbType) {
-                        url = url + '/graphite/' + this.accountId + '/series_multi';
+                    if (isCaql || irondbOptions['isCaql']) {
+                        options.method = 'GET';
+                        options.url = options.url + '/extension/lua';
+                        if ('hosted' == this.irondbType) {
+                            options.url = options.url + '/public';
+                        }
+                        options.url = options.url + '/caql_v1';
+                        options.url = options.url + '?start=' + irondbOptions['start'];
+                        options.url = options.url + '&end=' + irondbOptions['end'];
+                        options.url = options.url + '&period=60';
+                        options.url = options.url + '&q=' + irondbOptions['names'][0];
+                    }
+                    if ('hosted' == this.irondbType && !irondbOptions['isCaql']) {
+                        options.url = options.url + '/graphite/series_multi';
+                    }
+                    if ('standalone' == this.irondbType && !irondbOptions['isCaql']) {
+                        options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
                     }
                     console.log("baseUrl (_irondbRequest): " + JSON.stringify(this.url, null, 2));
-                    var options = {
-                        method: 'POST',
-                        url: url,
-                        data: irondbOptions,
-                        headers: headers,
-                    };
+                    options.data = irondbOptions;
+                    options.headers = headers;
                     if (this.basicAuth || this.withCredentials) {
                         options.withCredentials = true;
                     }
@@ -138,7 +148,12 @@ System.register(['lodash'], function(exports_1) {
                     console.log("options (_irondbRequest): " + JSON.stringify(options, null, 2));
                     var result = this.backendSrv.datasourceRequest(options);
                     return this.backendSrv.datasourceRequest(options).then(function (result) {
-                        return _this._convertIrondbDataToGrafana(result.data);
+                        if (isCaql || irondbOptions['isCaql']) {
+                            return _this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
+                        }
+                        else {
+                            return _this._convertIrondbDataToGrafana(result.data);
+                        }
                     }, function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
                         if (err.status !== 0 || err.status >= 300) {
@@ -218,6 +233,34 @@ System.register(['lodash'], function(exports_1) {
                                 }
                                 datapoint.push([origDatapoint[i], timestamp]);
                             }
+                        }
+                    }
+                    return { data: cleanData };
+                };
+                IrondbDatasource.prototype._convertIrondbCaqlDataToGrafana = function (data, name) {
+                    var cleanData = [];
+                    var timestamp, origDatapoint, datapoint;
+                    if (!data || data.length == 0)
+                        return { data: cleanData };
+                    datapoint = [];
+                    cleanData.push({
+                        target: name,
+                        datapoints: datapoint
+                    });
+                    if (data[0][1].constructor === Array) {
+                        for (var i = 0; i < data.length; i++) {
+                            if (null == data[i][1][0]) {
+                                continue;
+                            }
+                            datapoint.push([data[i][1][0], data[i][0] * 1000]);
+                        }
+                    }
+                    else if (data[0][2].constructor === Object) {
+                        for (var i = 0; i < data.length; i++) {
+                            if (null == data[i][2][0]) {
+                                continue;
+                            }
+                            datapoint.push([data[i][2][0], data[i][0] * 1000]);
                         }
                     }
                     return { data: cleanData };

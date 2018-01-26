@@ -10,4 +10,5 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     toggleEditorMode(): void;
     onChangeInternal(): void;
     getCollapsedText(): any;
+    getMetrics(): string[];
 }

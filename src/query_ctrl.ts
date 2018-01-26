@@ -32,4 +32,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
   getCollapsedText() {
     return this.target.query;
   }
+
+  getMetrics() {
+    return [
+        'graphite.test.smee.system.cpu.percent_used',
+        'graphite.test.smee.system.load.1min',
+        'graphite.test.smee.system.load.5min',
+        'graphite.test.smee.system.load.15min',
+    ];
+  }
 }

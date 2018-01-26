@@ -13,6 +13,9 @@
         <div class="gf-form-select-wrapper">
           <select class="gf-form-input gf-size-auto" ng-model="ctrl.target.getMetric" ng-options="f.value as f.text for f in ctrl.getMetrics" ng-change="ctrl.refresh()"></select>
         </div>
+<!--
+        <gf-form-dropdown get-options="ctrl.getMetrics" allow-custom="true" label-mode="true" on-change="ctrl.refresh()"></gf-form-dropdown>
+-->
       </div>
       <div class="gf-form gf-form--grow">
         <div class="gf-form-label gf-form-label--grow"></div>
