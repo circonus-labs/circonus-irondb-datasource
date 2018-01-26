@@ -35,6 +35,7 @@ export default class IrondbDatasource {
     var scopedVars = options.scopedVars;
     var i;
     var irondbOptions = this._buildIrondbParams(options);
+    var queryResults;
 
     console.log(`irondbOptions (query): ${JSON.stringify(irondbOptions, null, 2)}`);
 
@@ -42,7 +43,14 @@ export default class IrondbDatasource {
       return this.$q.when({ data: [] });
     }
 
-    return this._irondbRequest(irondbOptions['std'], false);
+    if (irondbOptions['std']['names'].length) {
+      queryResults = this._irondbRequest(irondbOptions['std'], false);
+    }
+    if (irondbOptions['caql']['names'].length) {
+      queryResults = this._irondbRequest(irondbOptions['caql'], true);
+    }
+    console.log(`queryResults (query): ${JSON.stringify(queryResults.data, null, 2)}`);
+    return queryResults;
   }
 
   annotationQuery(options) {
@@ -148,7 +156,6 @@ export default class IrondbDatasource {
     if ('standalone' == this.irondbType && !isCaql) {
       options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
     }
-    console.log(`baseUrl (_irondbRequest): ${JSON.stringify(this.url, null, 2)}`);
 
     options.data = irondbOptions;
     options.headers = headers;
@@ -167,7 +174,10 @@ export default class IrondbDatasource {
         if (isCaql) {
           return this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
         } else {
-          return this._convertIrondbDataToGrafana(result.data);
+          var queryResults = this._convertIrondbDataToGrafana(result.data);
+    console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+    console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
+          return queryResults;
         }
       },
       function(err) {

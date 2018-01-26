@@ -30,11 +30,19 @@ System.register(['lodash'], function(exports_1) {
                     var scopedVars = options.scopedVars;
                     var i;
                     var irondbOptions = this._buildIrondbParams(options);
+                    var queryResults;
                     console.log("irondbOptions (query): " + JSON.stringify(irondbOptions, null, 2));
                     if (lodash_1.default.isEmpty(irondbOptions)) {
                         return this.$q.when({ data: [] });
                     }
-                    return this._irondbRequest(irondbOptions['std'], false);
+                    if (irondbOptions['std']['names'].length) {
+                        queryResults = this._irondbRequest(irondbOptions['std'], false);
+                    }
+                    if (irondbOptions['caql']['names'].length) {
+                        queryResults = this._irondbRequest(irondbOptions['caql'], true);
+                    }
+                    console.log("queryResults (query): " + JSON.stringify(queryResults.data, null, 2));
+                    return queryResults;
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
@@ -134,7 +142,6 @@ System.register(['lodash'], function(exports_1) {
                     if ('standalone' == this.irondbType && !isCaql) {
                         options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
                     }
-                    console.log("baseUrl (_irondbRequest): " + JSON.stringify(this.url, null, 2));
                     options.data = irondbOptions;
                     options.headers = headers;
                     if (this.basicAuth || this.withCredentials) {
@@ -150,7 +157,10 @@ System.register(['lodash'], function(exports_1) {
                             return _this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
                         }
                         else {
-                            return _this._convertIrondbDataToGrafana(result.data);
+                            var queryResults = _this._convertIrondbDataToGrafana(result.data);
+                            console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
+                            console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
+                            return queryResults;
                         }
                     }, function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
