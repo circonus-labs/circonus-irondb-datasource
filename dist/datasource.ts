@@ -35,7 +35,6 @@ export default class IrondbDatasource {
     var scopedVars = options.scopedVars;
     var i;
     var irondbOptions = this._buildIrondbParams(options);
-    var queryResults;
 
     console.log(`irondbOptions (query): ${JSON.stringify(irondbOptions, null, 2)}`);
 
@@ -43,14 +42,7 @@ export default class IrondbDatasource {
       return this.$q.when({ data: [] });
     }
 
-    if (irondbOptions['std']['names'].length) {
-      queryResults = this._irondbRequest(irondbOptions['std'], false);
-    }
-    if (irondbOptions['caql']['names'].length) {
-      queryResults = this._irondbRequest(irondbOptions['caql'], true);
-    }
-    console.log(`queryResults (query): ${JSON.stringify(queryResults.data, null, 2)}`);
-    return queryResults;
+    return this._irondbRequest(irondbOptions);
   }
 
   annotationQuery(options) {
@@ -126,85 +118,146 @@ export default class IrondbDatasource {
 
   _irondbRequest(irondbOptions, isCaql = false) {
     console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
-    var url = this.url;
     var headers = { "Content-Type": "application/json" };
     var options: any = {
       method: 'POST',
       url: this.url,
     };
+    var queryResults = {};
+    queryResults['data'] = [];
 
-    if ('hosted' == this.irondbType) {
-      options.url = options.url + '/irondb';
-      headers['X-Circonus-Auth-Token'] = this.apiToken;
-      headers['X-Circonus-App-Name'] = this.appName;
+    if (irondbOptions['std']['names'].length) {
+      if ('hosted' == this.irondbType) {
+        options.url = options.url + '/irondb';
+        headers['X-Circonus-Auth-Token'] = this.apiToken;
+        headers['X-Circonus-App-Name'] = this.appName;
+        options.url = options.url + '/graphite/series_multi';
+      }
+      if ('standalone' == this.irondbType) {
+        options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
+      }
+
+      options.data = irondbOptions['std'];
+      options.headers = headers;
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
+
+      return this.backendSrv.datasourceRequest(options).then(
+        result => {
+          var queryInterimResults = this._convertIrondbDataToGrafana(result.data);
+          return queryInterimResults;
+        },
+        function(err) {
+          console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
+          if (err.status !== 0 || err.status >= 300) {
+            if (err.data && err.data.error) {
+              throw {
+                message: 'IRONdb Error: ' + err.data.error,
+                data: err.data,
+                config: err.config,
+              };
+            } else if (err.statusText === 'Not Found') {
+              throw {
+                message: 'IRONdb Error: ' + err.statusText,
+                data: err.data,
+                config: err.config,
+              };
+            } else {
+              throw {
+                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                data: err.data,
+                config: err.config,
+              };
+            }
+          }
+        }
+      ).then(
+        result => {
+          console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
+          for (var i = 0; i < result['data'].length; i++) {
+            queryResults['data'].push(result['data'][i]);
+          }
+          console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+          return queryResults;
+        }
+      );
     }
-    if (isCaql) {
+    if (irondbOptions['caql']['names'].length) {
+      options.url = this.url;
+      if ('hosted' == this.irondbType) {
+        options.url = options.url + '/irondb';
+        headers['X-Circonus-Auth-Token'] = this.apiToken;
+        headers['X-Circonus-App-Name'] = this.appName;
+      }
       options.method = 'GET';
       options.url = options.url + '/extension/lua';
       if ('hosted' == this.irondbType) {
         options.url = options.url + '/public';
       }
       options.url = options.url + '/caql_v1';
-      options.url = options.url + '?start=' + irondbOptions['start'];
-      options.url = options.url + '&end=' + irondbOptions['end'];
+      options.url = options.url + '?start=' + irondbOptions['caql']['start'];
+      options.url = options.url + '&end=' + irondbOptions['caql']['end'];
       options.url = options.url + '&period=60';
-      options.url = options.url + '&q=' + irondbOptions['names'][0];
-    }
-    if ('hosted' == this.irondbType && !isCaql) {
-      options.url = options.url + '/graphite/series_multi';
-    }
-    if ('standalone' == this.irondbType && !isCaql) {
-      options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
-    }
+      options.url = options.url + '&q=' + irondbOptions['caql']['names'][0];
 
-    options.data = irondbOptions;
-    options.headers = headers;
-    if (this.basicAuth || this.withCredentials) {
-      options.withCredentials = true;
-    }
-    if (this.basicAuth) {
-      options.headers.Authorization = this.basicAuth;
-    }
-    console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
+      options.data = irondbOptions['caql'];
+      options.headers = headers;
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
 
-    var result = this.backendSrv.datasourceRequest(options);
-
-    return this.backendSrv.datasourceRequest(options).then(
-      result => {
-        if (isCaql) {
-          return this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
-        } else {
-          var queryResults = this._convertIrondbDataToGrafana(result.data);
-    console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
-    console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
-          return queryResults;
-        }
-      },
-      function(err) {
-        console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
-        if (err.status !== 0 || err.status >= 300) {
-          if (err.data && err.data.error) {
-            throw {
-              message: 'IRONdb Error: ' + err.data.error,
-              data: err.data,
-              config: err.config,
-            };
-          } else if (err.statusText === 'Not Found') {
-            throw {
-              message: 'IRONdb Error: ' + err.statusText,
-              data: err.data,
-              config: err.config,
-            };
-          } else {
-            throw {
-              message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-              data: err.data,
-              config: err.config,
-            };
+      return this.backendSrv.datasourceRequest(options).then(
+        result => {
+          console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
+          var queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
+          return queryInterimResults;
+        },
+        function(err) {
+          console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
+          if (err.status !== 0 || err.status >= 300) {
+            if (err.data && err.data.error) {
+              throw {
+                message: 'IRONdb Error: ' + err.data.error,
+                data: err.data,
+                config: err.config,
+              };
+            } else if (err.statusText === 'Not Found') {
+              throw {
+                message: 'IRONdb Error: ' + err.statusText,
+                data: err.data,
+                config: err.config,
+              };
+            } else {
+              throw {
+                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                data: err.data,
+                config: err.config,
+              };
+            }
           }
         }
-      }
-    );
+      ).then(
+        result => {
+          console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
+          for (var i = 0; i < result['data'].length; i++) {
+            queryResults['data'].push(result['data'][i]);
+          }
+          console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+          return queryResults;
+        }
+      );
+      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+    }
+    return queryResults;
   }
 
   _buildIrondbParams(options) {
