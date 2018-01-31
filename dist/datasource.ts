@@ -36,8 +36,6 @@ export default class IrondbDatasource {
     var i;
     var irondbOptions = this._buildIrondbParams(options);
 
-    console.log(`irondbOptions (query): ${JSON.stringify(irondbOptions, null, 2)}`);
-
     if (_.isEmpty(irondbOptions)) {
       return this.$q.when({ data: [] });
     }
@@ -119,20 +117,23 @@ export default class IrondbDatasource {
   _irondbRequest(irondbOptions, isCaql = false) {
     console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     var headers = { "Content-Type": "application/json" };
-    var options: any = {
-      method: 'POST',
-      url: this.url,
-    };
+    var options: any = {};
+    var queries = [];
     var queryResults = {};
     queryResults['data'] = [];
 
+    if ('hosted' == this.irondbType) {
+      headers['X-Circonus-Auth-Token'] = this.apiToken;
+      headers['X-Circonus-App-Name'] = this.appName;
+    }
     if (irondbOptions['std']['names'].length) {
+      options = {};
+      options.url = this.url;
       if ('hosted' == this.irondbType) {
         options.url = options.url + '/irondb';
-        headers['X-Circonus-Auth-Token'] = this.apiToken;
-        headers['X-Circonus-App-Name'] = this.appName;
         options.url = options.url + '/graphite/series_multi';
       }
+      options.method = 'POST';
       if ('standalone' == this.irondbType) {
         options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
       }
@@ -145,80 +146,48 @@ export default class IrondbDatasource {
       if (this.basicAuth) {
         options.headers.Authorization = this.basicAuth;
       }
-      console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
-
-      return this.backendSrv.datasourceRequest(options).then(
-        result => {
-          var queryInterimResults = this._convertIrondbDataToGrafana(result.data);
-          return queryInterimResults;
-        },
-        function(err) {
-          console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
-          if (err.status !== 0 || err.status >= 300) {
-            if (err.data && err.data.error) {
-              throw {
-                message: 'IRONdb Error: ' + err.data.error,
-                data: err.data,
-                config: err.config,
-              };
-            } else if (err.statusText === 'Not Found') {
-              throw {
-                message: 'IRONdb Error: ' + err.statusText,
-                data: err.data,
-                config: err.config,
-              };
-            } else {
-              throw {
-                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-                data: err.data,
-                config: err.config,
-              };
-            }
-          }
-        }
-      ).then(
-        result => {
-          console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
-          for (var i = 0; i < result['data'].length; i++) {
-            queryResults['data'].push(result['data'][i]);
-          }
-          console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
-          return queryResults;
-        }
-      );
+      options.isCaql = false;
+      queries.push(options);
     }
     if (irondbOptions['caql']['names'].length) {
-      options.url = this.url;
-      if ('hosted' == this.irondbType) {
-        options.url = options.url + '/irondb';
-        headers['X-Circonus-Auth-Token'] = this.apiToken;
-        headers['X-Circonus-App-Name'] = this.appName;
+      for (var i = 0; i < irondbOptions['caql']['names'].length; i++) {
+        options = {};
+        options.url = this.url;
+        if ('hosted' == this.irondbType) {
+          options.url = options.url + '/irondb';
+        }
+        options.method = 'GET';
+        options.url = options.url + '/extension/lua';
+        if ('hosted' == this.irondbType) {
+          options.url = options.url + '/public';
+        }
+        options.url = options.url + '/caql_v1?start=' + irondbOptions['caql']['start'];
+        options.url = options.url + '&end=' + irondbOptions['caql']['end'];
+        options.url = options.url + '&period=60&q=' + irondbOptions['caql']['names'][i];
+        options.name = irondbOptions['caql']['names'][i];
+        options.headers = headers;
+        if (this.basicAuth || this.withCredentials) {
+          options.withCredentials = true;
+        }
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        options.isCaql = true;
+        queries.push(options);
       }
-      options.method = 'GET';
-      options.url = options.url + '/extension/lua';
-      if ('hosted' == this.irondbType) {
-        options.url = options.url + '/public';
-      }
-      options.url = options.url + '/caql_v1';
-      options.url = options.url + '?start=' + irondbOptions['caql']['start'];
-      options.url = options.url + '&end=' + irondbOptions['caql']['end'];
-      options.url = options.url + '&period=60';
-      options.url = options.url + '&q=' + irondbOptions['caql']['names'][0];
+    }
+    console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
-      options.data = irondbOptions['caql'];
-      options.headers = headers;
-      if (this.basicAuth || this.withCredentials) {
-        options.withCredentials = true;
-      }
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
-      }
-      console.log(`options (_irondbRequest): ${JSON.stringify(options, null, 2)}`);
-
-      return this.backendSrv.datasourceRequest(options).then(
+    return Promise.all(queries.map(query =>
+      this.backendSrv.datasourceRequest(query).then(
         result => {
-          console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
-          var queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, options['data']['names'][0]);
+          console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
+          var queryInterimResults;
+          if (query['isCaql']) {
+            queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
+          } else {
+            queryInterimResults = this._convertIrondbDataToGrafana(result.data);
+          }
           return queryInterimResults;
         },
         function(err) {
@@ -247,17 +216,19 @@ export default class IrondbDatasource {
         }
       ).then(
         result => {
-          console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
           for (var i = 0; i < result['data'].length; i++) {
             queryResults['data'].push(result['data'][i]);
           }
           console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
           return queryResults;
         }
-      );
-      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
-    }
-    return queryResults;
+      )
+    )).then(
+      result => {
+        console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+        return queryResults;
+      }
+    );
   }
 
   _buildIrondbParams(options) {
