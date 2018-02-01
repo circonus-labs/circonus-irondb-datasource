@@ -8,7 +8,7 @@
     <div class="gf-form">
       <span class="gf-form-label width-9">IRONdb Type</span>
       <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
-        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType' ></select>
+        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType' ng-change='ctrl.updateDefaultQueryPrefix()'></select>
         <info-popover mode="right-absolute">
           <p>This option determines whether a standalon or hosted IRONdb instance is the target of this datasource.</p>
           <p>Standalone = An IRONdb cluster accessible directly.</p>
@@ -30,5 +30,15 @@
       <info-popover mode="right-absolute">
           <p>The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "User Profile" section.</p>
       </info-popover>
+    </div>
+    <div class="gf-form">
+      <span class="gf-form-label width-9">Query Prefix</span>
+      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.queryPrefix' ng-init="ctrl.current.jsonData.queryPrefix"></input>
+      <info-popover mode="right-absolute">
+          <p>Prefix to be added to all queries sent to IRONdb.</p>
+          <p>For standalone installations, this defaults to "<strong>graphite.</strong>".</p>
+          <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
+      </info-popover>
+    </div>
   </div>
 </div>

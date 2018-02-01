@@ -8,6 +8,7 @@ export default class IrondbDatasource {
   type: string;
   accountId: number;
   irondbType: string;
+  queryPrefix: string;
   url: any;
   apiToken: string;
   appName: string;
@@ -23,6 +24,7 @@ export default class IrondbDatasource {
     this.id = instanceSettings.id;
     this.accountId = (instanceSettings.jsonData || {}).accountId;
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
+    this.queryPrefix = (instanceSettings.queryPrefix || {}).queryPrefix;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
@@ -55,7 +57,7 @@ export default class IrondbDatasource {
     }
     queryUrl = queryUrl + '/metrics/find?query=*';
     console.log(`queryUrl (metricFindQuery): ${JSON.stringify(queryUrl, null, 2)}`);
-    return this._irondbSimpleRequest('GET', queryUrl);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   testDatasource() {
@@ -84,19 +86,25 @@ export default class IrondbDatasource {
       });
   }
 
-  _irondbSimpleRequest(method, url, isCaql = false) {
+  _irondbSimpleRequest(method, url, isCaql = false, isFind = false) {
     var baseUrl = this.url;
     var headers = { "Content-Type": "application/json" };
 
     if ('hosted' == this.irondbType && !isCaql) {
-      baseUrl = baseUrl + '/irondb/graphite/series_multi';
+      baseUrl = baseUrl + '/irondb/graphite';
+      if (!isFind) {
+        baseUrl = baseUrl + '/series_multi';
+      }
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
     if ('standalone' == this.irondbType && !isCaql) {
-      baseUrl = baseUrl + '/graphite/' + this.accountId + '/graphite./series_multi';
+      baseUrl = baseUrl + '/graphite/' + this.accountId;
+      if (!isFind) {
+        baseUrl = baseUrl + '/graphite./series_multi';
+      }
     }
-    if (isCaql) {
+    if (isCaql && !isFind) {
       baseUrl = baseUrl + '/extension/lua/caql_v1';
     }
     console.log(`method (_irondbSimpleRequest): ${JSON.stringify(method, null, 2)}`);
@@ -184,6 +192,7 @@ export default class IrondbDatasource {
           console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
           var queryInterimResults;
           if (query['isCaql']) {
+            console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
             queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
           } else {
             queryInterimResults = this._convertIrondbDataToGrafana(result.data);
