@@ -18,7 +18,7 @@
       {"name": "Project site", "url": "https://www.circonus.com/irondb/"},
       {"name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE"}
     ],
-    "version": "0.5.6",
+    "version": "0.5.7",
     "updated": "2018-02-01"
   },
 

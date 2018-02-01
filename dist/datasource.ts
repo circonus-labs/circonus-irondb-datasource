@@ -24,7 +24,7 @@ export default class IrondbDatasource {
     this.id = instanceSettings.id;
     this.accountId = (instanceSettings.jsonData || {}).accountId;
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
-    this.queryPrefix = (instanceSettings.queryPrefix || {}).queryPrefix;
+    this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
@@ -101,7 +101,7 @@ export default class IrondbDatasource {
     if ('standalone' == this.irondbType && !isCaql) {
       baseUrl = baseUrl + '/graphite/' + this.accountId;
       if (!isFind) {
-        baseUrl = baseUrl + '/graphite./series_multi';
+        baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
       }
     }
     if (isCaql && !isFind) {
@@ -143,7 +143,7 @@ export default class IrondbDatasource {
       }
       options.method = 'POST';
       if ('standalone' == this.irondbType) {
-        options.url = options.url + '/graphite/' + this.accountId + '/graphite./series_multi';
+        options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
       }
 
       options.data = irondbOptions['std'];
@@ -267,7 +267,12 @@ export default class IrondbDatasource {
       if (target.isCaql) {
         cleanOptions['caql']['names'].push(target['query']);
       } else {
-        cleanOptions['std']['names'].push(target['query']);
+        if ('hosted' == this.irondbType) {
+          console.log(`adding queryPrefix (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
+          cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
+        } else {
+          cleanOptions['std']['names'].push(target['query']);
+        }
       }
     }
 
