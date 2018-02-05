@@ -36,15 +36,16 @@ export default class IrondbDatasource {
     console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
 
-    Promise.all([this._buildIrondbParams(options)]).then(
+    return Promise.all([this._buildIrondbParams(options)]).then(
       irondbOptions => {
-        console.log(`irondbOptions[0] (query): ${JSON.stringify(irondbOptions[0], null, 2)}`);
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        return this._irondbRequest(irondbOptions[0]);
+        var interimQueryResults = this._irondbRequest(irondbOptions[0]);
+        console.log(`interimQueryResults (query): ${JSON.stringify(interimQueryResults, null, 2)}`);
+        return interimQueryResults;
       }
-    );
+    ).then( result => result );
   }
 
   annotationQuery(options) {
@@ -117,7 +118,6 @@ export default class IrondbDatasource {
 
   _irondbRequest(irondbOptions, isCaql = false) {
     console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
-    console.log(`irondbOptions['std'] (_irondbRequest): ${JSON.stringify(irondbOptions['std'], null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
     var queries = [];
@@ -186,10 +186,10 @@ export default class IrondbDatasource {
           console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
           var queryInterimResults;
           if (query['isCaql']) {
-            console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
+            console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
             queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
           } else {
-            console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
+            console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
             queryInterimResults = this._convertIrondbDataToGrafana(result.data);
           }
           return queryInterimResults;
@@ -223,7 +223,6 @@ export default class IrondbDatasource {
           for (var i = 0; i < result['data'].length; i++) {
             queryResults['data'].push(result['data'][i]);
           }
-          console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
           return queryResults;
         }
       )
@@ -235,7 +234,7 @@ export default class IrondbDatasource {
     );
   }
 
-  _buildIrondbParamsInternal(options) {
+  _buildIrondbParamsAsync(options) {
     var cleanOptions = {};
     var intervalRegex = /'(\d+)m'/gi;
     var i, target;
@@ -314,7 +313,6 @@ export default class IrondbDatasource {
                 }
               }
             }
-            console.log(`cleanOptions (_buildIrondbParams): ${JSON.stringify(cleanOptions, null, 2)}`);
             return cleanOptions;
           }
         );
@@ -322,7 +320,6 @@ export default class IrondbDatasource {
       console.log(`promises (_buildIrondbParams): ${JSON.stringify(promises, null, 2)}`);
       return Promise.all(promises).then(
         result => {
-          console.log(`cleanOptions (_buildIrondbParams): ${JSON.stringify(cleanOptions, null, 2)}`);
           return cleanOptions;
         }
       ).catch(
@@ -358,7 +355,7 @@ export default class IrondbDatasource {
   _buildIrondbParams(options) {
     var self = this;
     return new Promise( function(resolve, reject) {
-      resolve(self._buildIrondbParamsInternal(options));
+      resolve(self._buildIrondbParamsAsync(options));
     });
   }
 

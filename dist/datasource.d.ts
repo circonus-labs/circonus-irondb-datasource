@@ -18,13 +18,13 @@ export default class IrondbDatasource {
     withCredentials: any;
     /** @ngInject */
     constructor(instanceSettings: any, $q: any, backendSrv: any, templateSrv: any);
-    query(options: any): void;
+    query(options: any): Promise<any>;
     annotationQuery(options: any): void;
     metricFindQuery(query: string): any;
     testDatasource(): any;
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean): any;
     _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
-    _buildIrondbParamsInternal(options: any): {};
+    _buildIrondbParamsAsync(options: any): {};
     _buildIrondbParams(options: any): Promise<{}>;
     _convertIrondbDataToGrafana(data: any): {
         data: any[];

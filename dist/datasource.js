@@ -30,13 +30,14 @@ System.register(['lodash'], function(exports_1) {
                     var _this = this;
                     console.log("options (query): " + JSON.stringify(options, null, 2));
                     var scopedVars = options.scopedVars;
-                    Promise.all([this._buildIrondbParams(options)]).then(function (irondbOptions) {
-                        console.log("irondbOptions[0] (query): " + JSON.stringify(irondbOptions[0], null, 2));
+                    return Promise.all([this._buildIrondbParams(options)]).then(function (irondbOptions) {
                         if (lodash_1.default.isEmpty(irondbOptions[0])) {
                             return _this.$q.when({ data: [] });
                         }
-                        return _this._irondbRequest(irondbOptions[0]);
-                    });
+                        var interimQueryResults = _this._irondbRequest(irondbOptions[0]);
+                        console.log("interimQueryResults (query): " + JSON.stringify(interimQueryResults, null, 2));
+                        return interimQueryResults;
+                    }).then(function (result) { return result; });
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
@@ -105,7 +106,6 @@ System.register(['lodash'], function(exports_1) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
-                    console.log("irondbOptions['std'] (_irondbRequest): " + JSON.stringify(irondbOptions['std'], null, 2));
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
                     var queries = [];
@@ -170,11 +170,11 @@ System.register(['lodash'], function(exports_1) {
                             console.log("query (_irondbRequest): " + JSON.stringify(query, null, 2));
                             var queryInterimResults;
                             if (query['isCaql']) {
-                                console.log("result.data (_irondbRequest): " + JSON.stringify(result.data, null, 2));
+                                console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
                                 queryInterimResults = _this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
                             }
                             else {
-                                console.log("result.data (_irondbRequest): " + JSON.stringify(result.data, null, 2));
+                                console.log("result (_irondbRequest): " + JSON.stringify(result, null, 2));
                                 queryInterimResults = _this._convertIrondbDataToGrafana(result.data);
                             }
                             return queryInterimResults;
@@ -207,7 +207,6 @@ System.register(['lodash'], function(exports_1) {
                             for (var i = 0; i < result['data'].length; i++) {
                                 queryResults['data'].push(result['data'][i]);
                             }
-                            console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
                             return queryResults;
                         });
                     })).then(function (result) {
@@ -215,7 +214,7 @@ System.register(['lodash'], function(exports_1) {
                         return queryResults;
                     });
                 };
-                IrondbDatasource.prototype._buildIrondbParamsInternal = function (options) {
+                IrondbDatasource.prototype._buildIrondbParamsAsync = function (options) {
                     var _this = this;
                     var cleanOptions = {};
                     var intervalRegex = /'(\d+)m'/gi;
@@ -293,13 +292,11 @@ System.register(['lodash'], function(exports_1) {
                                         }
                                     }
                                 }
-                                console.log("cleanOptions (_buildIrondbParams): " + JSON.stringify(cleanOptions, null, 2));
                                 return cleanOptions;
                             });
                         });
                         console.log("promises (_buildIrondbParams): " + JSON.stringify(promises, null, 2));
                         return Promise.all(promises).then(function (result) {
-                            console.log("cleanOptions (_buildIrondbParams): " + JSON.stringify(cleanOptions, null, 2));
                             return cleanOptions;
                         }).catch(function (err) {
                             console.log("err (_buildIrondbParams): " + JSON.stringify(err, null, 2));
@@ -333,7 +330,7 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype._buildIrondbParams = function (options) {
                     var self = this;
                     return new Promise(function (resolve, reject) {
-                        resolve(self._buildIrondbParamsInternal(options));
+                        resolve(self._buildIrondbParamsAsync(options));
                     });
                 };
                 IrondbDatasource.prototype._convertIrondbDataToGrafana = function (data) {
