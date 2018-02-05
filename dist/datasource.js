@@ -27,26 +27,23 @@ System.register(['lodash'], function(exports_1) {
                     this.appName = 'Grafana';
                 }
                 IrondbDatasource.prototype.query = function (options) {
+                    var _this = this;
                     console.log("options (query): " + JSON.stringify(options, null, 2));
                     var scopedVars = options.scopedVars;
-                    var i;
-                    var irondbOptions = this._buildIrondbParams(options);
-                    if (lodash_1.default.isEmpty(irondbOptions)) {
-                        return this.$q.when({ data: [] });
-                    }
-                    return this._irondbRequest(irondbOptions);
+                    Promise.all([this._buildIrondbParams(options)]).then(function (irondbOptions) {
+                        console.log("irondbOptions[0] (query): " + JSON.stringify(irondbOptions[0], null, 2));
+                        if (lodash_1.default.isEmpty(irondbOptions[0])) {
+                            return _this.$q.when({ data: [] });
+                        }
+                        return _this._irondbRequest(irondbOptions[0]);
+                    });
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query) {
-                    var queryUrl = '';
-                    console.log("query (metricFindQuery): " + JSON.stringify(query, null, 2));
-                    if ('*' !== query) {
-                        queryUrl = queryUrl + '/' + query.replace(/\*$/, '');
-                    }
-                    queryUrl = queryUrl + '/metrics/find?query=*';
-                    console.log("queryUrl (metricFindQuery): " + JSON.stringify(queryUrl, null, 2));
+                    var queryUrl = '/' + this.queryPrefix;
+                    queryUrl = queryUrl + '/metrics/find?query=' + query;
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
@@ -96,10 +93,6 @@ System.register(['lodash'], function(exports_1) {
                     if (isCaql && !isFind) {
                         baseUrl = baseUrl + '/extension/lua/caql_v1';
                     }
-                    console.log("method (_irondbSimpleRequest): " + JSON.stringify(method, null, 2));
-                    console.log("passed url (_irondbSimpleRequest): " + JSON.stringify(url, null, 2));
-                    console.log("url (_irondbSimpleRequest): " + JSON.stringify(this.url, null, 2));
-                    console.log("baseUrl (_irondbSimpleRequest): " + JSON.stringify(baseUrl, null, 2));
                     console.log("fullUrl (_irondbSimpleRequest): " + JSON.stringify(baseUrl + url, null, 2));
                     var options = {
                         method: method,
@@ -112,6 +105,7 @@ System.register(['lodash'], function(exports_1) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
                     console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
+                    console.log("irondbOptions['std'] (_irondbRequest): " + JSON.stringify(irondbOptions['std'], null, 2));
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
                     var queries = [];
@@ -180,6 +174,7 @@ System.register(['lodash'], function(exports_1) {
                                 queryInterimResults = _this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
                             }
                             else {
+                                console.log("result.data (_irondbRequest): " + JSON.stringify(result.data, null, 2));
                                 queryInterimResults = _this._convertIrondbDataToGrafana(result.data);
                             }
                             return queryInterimResults;
@@ -220,13 +215,15 @@ System.register(['lodash'], function(exports_1) {
                         return queryResults;
                     });
                 };
-                IrondbDatasource.prototype._buildIrondbParams = function (options) {
+                IrondbDatasource.prototype._buildIrondbParamsInternal = function (options) {
+                    var _this = this;
                     var cleanOptions = {};
                     var intervalRegex = /'(\d+)m'/gi;
                     var i, target;
                     var hasTargets = false;
                     var start = (new Date(options.range.from)).getTime() / 1000;
                     var end = (new Date(options.range.to)).getTime() / 1000;
+                    var hasWildcards = false;
                     cleanOptions['std'] = {};
                     cleanOptions['std']['start'] = start;
                     cleanOptions['std']['end'] = end;
@@ -241,25 +238,103 @@ System.register(['lodash'], function(exports_1) {
                             continue;
                         }
                         hasTargets = true;
-                        if (target.isCaql) {
-                            cleanOptions['caql']['names'].push(target['query']);
-                        }
-                        else {
-                            if ('hosted' == this.irondbType) {
-                                console.log("adding queryPrefix (_irondbRequest): " + JSON.stringify(target['query'], null, 2));
-                                cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
-                            }
-                            else {
-                                cleanOptions['std']['names'].push(target['query']);
-                            }
+                        if (!target['isCaql'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
+                            hasWildcards = true;
                         }
                     }
                     if (!hasTargets) {
-                        return [];
+                        return {};
                     }
-                    else {
+                    if (!hasWildcards) {
+                        for (i = 0; i < options.targets.length; i++) {
+                            target = options.targets[i];
+                            if (target.hide) {
+                                continue;
+                            }
+                            if (target.isCaql) {
+                                cleanOptions['caql']['names'].push(target['query']);
+                            }
+                            else {
+                                console.log("target['query'] (_irondbRequest): " + JSON.stringify(target['query'], null, 2));
+                                if ('hosted' == this.irondbType) {
+                                    console.log("adding queryPrefix (_irondbRequest): " + JSON.stringify(target['query'], null, 2));
+                                    cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
+                                }
+                                else {
+                                    cleanOptions['std']['names'].push(target['query']);
+                                }
+                            }
+                        }
                         return cleanOptions;
                     }
+                    else {
+                        var promises = options.targets.map(function (target) {
+                            console.log("target (_buildIrondbParams): " + JSON.stringify(target, null, 2));
+                            return _this.metricFindQuery(target['query']).then(function (result) {
+                                console.log("result (_buildIrondbParams): " + JSON.stringify(result, null, 2));
+                                for (var i = 0; i < result.data.length; i++) {
+                                    result.data[i]['target'] = target;
+                                }
+                                return result.data;
+                            }).then(function (result) {
+                                for (var i = 0; i < result.length; i++) {
+                                    if (result[i]['target'].hide) {
+                                        continue;
+                                    }
+                                    if (target.isCaql) {
+                                        cleanOptions['caql']['names'].push(result[i]['name']);
+                                    }
+                                    else {
+                                        if ('hosted' == _this.irondbType) {
+                                            cleanOptions['std']['names'].push(_this.queryPrefix + result[i]['name']);
+                                        }
+                                        else {
+                                            cleanOptions['std']['names'].push(result[i]['name']);
+                                        }
+                                    }
+                                }
+                                console.log("cleanOptions (_buildIrondbParams): " + JSON.stringify(cleanOptions, null, 2));
+                                return cleanOptions;
+                            });
+                        });
+                        console.log("promises (_buildIrondbParams): " + JSON.stringify(promises, null, 2));
+                        return Promise.all(promises).then(function (result) {
+                            console.log("cleanOptions (_buildIrondbParams): " + JSON.stringify(cleanOptions, null, 2));
+                            return cleanOptions;
+                        }).catch(function (err) {
+                            console.log("err (_buildIrondbParams): " + JSON.stringify(err, null, 2));
+                            if (err.status !== 0 || err.status >= 300) {
+                                if (err.data && err.data.error) {
+                                    throw {
+                                        message: 'IRONdb Error: ' + err.data.error,
+                                        data: err.data,
+                                        config: err.config,
+                                    };
+                                }
+                                else if (err.statusText === 'Not Found') {
+                                    throw {
+                                        message: 'IRONdb Error: ' + err.statusText,
+                                        data: err.data,
+                                        config: err.config,
+                                    };
+                                }
+                                else {
+                                    throw {
+                                        message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                                        data: err.data,
+                                        config: err.config,
+                                    };
+                                }
+                            }
+                        });
+                        return cleanOptions;
+                    }
+                };
+                IrondbDatasource.prototype._buildIrondbParams = function (options) {
+                    var self = this;
+                    return new Promise(function (resolve, reject) {
+                        resolve(self._buildIrondbParamsInternal(options));
+                    });
                 };
                 IrondbDatasource.prototype._convertIrondbDataToGrafana = function (data) {
                     var cleanData = [];

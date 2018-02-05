@@ -35,14 +35,16 @@ export default class IrondbDatasource {
   query(options) {
     console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
-    var i;
-    var irondbOptions = this._buildIrondbParams(options);
 
-    if (_.isEmpty(irondbOptions)) {
-      return this.$q.when({ data: [] });
-    }
-
-    return this._irondbRequest(irondbOptions);
+    Promise.all([this._buildIrondbParams(options)]).then(
+      irondbOptions => {
+        console.log(`irondbOptions[0] (query): ${JSON.stringify(irondbOptions[0], null, 2)}`);
+        if (_.isEmpty(irondbOptions[0])) {
+          return this.$q.when({ data: [] });
+        }
+        return this._irondbRequest(irondbOptions[0]);
+      }
+    );
   }
 
   annotationQuery(options) {
@@ -50,13 +52,8 @@ export default class IrondbDatasource {
   }
 
   metricFindQuery(query: string) {
-    var queryUrl = '';
-    console.log(`query (metricFindQuery): ${JSON.stringify(query, null, 2)}`);
-    if('*' !== query) {
-      queryUrl = queryUrl + '/' + query.replace(/\*$/, '');
-    }
-    queryUrl = queryUrl + '/metrics/find?query=*';
-    console.log(`queryUrl (metricFindQuery): ${JSON.stringify(queryUrl, null, 2)}`);
+    var queryUrl = '/' + this.queryPrefix;
+    queryUrl = queryUrl + '/metrics/find?query=' + query;
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
@@ -107,10 +104,6 @@ export default class IrondbDatasource {
     if (isCaql && !isFind) {
       baseUrl = baseUrl + '/extension/lua/caql_v1';
     }
-    console.log(`method (_irondbSimpleRequest): ${JSON.stringify(method, null, 2)}`);
-    console.log(`passed url (_irondbSimpleRequest): ${JSON.stringify(url, null, 2)}`);
-    console.log(`url (_irondbSimpleRequest): ${JSON.stringify(this.url, null, 2)}`);
-    console.log(`baseUrl (_irondbSimpleRequest): ${JSON.stringify(baseUrl, null, 2)}`);
     console.log(`fullUrl (_irondbSimpleRequest): ${JSON.stringify(baseUrl+url, null, 2)}`);
 
     var options: any = {
@@ -124,6 +117,7 @@ export default class IrondbDatasource {
 
   _irondbRequest(irondbOptions, isCaql = false) {
     console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+    console.log(`irondbOptions['std'] (_irondbRequest): ${JSON.stringify(irondbOptions['std'], null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
     var queries = [];
@@ -195,6 +189,7 @@ export default class IrondbDatasource {
             console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
             queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
           } else {
+            console.log(`result.data (_irondbRequest): ${JSON.stringify(result.data, null, 2)}`);
             queryInterimResults = this._convertIrondbDataToGrafana(result.data);
           }
           return queryInterimResults;
@@ -240,13 +235,14 @@ export default class IrondbDatasource {
     );
   }
 
-  _buildIrondbParams(options) {
+  _buildIrondbParamsInternal(options) {
     var cleanOptions = {};
     var intervalRegex = /'(\d+)m'/gi;
     var i, target;
     var hasTargets = false;
     var start = (new Date(options.range.from)).getTime() / 1000;
     var end = (new Date(options.range.to)).getTime() / 1000;
+    var hasWildcards = false;
 
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
@@ -262,25 +258,108 @@ export default class IrondbDatasource {
       if (target.hide) {
         continue;
       }
-
       hasTargets = true;
-      if (target.isCaql) {
-        cleanOptions['caql']['names'].push(target['query']);
-      } else {
-        if ('hosted' == this.irondbType) {
-          console.log(`adding queryPrefix (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
-          cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
-        } else {
-          cleanOptions['std']['names'].push(target['query']);
-        }
+      if ( !target['isCaql'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
+        hasWildcards = true;
       }
     }
 
     if (!hasTargets) {
-      return [];
+      return {};
+    }
+
+    if (!hasWildcards) {
+      for (i = 0; i < options.targets.length; i++) {
+        target = options.targets[i];
+        if (target.hide) {
+          continue;
+        }
+        if (target.isCaql) {
+          cleanOptions['caql']['names'].push(target['query']);
+        } else {
+          console.log(`target['query'] (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
+          if ('hosted' == this.irondbType) {
+            console.log(`adding queryPrefix (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
+            cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
+          } else {
+            cleanOptions['std']['names'].push(target['query']);
+          }
+        }
+      }
+      return cleanOptions;
     } else {
+      var promises = options.targets.map(target => {
+        console.log(`target (_buildIrondbParams): ${JSON.stringify(target, null, 2)}`);
+        return this.metricFindQuery(target['query']).then(
+          result => {
+            console.log(`result (_buildIrondbParams): ${JSON.stringify(result, null, 2)}`);
+            for (var i = 0; i < result.data.length; i++) {
+              result.data[i]['target'] = target;
+            }
+            return result.data;
+          }
+        ).then(
+          result => {
+            for (var i = 0; i < result.length; i++) {
+              if (result[i]['target'].hide) {
+                continue;
+              }
+              if (target.isCaql) {
+                cleanOptions['caql']['names'].push(result[i]['name']);
+              } else {
+                if ('hosted' == this.irondbType) {
+                  cleanOptions['std']['names'].push(this.queryPrefix + result[i]['name']);
+                } else {
+                  cleanOptions['std']['names'].push(result[i]['name']);
+                }
+              }
+            }
+            console.log(`cleanOptions (_buildIrondbParams): ${JSON.stringify(cleanOptions, null, 2)}`);
+            return cleanOptions;
+          }
+        );
+      });
+      console.log(`promises (_buildIrondbParams): ${JSON.stringify(promises, null, 2)}`);
+      return Promise.all(promises).then(
+        result => {
+          console.log(`cleanOptions (_buildIrondbParams): ${JSON.stringify(cleanOptions, null, 2)}`);
+          return cleanOptions;
+        }
+      ).catch(
+        function(err) {
+          console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
+          if (err.status !== 0 || err.status >= 300) {
+            if (err.data && err.data.error) {
+              throw {
+                message: 'IRONdb Error: ' + err.data.error,
+                data: err.data,
+                config: err.config,
+              };
+            } else if (err.statusText === 'Not Found') {
+              throw {
+                message: 'IRONdb Error: ' + err.statusText,
+                data: err.data,
+                config: err.config,
+              };
+            } else {
+              throw {
+                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                data: err.data,
+                config: err.config,
+              };
+            }
+          }
+        }
+      );
       return cleanOptions;
     }
+  }
+
+  _buildIrondbParams(options) {
+    var self = this;
+    return new Promise( function(resolve, reject) {
+      resolve(self._buildIrondbParamsInternal(options));
+    });
   }
 
   _convertIrondbDataToGrafana(data) {
