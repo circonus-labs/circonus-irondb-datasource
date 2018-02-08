@@ -41,9 +41,7 @@ export default class IrondbDatasource {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        var interimQueryResults = this._irondbRequest(irondbOptions[0]);
-        console.log(`interimQueryResults (query): ${JSON.stringify(interimQueryResults, null, 2)}`);
-        return interimQueryResults;
+        return this._irondbRequest(irondbOptions[0]);
       }
     ).then( result => result );
   }
@@ -105,7 +103,6 @@ export default class IrondbDatasource {
     if (isCaql && !isFind) {
       baseUrl = baseUrl + '/extension/lua/caql_v1';
     }
-    console.log(`fullUrl (_irondbSimpleRequest): ${JSON.stringify(baseUrl+url, null, 2)}`);
 
     var options: any = {
       method: method,
@@ -186,10 +183,8 @@ export default class IrondbDatasource {
           console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
           var queryInterimResults;
           if (query['isCaql']) {
-            console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
             queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
           } else {
-            console.log(`result (_irondbRequest): ${JSON.stringify(result, null, 2)}`);
             queryInterimResults = this._convertIrondbDataToGrafana(result.data);
           }
           return queryInterimResults;
@@ -278,7 +273,6 @@ export default class IrondbDatasource {
         } else {
           console.log(`target['query'] (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
           if ('hosted' == this.irondbType) {
-            console.log(`adding queryPrefix (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
             cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
           } else {
             cleanOptions['std']['names'].push(target['query']);
@@ -288,10 +282,8 @@ export default class IrondbDatasource {
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
-        console.log(`target (_buildIrondbParams): ${JSON.stringify(target, null, 2)}`);
         return this.metricFindQuery(target['query']).then(
           result => {
-            console.log(`result (_buildIrondbParams): ${JSON.stringify(result, null, 2)}`);
             for (var i = 0; i < result.data.length; i++) {
               result.data[i]['target'] = target;
             }
@@ -317,7 +309,7 @@ export default class IrondbDatasource {
           }
         );
       });
-      console.log(`promises (_buildIrondbParams): ${JSON.stringify(promises, null, 2)}`);
+
       return Promise.all(promises).then(
         result => {
           return cleanOptions;
