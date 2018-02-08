@@ -18,7 +18,7 @@ export default class IrondbDatasource {
     withCredentials: any;
     /** @ngInject */
     constructor(instanceSettings: any, $q: any, backendSrv: any, templateSrv: any);
-    query(options: any): Promise<any>;
+    query(options: any): any;
     annotationQuery(options: any): void;
     metricFindQuery(query: string): any;
     testDatasource(): any;

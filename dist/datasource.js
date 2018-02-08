@@ -30,6 +30,9 @@ System.register(['lodash'], function(exports_1) {
                     var _this = this;
                     console.log("options (query): " + JSON.stringify(options, null, 2));
                     var scopedVars = options.scopedVars;
+                    if (lodash_1.default.isEmpty(options['targets'][0])) {
+                        return this.$q.when({ data: [] });
+                    }
                     return Promise.all([this._buildIrondbParams(options)]).then(function (irondbOptions) {
                         if (lodash_1.default.isEmpty(irondbOptions[0])) {
                             return _this.$q.when({ data: [] });
@@ -232,6 +235,7 @@ System.register(['lodash'], function(exports_1) {
                             continue;
                         }
                         hasTargets = true;
+                        console.log("target (_irondbRequest): " + JSON.stringify(target, null, 2));
                         if (!target['isCaql'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
                             hasWildcards = true;
                         }

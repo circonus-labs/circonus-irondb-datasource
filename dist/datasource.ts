@@ -36,6 +36,10 @@ export default class IrondbDatasource {
     console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
 
+    if (_.isEmpty(options['targets'][0])) {
+      return this.$q.when({ data: [] });
+    }
+
     return Promise.all([this._buildIrondbParams(options)]).then(
       irondbOptions => {
         if (_.isEmpty(irondbOptions[0])) {
@@ -253,6 +257,7 @@ export default class IrondbDatasource {
         continue;
       }
       hasTargets = true;
+          console.log(`target (_irondbRequest): ${JSON.stringify(target, null, 2)}`);
       if ( !target['isCaql'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
         hasWildcards = true;
       }
