@@ -172,7 +172,8 @@ export default class IrondbDatasource {
         }
         options.url = options.url + '/caql_v1?start=' + irondbOptions['caql']['start'];
         options.url = options.url + '&end=' + irondbOptions['caql']['end'];
-        options.url = options.url + '&period=60&q=' + irondbOptions['caql']['names'][i];
+        options.url = options.url + '&period=' + irondbOptions['caql']['interval'];
+        options.url = options.url + '&q=' + irondbOptions['caql']['names'][i];
         options.name = irondbOptions['caql']['names'][i];
         options.headers = headers;
         if (this.basicAuth || this.withCredentials) {
@@ -252,10 +253,12 @@ export default class IrondbDatasource {
     cleanOptions['std']['start'] = start;
     cleanOptions['std']['end'] = end;
     cleanOptions['std']['names'] = [];
+    cleanOptions['std']['interval'] = options.intervalMs / 1000;
     cleanOptions['caql'] = {};
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
     cleanOptions['caql']['names'] = [];
+    cleanOptions['caql']['interval'] = options.intervalMs / 1000;
 
     for (i = 0; i < options.targets.length; i++) {
       target = options.targets[i];
