@@ -38,7 +38,13 @@ System.register(['lodash'], function(exports_1) {
                             return _this.$q.when({ data: [] });
                         }
                         return _this._irondbRequest(irondbOptions[0]);
-                    }).then(function (result) { return result; });
+                    }).then(function (queryResults) {
+                        queryResults['data'].sort(function (a, b) {
+                            return a['target'].localeCompare(b['target']);
+                        });
+                        console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
+                        return queryResults;
+                    });
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");

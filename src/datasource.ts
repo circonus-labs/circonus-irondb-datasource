@@ -47,7 +47,13 @@ export default class IrondbDatasource {
         }
         return this._irondbRequest(irondbOptions[0]);
       }
-    ).then( result => result );
+    ).then( queryResults => {
+        queryResults['data'].sort( (a, b): number => {
+          return a['target'].localeCompare(b['target']);
+        });
+        console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+        return queryResults;
+    });
   }
 
   annotationQuery(options) {
