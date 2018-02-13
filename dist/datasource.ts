@@ -40,19 +40,40 @@ export default class IrondbDatasource {
       return this.$q.when({ data: [] });
     }
 
-    return Promise.all([this._buildIrondbParams(options)]).then(
-      irondbOptions => {
-        if (_.isEmpty(irondbOptions[0])) {
-          return this.$q.when({ data: [] });
-        }
-        return this._irondbRequest(irondbOptions[0]);
+    return Promise.all([this._buildIrondbParams(options)]).then( irondbOptions => {
+      if (_.isEmpty(irondbOptions[0])) {
+        return this.$q.when({ data: [] });
       }
-    ).then( queryResults => {
-        queryResults['data'].sort( (a, b): number => {
-          return a['target'].localeCompare(b['target']);
-        });
-        console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
-        return queryResults;
+      return this._irondbRequest(irondbOptions[0]);
+    }).then( queryResults => {
+      queryResults['data'].sort( (a, b): number => {
+        return a['target'].localeCompare(b['target']);
+      });
+      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+      return queryResults;
+    }).catch( err => {
+      console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
+      if (err.status !== 0 || err.status >= 300) {
+        if (err.data && err.data.error) {
+          throw {
+            message: 'IRONdb Error: ' + err.data.error,
+            data: err.data,
+            config: err.config,
+          };
+        } else if (err.statusText === 'Not Found') {
+          throw {
+            message: 'IRONdb Error: ' + err.statusText,
+            data: err.data,
+            config: err.config,
+          };
+        } else {
+          throw {
+            message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+            data: err.data,
+            config: err.config,
+          };
+        }
+      }
     });
   }
 
@@ -67,29 +88,27 @@ export default class IrondbDatasource {
   }
 
   testDatasource() {
-    return this.metricFindQuery('*')
-      .then(res => {
-        let error = _.get(res, 'results[0].error');
-        if(error) {
-          return {
-            status: 'error',
-            message: error,
-            title: 'Error'
-          }
-        }
-        return {
-          status: 'success',
-          message: 'Data source is working',
-          title: 'Success'
-        };
-      })
-      .catch(err => {
+    return this.metricFindQuery('*').then( res => {
+      let error = _.get(res, 'results[0].error');
+      if (error) {
         return {
           status: 'error',
-          message: err.message,
+          message: error,
           title: 'Error'
-        };
-      });
+        }
+      }
+      return {
+        status: 'success',
+        message: 'Data source is working',
+        title: 'Success'
+      };
+    }).catch( err => {
+      return {
+        status: 'error',
+        message: err.message,
+        title: 'Error'
+      };
+    });
   }
 
   _irondbSimpleRequest(method, url, isCaql = false, isFind = false) {
@@ -189,55 +208,48 @@ export default class IrondbDatasource {
     console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
     return Promise.all(queries.map(query =>
-      this.backendSrv.datasourceRequest(query).then(
-        result => {
-          console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
-          var queryInterimResults;
-          if (query['isCaql']) {
-            queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
-          } else {
-            queryInterimResults = this._convertIrondbDataToGrafana(result.data);
-          }
-          return queryInterimResults;
-        },
-        function(err) {
-          console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
-          if (err.status !== 0 || err.status >= 300) {
-            if (err.data && err.data.error) {
-              throw {
-                message: 'IRONdb Error: ' + err.data.error,
-                data: err.data,
-                config: err.config,
-              };
-            } else if (err.statusText === 'Not Found') {
-              throw {
-                message: 'IRONdb Error: ' + err.statusText,
-                data: err.data,
-                config: err.config,
-              };
-            } else {
-              throw {
-                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-                data: err.data,
-                config: err.config,
-              };
-            }
-          }
+      this.backendSrv.datasourceRequest(query).then( result => {
+        console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
+        var queryInterimResults;
+        if (query['isCaql']) {
+          queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
+        } else {
+          queryInterimResults = this._convertIrondbDataToGrafana(result.data);
         }
-      ).then(
-        result => {
-          for (var i = 0; i < result['data'].length; i++) {
-            queryResults['data'].push(result['data'][i]);
-          }
-          return queryResults;
+        return queryInterimResults;
+      }).then( result => {
+        for (var i = 0; i < result['data'].length; i++) {
+          queryResults['data'].push(result['data'][i]);
         }
-      )
-    )).then(
-      result => {
-        console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
         return queryResults;
+      })
+    )).then( result => {
+      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+      return queryResults;
+    }).catch( err => {
+      console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
+      if (err.status !== 0 || err.status >= 300) {
+        if (err.data && err.data.error) {
+          throw {
+            message: 'IRONdb Error: ' + err.data.error,
+            data: err.data,
+            config: err.config,
+          };
+        } else if (err.statusText === 'Not Found') {
+          throw {
+            message: 'IRONdb Error: ' + err.statusText,
+            data: err.data,
+            config: err.config,
+          };
+        } else {
+          throw {
+            message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+            data: err.data,
+            config: err.config,
+          };
+        }
       }
-    );
+    });
   }
 
   _buildIrondbParamsAsync(options) {
@@ -296,64 +308,56 @@ export default class IrondbDatasource {
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
-        return this.metricFindQuery(target['query']).then(
-          result => {
-            for (var i = 0; i < result.data.length; i++) {
-              result.data[i]['target'] = target;
-            }
-            return result.data;
+        return this.metricFindQuery(target['query']).then( result => {
+          for (var i = 0; i < result.data.length; i++) {
+            result.data[i]['target'] = target;
           }
-        ).then(
-          result => {
-            for (var i = 0; i < result.length; i++) {
-              if (result[i]['target'].hide) {
-                continue;
-              }
-              if (target.isCaql) {
-                cleanOptions['caql']['names'].push(result[i]['name']);
+          return result.data;
+        }).then( result => {
+          for (var i = 0; i < result.length; i++) {
+            if (result[i]['target'].hide) {
+              continue;
+            }
+            if (target.isCaql) {
+              cleanOptions['caql']['names'].push(result[i]['name']);
+            } else {
+              if ('hosted' == this.irondbType) {
+                cleanOptions['std']['names'].push(this.queryPrefix + result[i]['name']);
               } else {
-                if ('hosted' == this.irondbType) {
-                  cleanOptions['std']['names'].push(this.queryPrefix + result[i]['name']);
-                } else {
-                  cleanOptions['std']['names'].push(result[i]['name']);
-                }
+                cleanOptions['std']['names'].push(result[i]['name']);
               }
             }
-            return cleanOptions;
           }
-        );
+          return cleanOptions;
+        });
       });
 
-      return Promise.all(promises).then(
-        result => {
-          return cleanOptions;
-        }
-      ).catch(
-        function(err) {
-          console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
-          if (err.status !== 0 || err.status >= 300) {
-            if (err.data && err.data.error) {
-              throw {
-                message: 'IRONdb Error: ' + err.data.error,
-                data: err.data,
-                config: err.config,
-              };
-            } else if (err.statusText === 'Not Found') {
-              throw {
-                message: 'IRONdb Error: ' + err.statusText,
-                data: err.data,
-                config: err.config,
-              };
-            } else {
-              throw {
-                message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-                data: err.data,
-                config: err.config,
-              };
-            }
+      return Promise.all(promises).then( result => {
+        return cleanOptions;
+      }).catch( err => {
+        console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
+        if (err.status !== 0 || err.status >= 300) {
+          if (err.data && err.data.error) {
+            throw {
+              message: 'IRONdb Error: ' + err.data.error,
+              data: err.data,
+              config: err.config,
+            };
+          } else if (err.statusText === 'Not Found') {
+            throw {
+              message: 'IRONdb Error: ' + err.statusText,
+              data: err.data,
+              config: err.config,
+            };
+          } else {
+            throw {
+              message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+              data: err.data,
+              config: err.config,
+            };
           }
         }
-      );
+      });
       return cleanOptions;
     }
   }

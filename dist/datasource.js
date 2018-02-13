@@ -44,6 +44,31 @@ System.register(['lodash'], function(exports_1) {
                         });
                         console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
                         return queryResults;
+                    }).catch(function (err) {
+                        console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
+                        if (err.status !== 0 || err.status >= 300) {
+                            if (err.data && err.data.error) {
+                                throw {
+                                    message: 'IRONdb Error: ' + err.data.error,
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                            else if (err.statusText === 'Not Found') {
+                                throw {
+                                    message: 'IRONdb Error: ' + err.statusText,
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                            else {
+                                throw {
+                                    message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                        }
                     });
                 };
                 IrondbDatasource.prototype.annotationQuery = function (options) {
@@ -55,8 +80,7 @@ System.register(['lodash'], function(exports_1) {
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
-                    return this.metricFindQuery('*')
-                        .then(function (res) {
+                    return this.metricFindQuery('*').then(function (res) {
                         var error = lodash_1.default.get(res, 'results[0].error');
                         if (error) {
                             return {
@@ -70,8 +94,7 @@ System.register(['lodash'], function(exports_1) {
                             message: 'Data source is working',
                             title: 'Success'
                         };
-                    })
-                        .catch(function (err) {
+                    }).catch(function (err) {
                         return {
                             status: 'error',
                             message: err.message,
@@ -183,31 +206,6 @@ System.register(['lodash'], function(exports_1) {
                                 queryInterimResults = _this._convertIrondbDataToGrafana(result.data);
                             }
                             return queryInterimResults;
-                        }, function (err) {
-                            console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
-                            if (err.status !== 0 || err.status >= 300) {
-                                if (err.data && err.data.error) {
-                                    throw {
-                                        message: 'IRONdb Error: ' + err.data.error,
-                                        data: err.data,
-                                        config: err.config,
-                                    };
-                                }
-                                else if (err.statusText === 'Not Found') {
-                                    throw {
-                                        message: 'IRONdb Error: ' + err.statusText,
-                                        data: err.data,
-                                        config: err.config,
-                                    };
-                                }
-                                else {
-                                    throw {
-                                        message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-                                        data: err.data,
-                                        config: err.config,
-                                    };
-                                }
-                            }
                         }).then(function (result) {
                             for (var i = 0; i < result['data'].length; i++) {
                                 queryResults['data'].push(result['data'][i]);
@@ -217,6 +215,31 @@ System.register(['lodash'], function(exports_1) {
                     })).then(function (result) {
                         console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
                         return queryResults;
+                    }).catch(function (err) {
+                        console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
+                        if (err.status !== 0 || err.status >= 300) {
+                            if (err.data && err.data.error) {
+                                throw {
+                                    message: 'IRONdb Error: ' + err.data.error,
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                            else if (err.statusText === 'Not Found') {
+                                throw {
+                                    message: 'IRONdb Error: ' + err.statusText,
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                            else {
+                                throw {
+                                    message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+                                    data: err.data,
+                                    config: err.config,
+                                };
+                            }
+                        }
                     });
                 };
                 IrondbDatasource.prototype._buildIrondbParamsAsync = function (options) {
