@@ -11,15 +11,15 @@
     },
     "keywords": ["circonus", "irondb", "time series"],
     "logos": {
-      "small": "img/irondb-logo.png",
-      "large": "img/irondb-logo.png"
+      "small": "img/irondb-logo.svg",
+      "large": "img/irondb-logo.svg"
     },
     "links": [
       {"name": "Project site", "url": "https://www.circonus.com/irondb/"},
       {"name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE"}
     ],
-    "version": "0.7.0",
-    "updated": "2018-02-14"
+    "version": "0.7.1",
+    "updated": "2018-02-16"
   },
 
   "dependencies": {
