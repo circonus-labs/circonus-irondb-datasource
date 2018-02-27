@@ -10,7 +10,7 @@
       <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
         <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType' ng-change='ctrl.updateDefaultQueryPrefix()'></select>
         <info-popover mode="right-absolute">
-          <p>This option determines whether a standalon or hosted IRONdb instance is the target of this datasource.</p>
+          <p>This option determines whether a standalone or hosted IRONdb instance is the target of this datasource.</p>
           <p>Standalone = An IRONdb cluster accessible directly.</p>
           <p>Hosted = An IRONdb instance hosted by Circonus, requires entry of API tokens.</p>
         </info-popover>
