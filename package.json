@@ -1,6 +1,6 @@
 {
   "name": "circonus-irondb-datasource",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "IRONdb Data Source for Grafana.",
   "scripts": {
     "build": "grunt",

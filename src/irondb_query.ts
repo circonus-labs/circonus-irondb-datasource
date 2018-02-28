@@ -21,7 +21,7 @@ export default class IrondbQuery {
     this.segments = [];
     this.error = null;
 
-console.log(`this.target (parseTarget): ${JSON.stringify(this.target, null, 2)}`);
+//console.log(`this.target (parseTarget): ${JSON.stringify(this.target, null, 2)}`);
 
     if (this.target.rawQuery) {
       return;
@@ -53,13 +53,13 @@ console.log(`this.target (parseTarget): ${JSON.stringify(this.target, null, 2)}`
 
   getSegmentPathUpTo(index) {
     var arr = this.segments.slice(0, index);
-console.log(`arr (getSegmentPathUpTo): ${JSON.stringify(arr, null, 2)}`);
+//console.log(`arr (getSegmentPathUpTo): ${JSON.stringify(arr, null, 2)}`);
 
     return _.reduce(
       arr,
       function(result, segment) {
-console.log(`segment (getSegmentPathUpTo): ${JSON.stringify(segment, null, 2)}`);
-console.log(`result (getSegmentPathUpTo): ${JSON.stringify(result, null, 2)}`);
+//console.log(`segment (getSegmentPathUpTo): ${JSON.stringify(segment, null, 2)}`);
+//console.log(`result (getSegmentPathUpTo): ${JSON.stringify(result, null, 2)}`);
         return result ? result + segment.value + '.' : segment.value + '.';
       },
       ''
@@ -88,12 +88,12 @@ console.log(`result (getSegmentPathUpTo): ${JSON.stringify(result, null, 2)}`);
 
   updateModelTarget(targets) {
     // render query
-console.log(`this.segments.length (updateModelTarget): ${JSON.stringify(this.segments.length, null, 2)}`);
-console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
+//console.log(`this.segments.length (updateModelTarget): ${JSON.stringify(this.segments.length, null, 2)}`);
+//console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
     this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
-console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
+//console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
     this.target.query = this.target.query.replace(/\.$/, '');
-console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
+//console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
 
     this.updateRenderedTarget(this.target, targets);
 
@@ -106,11 +106,11 @@ console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target
   }
 
   updateRenderedTarget(target, targets) {
-console.log(`target (updateRenderedTarget): ${JSON.stringify(target, null, 2)}`);
-console.log(`targets (updateRenderedTarget): ${JSON.stringify(targets, null, 2)}`);
+//console.log(`target (updateRenderedTarget): ${JSON.stringify(target, null, 2)}`);
+//console.log(`targets (updateRenderedTarget): ${JSON.stringify(targets, null, 2)}`);
     // render nested query
     var targetsByRefId = _.keyBy(targets, 'refId');
-console.log(`targetsByRefId (updateRenderedTarget): ${JSON.stringify(targetsByRefId, null, 2)}`);
+//console.log(`targetsByRefId (updateRenderedTarget): ${JSON.stringify(targetsByRefId, null, 2)}`);
 
     // no references to self
     delete targetsByRefId[target.refId];
@@ -127,7 +127,7 @@ console.log(`targetsByRefId (updateRenderedTarget): ${JSON.stringify(targetsByRe
       targetsByRefId[refId].refCount = refCount;
     }
     _.each(targetsByRefId, (t, id) => {
-console.log(`t (updateRenderedTarget): ${JSON.stringify(t, null, 2)}`);
+//console.log(`t (updateRenderedTarget): ${JSON.stringify(t, null, 2)}`);
       countTargetRefs(targetsByRefId, id);
     });
 

@@ -42,7 +42,7 @@ System.register(['lodash'], function(exports_1) {
                         queryResults['data'].sort(function (a, b) {
                             return a['target'].localeCompare(b['target']);
                         });
-                        console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
+                        //console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
                         return queryResults;
                     }).catch(function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
@@ -134,7 +134,7 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
-                    console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
+                    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
                     var queries = [];
@@ -194,10 +194,10 @@ System.register(['lodash'], function(exports_1) {
                             queries.push(options);
                         }
                     }
-                    console.log("queries (_irondbRequest): " + JSON.stringify(queries, null, 2));
+                    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
                     return Promise.all(queries.map(function (query) {
                         return _this.backendSrv.datasourceRequest(query).then(function (result) {
-                            console.log("query (_irondbRequest): " + JSON.stringify(query, null, 2));
+                            //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
                             var queryInterimResults;
                             if (query['isCaql']) {
                                 queryInterimResults = _this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
@@ -213,7 +213,7 @@ System.register(['lodash'], function(exports_1) {
                             return queryResults;
                         });
                     })).then(function (result) {
-                        console.log("queryResults (_irondbRequest): " + JSON.stringify(queryResults, null, 2));
+                        //console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
                         return queryResults;
                     }).catch(function (err) {
                         console.log("err (_irondbRequest): " + JSON.stringify(err, null, 2));
@@ -267,7 +267,7 @@ System.register(['lodash'], function(exports_1) {
                             continue;
                         }
                         hasTargets = true;
-                        console.log("target (_irondbRequest): " + JSON.stringify(target, null, 2));
+                        //console.log(`target (_irondbRequest): ${JSON.stringify(target, null, 2)}`);
                         if (!target['isCaql'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
                             hasWildcards = true;
                         }
@@ -285,7 +285,7 @@ System.register(['lodash'], function(exports_1) {
                                 cleanOptions['caql']['names'].push(target['query']);
                             }
                             else {
-                                console.log("target['query'] (_irondbRequest): " + JSON.stringify(target['query'], null, 2));
+                                //console.log(`target['query'] (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
                                 if ('hosted' == this.irondbType) {
                                     cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
                                 }

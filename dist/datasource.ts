@@ -49,7 +49,7 @@ export default class IrondbDatasource {
       queryResults['data'].sort( (a, b): number => {
         return a['target'].localeCompare(b['target']);
       });
-      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+      //console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
       return queryResults;
     }).catch( err => {
       console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
@@ -143,7 +143,7 @@ export default class IrondbDatasource {
   }
 
   _irondbRequest(irondbOptions, isCaql = false) {
-    console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
     var queries = [];
@@ -205,11 +205,11 @@ export default class IrondbDatasource {
         queries.push(options);
       }
     }
-    console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
+    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
     return Promise.all(queries.map(query =>
       this.backendSrv.datasourceRequest(query).then( result => {
-        console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
+        //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
         var queryInterimResults;
         if (query['isCaql']) {
           queryInterimResults = this._convertIrondbCaqlDataToGrafana(result.data, query['name']);
@@ -224,7 +224,7 @@ export default class IrondbDatasource {
         return queryResults;
       })
     )).then( result => {
-      console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
+      //console.log(`queryResults (_irondbRequest): ${JSON.stringify(queryResults, null, 2)}`);
       return queryResults;
     }).catch( err => {
       console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
@@ -278,7 +278,7 @@ export default class IrondbDatasource {
         continue;
       }
       hasTargets = true;
-          console.log(`target (_irondbRequest): ${JSON.stringify(target, null, 2)}`);
+          //console.log(`target (_irondbRequest): ${JSON.stringify(target, null, 2)}`);
       if ( !target['isCaql'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
         hasWildcards = true;
       }
@@ -297,7 +297,7 @@ export default class IrondbDatasource {
         if (target.isCaql) {
           cleanOptions['caql']['names'].push(target['query']);
         } else {
-          console.log(`target['query'] (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
+          //console.log(`target['query'] (_irondbRequest): ${JSON.stringify(target['query'], null, 2)}`);
           if ('hosted' == this.irondbType) {
             cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
           } else {

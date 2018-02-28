@@ -50,29 +50,29 @@ export class IrondbQueryCtrl extends QueryCtrl {
   getSegments(index, prefix) {
     var query = prefix && prefix.length > 0 ? prefix : '';
 
-console.log(`index (getSegments): ${JSON.stringify(index, null, 2)}`);
-console.log(`prefix (getSegments): ${JSON.stringify(prefix, null, 2)}`);
+//console.log(`index (getSegments): ${JSON.stringify(index, null, 2)}`);
+//console.log(`prefix (getSegments): ${JSON.stringify(prefix, null, 2)}`);
     if (index > 0) {
       query = this.queryModel.getSegmentPathUpTo(index) + query;
     }
-console.log(`query (getSegments): ${JSON.stringify(query, null, 2)}`);
+//console.log(`query (getSegments): ${JSON.stringify(query, null, 2)}`);
 
     return this.datasource
       .metricFindQuery( query + '*' )
       .then( segments => {
-console.log(`segments (getSegments): ${JSON.stringify(segments, null, 2)}`);
+//console.log(`segments (getSegments): ${JSON.stringify(segments, null, 2)}`);
         var allSegments = _.map(segments.data, segment => {
-console.log(`segment (getSegments): ${JSON.stringify(segment, null, 2)}`);
-console.log(`escapeRegExp(query) (getSegments): ${JSON.stringify(this.escapeRegExp(query), null, 2)}`);
+//console.log(`segment (getSegments): ${JSON.stringify(segment, null, 2)}`);
+//console.log(`escapeRegExp(query) (getSegments): ${JSON.stringify(this.escapeRegExp(query), null, 2)}`);
           var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-console.log(`queryRegExp (getSegments): ${JSON.stringify(queryRegExp, null, 2)}`);
+//console.log(`queryRegExp (getSegments): ${JSON.stringify(queryRegExp, null, 2)}`);
 
           return this.uiSegmentSrv.newSegment({
             value: segment.name.replace(queryRegExp,''),
             expandable: !segment.leaf,
           });
         });
-console.log(`allSegments (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
+//console.log(`allSegments (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
 
         if (index > 0 && allSegments.length === 0) {
           return allSegments;
@@ -81,19 +81,19 @@ console.log(`allSegments (getSegments): ${JSON.stringify(allSegments, null, 2)}`
         // add query references
         if (index === 0) {
           _.eachRight(this.panelCtrl.panel.targets, target => {
-console.log(`panelCtrl.target (getSegments): ${JSON.stringify(target, null, 2)}`);
+//console.log(`panelCtrl.target (getSegments): ${JSON.stringify(target, null, 2)}`);
             if (target.refId === this.queryModel.target.refId) {
               return;
             }
-console.log(`target.refId no match! (getSegments)`);
-console.log(`allSegments (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
+//console.log(`target.refId no match! (getSegments)`);
+//console.log(`allSegments (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
           });
         }
 
         // de-dupe segments
-console.log(`allSegments pre-uniq (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
+//console.log(`allSegments pre-uniq (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
         allSegments = _.uniqBy(allSegments, 'value');
-console.log(`allSegments post-uniq (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
+//console.log(`allSegments post-uniq (getSegments): ${JSON.stringify(allSegments, null, 2)}`);
         // add wildcard option
         allSegments.unshift(this.uiSegmentSrv.newSegment('*'));
         return allSegments;
@@ -113,30 +113,30 @@ console.log(`allSegments post-uniq (getSegments): ${JSON.stringify(allSegments, 
       return this.uiSegmentSrv.newSegment(segment);
     });
 
-console.log(`this.segments (buildSegments): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`this.segments (buildSegments): ${JSON.stringify(this.segments, null, 2)}`);
     let checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
-console.log(`checkOtherSegmentsIndex (buildSegments): ${JSON.stringify(checkOtherSegmentsIndex, null, 2)}`);
+//console.log(`checkOtherSegmentsIndex (buildSegments): ${JSON.stringify(checkOtherSegmentsIndex, null, 2)}`);
     this.checkOtherSegments(checkOtherSegmentsIndex);
   }
 
   addSelectMetricSegment() {
     this.queryModel.addSelectMetricSegment();
     this.segments.push(this.uiSegmentSrv.newSelectMetric());
-console.log(`this.segments (addSelectMetricSegment): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`this.segments (addSelectMetricSegment): ${JSON.stringify(this.segments, null, 2)}`);
   }
 
   checkOtherSegments(fromIndex) {
-console.log(`fromIndex (checkOtherSegments): ${JSON.stringify(fromIndex, null, 2)}`);
-console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
-console.log(`this.queryModel.segments (checkOtherSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
+//console.log(`fromIndex (checkOtherSegments): ${JSON.stringify(fromIndex, null, 2)}`);
+//console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`this.queryModel.segments (checkOtherSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
     if (fromIndex === 0) {
-console.log(`Adding Select Metric Segment (checkOtherSegments)`);
+//console.log(`Adding Select Metric Segment (checkOtherSegments)`);
       this.addSelectMetricSegment();
       return;
     }
 
     var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);
-console.log(`path (checkOtherSegments): ${JSON.stringify(path, null, 2)}`);
+//console.log(`path (checkOtherSegments): ${JSON.stringify(path, null, 2)}`);
     if (path === '') {
       return Promise.resolve();
     }
@@ -144,35 +144,35 @@ console.log(`path (checkOtherSegments): ${JSON.stringify(path, null, 2)}`);
     return this.datasource
       .metricFindQuery( path + '*' )
       .then(segments => {
-console.log(`segments (checkOtherSegments): ${JSON.stringify(segments, null, 2)}`);
-console.log(`segments.data.length (checkOtherSegments): ${JSON.stringify(segments.data.length, null, 2)}`);
+//console.log(`segments (checkOtherSegments): ${JSON.stringify(segments, null, 2)}`);
+//console.log(`segments.data.length (checkOtherSegments): ${JSON.stringify(segments.data.length, null, 2)}`);
         if (segments.data.length === 0) {
           if (path !== '') {
             this.queryModel.segments = this.queryModel.segments.splice(0, fromIndex + 1);
-console.log(`this.queryModel.segments (checkOtherSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
+//console.log(`this.queryModel.segments (checkOtherSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
             this.segments = this.segments.splice(0, fromIndex + 1);
-console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
           }
         } else {
           _.map(segments.data, segment => {
-console.log(`path (checkOtherSegments): ${JSON.stringify(path, null, 2)}`);
-console.log(`segment (checkOtherSegments): ${JSON.stringify(segment, null, 2)}`);
-console.log(`escapeRegExp(path) (checkOtherSegments): ${JSON.stringify(this.escapeRegExp(path), null, 2)}`);
+//console.log(`path (checkOtherSegments): ${JSON.stringify(path, null, 2)}`);
+//console.log(`segment (checkOtherSegments): ${JSON.stringify(segment, null, 2)}`);
+//console.log(`escapeRegExp(path) (checkOtherSegments): ${JSON.stringify(this.escapeRegExp(path), null, 2)}`);
             var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
-console.log(`pathRegExp (checkOtherSegments): ${JSON.stringify(pathRegExp, null, 2)}`);
+//console.log(`pathRegExp (checkOtherSegments): ${JSON.stringify(pathRegExp, null, 2)}`);
             var segmentName = segment.name.replace(pathRegExp,'');
-console.log(`segmentName (checkOtherSegments): ${JSON.stringify(segmentName, null, 2)}`);
+//console.log(`segmentName (checkOtherSegments): ${JSON.stringify(segmentName, null, 2)}`);
             segment.name = segmentName;
 //            this.uiSegmentSrv.newSegment({
 //              value: segmentName,
 //              expandable: !segment.leaf,
 //            });
-console.log(`segment (checkOtherSegments): ${JSON.stringify(segment, null, 2)}`);
+//console.log(`segment (checkOtherSegments): ${JSON.stringify(segment, null, 2)}`);
           });
-console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
-console.log(`this.segments.length (checkOtherSegments): ${JSON.stringify(this.segments.length, null, 2)}`);
+//console.log(`this.segments (checkOtherSegments): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`this.segments.length (checkOtherSegments): ${JSON.stringify(this.segments.length, null, 2)}`);
           if (this.segments.length === fromIndex) {
-console.log(`Adding Select Metric Segment (checkOtherSegments)`);
+//console.log(`Adding Select Metric Segment (checkOtherSegments)`);
             this.addSelectMetricSegment();
           } else {
             return this.checkOtherSegments(fromIndex + 1);
@@ -193,8 +193,8 @@ console.log(`Adding Select Metric Segment (checkOtherSegments)`);
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
-console.log(`segment (segmentValueChanged): ${JSON.stringify(segment, null, 2)}`);
-console.log(`segmentIndex (segmentValueChanged): ${JSON.stringify(segmentIndex, null, 2)}`);
+//console.log(`segment (segmentValueChanged): ${JSON.stringify(segment, null, 2)}`);
+//console.log(`segmentIndex (segmentValueChanged): ${JSON.stringify(segmentIndex, null, 2)}`);
     this.spliceSegments(segmentIndex + 1);
     if (segment.expandable) {
       return this.checkOtherSegments(segmentIndex + 1).then(() => {
@@ -210,11 +210,11 @@ console.log(`segmentIndex (segmentValueChanged): ${JSON.stringify(segmentIndex, 
   }
 
   spliceSegments(index) {
-console.log(`splicing at index (spliceSegments): ${JSON.stringify(index, null, 2)}`);
+//console.log(`splicing at index (spliceSegments): ${JSON.stringify(index, null, 2)}`);
     this.segments = this.segments.splice(0, index);
     this.queryModel.segments = this.queryModel.segments.splice(0, index);
-console.log(`segments (spliceSegments): ${JSON.stringify(this.segments, null, 2)}`);
-console.log(`queryModel.segments (spliceSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
+//console.log(`segments (spliceSegments): ${JSON.stringify(this.segments, null, 2)}`);
+//console.log(`queryModel.segments (spliceSegments): ${JSON.stringify(this.queryModel.segments, null, 2)}`);
   }
 
   emptySegments() {
