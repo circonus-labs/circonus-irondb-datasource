@@ -32,4 +32,7 @@ export default class IrondbDatasource {
     _convertIrondbCaqlDataToGrafana(data: any, name: any): {
         data: any[];
     };
+    _convertIrondbCaqlDataToGrafanaHeatmap(data: any, query: any): {
+        data: any[];
+    };
 }
