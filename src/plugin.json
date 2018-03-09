@@ -18,12 +18,12 @@
       {"name": "Project site", "url": "https://www.circonus.com/irondb/"},
       {"name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE"}
     ],
-    "version": "0.8.0",
+    "version": "0.8.1",
     "updated": "2018-03-09"
   },
 
   "dependencies": {
-    "grafanaVersion": "5.0.x",
+    "grafanaVersion": "5.x.x",
     "plugins": [ ]
   },
 
