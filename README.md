@@ -51,6 +51,9 @@ Once selected, histogram data processing will be utilized for any returned data 
 
 ### Heatmaps
 Using the histogram checkbox to process returned data allows for histograms to be displayed on the heatmap panel type.
+
 ![](img/irondb-heatmap-sample.png)
+
 For this processed data to be displayed on the heatmap panel as the sample above, select *Time Series Buckets* as the Data Format to be used on the Heatmap panel.
+
 ![](img/irondb-heatmap-tsbuckets.png)
