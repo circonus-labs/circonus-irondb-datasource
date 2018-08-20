@@ -274,11 +274,11 @@ export default class IrondbDatasource {
 
     // Pick a reasonable period for CAQL
     // We assume will use something close the request interval
-    // unless it would produce more than maxDataPoints / 4
+    // unless it would produce more than maxDataPoints / 8
     // CAQL analytics at one point per pixel is almost never what
     // someone will want.
     var estdp = Math.floor((end-start)*1000/options.intervalMs);
-    if (estdp > options.maxDataPoints/4) estdp = options.maxDataPoints/4;
+    if (estdp > options.maxDataPoints/8) estdp = options.maxDataPoints/8;
     var period = Math.ceil((end-start) / estdp)
     // The period is in the right realm now, force align to something
     // that will make it pretty.
