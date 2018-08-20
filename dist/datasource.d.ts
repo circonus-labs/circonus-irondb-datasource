@@ -27,13 +27,10 @@ export default class IrondbDatasource {
     _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
     _buildIrondbParamsAsync(options: any): {};
     _buildIrondbParams(options: any): Promise<{}>;
-    _convertIrondbDataToGrafana(data: any): {
+    _convertIrondbDataToGrafana(result: any): {
         data: any[];
     };
-    _convertIrondbCaqlDataToGrafana(data: any, name: any): {
-        data: any[];
-    };
-    _convertIrondbCaqlDataToGrafanaHeatmap(data: any, query: any): {
+    _convertIrondbCaqlDataToGrafana(result: any, query: any): {
         data: any[];
     };
 }
