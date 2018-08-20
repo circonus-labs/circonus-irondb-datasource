@@ -22,6 +22,7 @@ export default class IrondbDatasource {
     annotationQuery(options: any): void;
     metricFindQuery(query: string): any;
     testDatasource(): any;
+    _throwerr(err: any): void;
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean): any;
     _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
     _buildIrondbParamsAsync(options: any): {};
