@@ -56,25 +56,7 @@ export default class IrondbDatasource {
     }).catch( err => {
       console.log(`err (query): ${JSON.stringify(err, null, 2)}`);
       if (err.status !== 0 || err.status >= 300) {
-        if (err.data && err.data.error) {
-          throw {
-            message: 'IRONdb Error: ' + err.data.error,
-            data: err.data,
-            config: err.config,
-          };
-        } else if (err.statusText === 'Not Found') {
-          throw {
-            message: 'IRONdb Error: ' + err.statusText,
-            data: err.data,
-            config: err.config,
-          };
-        } else {
-          throw {
-            message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-            data: err.data,
-            config: err.config,
-          };
-        }
+        this._throwerr(err);
       }
     });
   }
@@ -113,10 +95,43 @@ export default class IrondbDatasource {
     });
   }
 
+  _throwerr(err) {
+    if (err.data && err.data.error) {
+      throw {
+        message: 'Circonus IRONdb Error: ' + err.data.error,
+        data: err.data,
+        config: err.config,
+      };
+    } else if (err.data && err.data.user_error) {
+      var name = err.data.method || 'IRONdb';
+      var suffix = ''
+      if (err.data.user_error.query) suffix = ' in"' + err.data.user_error.query + '"';
+      throw {
+        message: name + ' error: ' + err.data.user_error.message + suffix,
+        data: err.data,
+        config: err.config,
+      };
+    } else if (err.statusText === 'Not Found') {
+      throw {
+        message: 'Circonus IRONdb Error: ' + err.statusText,
+        data: err.data,
+        config: err.config,
+      };
+    } else {
+      throw {
+        message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
+        data: err.data,
+        config: err.config,
+      };
+    }
+  }
   _irondbSimpleRequest(method, url, isCaql = false, isFind = false) {
     var baseUrl = this.url;
     var headers = { "Content-Type": "application/json" };
 
+    if ('hosted' != this.irondbType) {
+      headers['X-Circonus-Account'] = this.accountId;
+    }
     if ('hosted' == this.irondbType && !isCaql) {
       baseUrl = baseUrl + '/irondb/graphite';
       if (!isFind) {
@@ -156,6 +171,8 @@ export default class IrondbDatasource {
     if ('hosted' == this.irondbType) {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
+    } else {
+      headers['X-Circonus-Account'] = this.accountId;
     }
     if (irondbOptions['std']['names'].length) {
       options = {};
@@ -244,25 +261,7 @@ export default class IrondbDatasource {
     }).catch( err => {
       console.log(`err (_irondbRequest): ${JSON.stringify(err, null, 2)}`);
       if (err.status !== 0 || err.status >= 300) {
-        if (err.data && err.data.error) {
-          throw {
-            message: 'IRONdb Error: ' + err.data.error,
-            data: err.data,
-            config: err.config,
-          };
-        } else if (err.statusText === 'Not Found') {
-          throw {
-            message: 'IRONdb Error: ' + err.statusText,
-            data: err.data,
-            config: err.config,
-          };
-        } else {
-          throw {
-            message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-            data: err.data,
-            config: err.config,
-          };
-        }
+        this._throwerr(err);
       }
     });
   }
@@ -362,25 +361,6 @@ export default class IrondbDatasource {
       }).catch( err => {
         console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
         if (err.status !== 0 || err.status >= 300) {
-          if (err.data && err.data.error) {
-            throw {
-              message: 'IRONdb Error: ' + err.data.error,
-              data: err.data,
-              config: err.config,
-            };
-          } else if (err.statusText === 'Not Found') {
-            throw {
-              message: 'IRONdb Error: ' + err.statusText,
-              data: err.data,
-              config: err.config,
-            };
-          } else {
-            throw {
-              message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-              data: err.data,
-              config: err.config,
-            };
-          }
         }
       });
       return cleanOptions;
