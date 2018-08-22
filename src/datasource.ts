@@ -71,7 +71,7 @@ export default class IrondbDatasource {
   }
 
   testDatasource() {
-    return this.metricFindQuery('*').then( res => {
+    return this.metricFindQuery('ametric').then( res => {
       let error = _.get(res, 'results[0].error');
       if (error) {
         return {
@@ -307,7 +307,7 @@ export default class IrondbDatasource {
         continue;
       }
       hasTargets = true;
-      if ( !target['isCaql'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
+      if ( !target['isCaql'] && target['query'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
         hasWildcards = true;
       }
     }
@@ -319,7 +319,7 @@ export default class IrondbDatasource {
     if (!hasWildcards) {
       for (i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
-        if (target.hide) {
+        if (target.hide || !target['query'] || target['query'].length == 0) {
           continue;
         }
         if (target.isCaql) {

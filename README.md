@@ -68,3 +68,24 @@ Using the histogram checkbox to process returned data allows for histograms to b
 For this processed data to be displayed on the heatmap panel as the sample above, select *Time Series Buckets* as the Data Format to be used on the Heatmap panel.
 
 ![](img/irondb-heatmap-tsbuckets.png)
+
+# Development
+
+The build process requires node, npm, typescrypt, and tslint
+
+On Cent7 setup:
+
+```
+# One time setup
+sudo yum install node bzip2
+sudo npm install -g typescript tslint
+npm install .
+npm install grunt
+npm install load-grunt-tasks
+
+# Build
+./node_modules/grunt/bin/grunt
+
+# Test
+./docker-up
+```

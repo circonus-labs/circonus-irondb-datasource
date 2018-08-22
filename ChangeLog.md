@@ -9,6 +9,9 @@
  * Auto-detect histograms in CAQL output, simplify code.
  * Improve period selection for CAQL queries.
  * Improve histogram coalescing and conversion performance.
+ * Avoid making blank CAQL queries
+ * Add dev notes to README.md
+ * Provider a docker-up script to help development and testing.
 
 ## 0.8.3
 

@@ -1,0 +1,39 @@
+#!/bin/sh
+
+if test -n "$1"; then
+	VERSION=":$1"
+fi
+NAME="grafana"
+
+cmd() {
+	echo Running "'$@'"
+	$@
+	if test 0 != $?; then
+		echo "FAILED... aborting."
+		exit $?
+	fi
+}
+IMAGE="grafana/grafana$VERSION"
+ID=$(docker ps -q -f name=grafana)
+RUNNING=$(docker ps --filter name=$NAME --format '{{.Image}}')
+if test "$RUNNING" = "$IMAGE"; then
+	echo "Image $NAME already running at $ID"
+elif test -n "$RUNNING"; then
+	echo "Image $NAME running w/ $RUNNING, you need delete it first."
+	echo "Run:"
+	echo "; docker stop $NAME"
+	echo "; docker rm $NAME"
+	exit 1
+else
+	cmd docker run --net=host -d --name=$NAME $IMAGE
+	ID=$(docker ps -q -f name=grafana)
+fi
+
+SRC=$(dirname $0)
+ID=$(docker ps -q -f name=grafana)
+# We use user root here b/c of docker bugs w/ cp.
+# Target files from the last run should be owned by grafana, alas they are not.
+cmd docker exec --user=root -it $ID rm -rf /var/lib/grafana/plugins/circonus-irondb-datasource
+cmd docker cp $SRC/ $ID:/var/lib/grafana/plugins/circonus-irondb-datasource/
+cmd docker exec --user=root -it $ID rm -rf /var/lib/grafana/plugins/circonus-irondb-datasource/node_modules
+cmd docker restart $ID

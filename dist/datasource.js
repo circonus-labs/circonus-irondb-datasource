@@ -61,7 +61,7 @@ System.register(['lodash'], function(exports_1) {
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
-                    return this.metricFindQuery('*').then(function (res) {
+                    return this.metricFindQuery('ametric').then(function (res) {
                         var error = lodash_1.default.get(res, 'results[0].error');
                         if (error) {
                             return {
@@ -298,7 +298,7 @@ System.register(['lodash'], function(exports_1) {
                             continue;
                         }
                         hasTargets = true;
-                        if (!target['isCaql'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
+                        if (!target['isCaql'] && target['query'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
                             hasWildcards = true;
                         }
                     }
@@ -308,7 +308,7 @@ System.register(['lodash'], function(exports_1) {
                     if (!hasWildcards) {
                         for (i = 0; i < options.targets.length; i++) {
                             target = options.targets[i];
-                            if (target.hide) {
+                            if (target.hide || !target['query'] || target['query'].length == 0) {
                                 continue;
                             }
                             if (target.isCaql) {
