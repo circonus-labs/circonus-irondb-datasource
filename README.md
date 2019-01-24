@@ -10,7 +10,7 @@ Read more about IRONdb here:
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
 
 ### From Releases
-1. Download [https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.4.tar.gz](https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.4.tar.gz)
+1. Download [https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.5.tar.gz](https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.5.tar.gz)
 
 2. Unzip into plugins directory.
 
