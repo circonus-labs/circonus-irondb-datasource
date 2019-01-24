@@ -2,6 +2,10 @@
 
 ## 0.8
 
+## 0.8.5
+
+ * Fix graphite series pulls for tagged metrics.
+
 ## 0.8.4
 
  * Switch to DF4 from CAQL

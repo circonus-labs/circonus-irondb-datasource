@@ -84,43 +84,25 @@ System.register(['lodash'], function(exports_1) {
                     });
                 };
                 IrondbDatasource.prototype._throwerr = function (err) {
+                    console.log(err);
                     if (err.data && err.data.error) {
-                        throw {
-                            message: 'Circonus IRONdb Error: ' + err.data.error,
-                            data: err.data,
-                            config: err.config,
-                        };
+                        throw new Error('Circonus IRONdb Error: ' + err.data.error);
                     }
                     else if (err.data && err.data.user_error) {
                         var name = err.data.method || 'IRONdb';
                         var suffix = '';
                         if (err.data.user_error.query)
                             suffix = ' in"' + err.data.user_error.query + '"';
-                        throw {
-                            message: name + ' error: ' + err.data.user_error.message + suffix,
-                            data: err.data,
-                            config: err.config,
-                        };
+                        throw new Error(name + ' error: ' + err.data.user_error.message + suffix);
                     }
                     else if (err.statusText === 'Not Found') {
-                        throw {
-                            message: 'Circonus IRONdb Error: ' + err.statusText,
-                            data: err.data,
-                            config: err.config,
-                        };
+                        throw new Error('Circonus IRONdb Error: ' + err.statusText);
                     }
                     else if (err.statusText && err.status > 0) {
-                        throw {
-                            message: 'Network Error: ' + err.statusText + '(' + err.status + ')',
-                            data: err.data,
-                            config: err.config,
-                        };
+                        throw new Error('Network Error: ' + err.statusText + '(' + err.status + ')');
                     }
                     else {
-                        throw {
-                            message: 'Error: ' + (err ? err.toString() : "unknown"),
-                            err: err,
-                        };
+                        throw new Error('Error: ' + (err ? err.toString() : "unknown"));
                     }
                 };
                 IrondbDatasource.prototype._irondbSimpleRequest = function (method, url, isCaql, isFind) {
@@ -343,10 +325,10 @@ System.register(['lodash'], function(exports_1) {
                                     }
                                     else {
                                         if ('hosted' == _this.irondbType) {
-                                            cleanOptions['std']['names'].push(_this.queryPrefix + result[i]['name']);
+                                            cleanOptions['std']['names'].push({ leaf_name: _this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                         else {
-                                            cleanOptions['std']['names'].push(result[i]['name']);
+                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                     }
                                 }
