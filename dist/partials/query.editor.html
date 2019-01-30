@@ -9,7 +9,7 @@
       <div ng-if="ctrl.target.isCaql" class="gf-form gf-form--grow">
         <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="IRONdb Metric" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
       </div>
-      <div ng-if="!ctrl.target.isCaql" class="gf-form">
+      <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form-inline">
         <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
           <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
         </div>
