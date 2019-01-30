@@ -280,12 +280,21 @@ System.register(['lodash'], function(exports_1) {
                             continue;
                         }
                         hasTargets = true;
-                        if (!target['isCaql'] && target['query'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}'))) {
+                        if (!target['isCaql'] && target['query'] && (target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') || target['query'].includes(';'))) {
                             hasWildcards = true;
                         }
                     }
                     if (!hasTargets) {
                         return {};
+                    }
+                    for (i = 0; i < options.targets.length; i++) {
+                        target = options.targets[i];
+                        if (target.hide || !target['query'] || target['query'].length == 0) {
+                            continue;
+                        }
+                        if (target.isCaql) {
+                            cleanOptions['caql']['names'].push(target['query']);
+                        }
                     }
                     if (!hasWildcards) {
                         for (i = 0; i < options.targets.length; i++) {
@@ -293,10 +302,7 @@ System.register(['lodash'], function(exports_1) {
                             if (target.hide || !target['query'] || target['query'].length == 0) {
                                 continue;
                             }
-                            if (target.isCaql) {
-                                cleanOptions['caql']['names'].push(target['query']);
-                            }
-                            else {
+                            if (!target.isCaql) {
                                 //console.log(`target['query'] (_buildIrondbParamsAsync): ${JSON.stringify(target['query'], null, 2)}`);
                                 if ('hosted' == this.irondbType) {
                                     cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
@@ -320,10 +326,10 @@ System.register(['lodash'], function(exports_1) {
                                     if (result[i]['target'].hide) {
                                         continue;
                                     }
-                                    if (target.isCaql) {
-                                        cleanOptions['caql']['names'].push(result[i]['name']);
-                                    }
-                                    else {
+                                    if (!target.isCaql) {
+                                        if (target.egressoverride != "default") {
+                                            result[i]['leaf_data'].egress_function = target.egressoverride;
+                                        }
                                         if ('hosted' == _this.irondbType) {
                                             cleanOptions['std']['names'].push({ leaf_name: _this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
                                         }

@@ -2,6 +2,11 @@
 
 ## 0.8
 
+## 0.8.6
+
+ * Allow flip back and forth between CAQL mode.
+ * Allow override of egress of searched datapoints.
+
 ## 0.8.5
 
  * Fix graphite series pulls for tagged metrics.

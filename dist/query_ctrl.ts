@@ -11,6 +11,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
   defaults = {
   };
   queryModel: IrondbQuery;
+  pointTypeOptions = [ { id: "Metric", name: "Metric" }, { id: "CAQL", name: "CAQL" } ];
+  egressTypeOptions = [ { id: "default", name: "default" },
+                        { id: "avg", name: "average" },
+                        { id: "sum", name: "sum" },
+                        { id: "count", name: "count" },
+                        { id: "stddev", name: "\u03C3" },
+                        { id: "derivative", name: "derivative" },
+                        { id: "d_stddev", name: "\u03C3 derivative" },
+                        { id: "counter", name: "counter" },
+                        { id: "c_stddev", name: "\u03C3 counter" } ];
   segments: any[];
 
   /** @ngInject **/
@@ -18,25 +28,23 @@ export class IrondbQueryCtrl extends QueryCtrl {
     super($scope, $injector);
 
     _.defaultsDeep(this.target, this.defaults);
+    this.target.isCaql = this.target.isCaql || false;
+    this.target.egressoverride = this.target.egressoverride || "default";
+    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
   }
 
-  getOptions(query) {
-    return this.datasource.metricFindQuery(query || '');
+  typeValueChanged() {
+    this.target.isCaql = (this.target.pointtype == "CAQL");
+    this.error = null;
+    this.panelCtrl.refresh();
   }
 
-  toggleEditorMode() {
-    this.target.rawQuery = !this.target.rawQuery;
-  }
-
-  switchCaql() {
-    if (this.target.isCaql) {
-      this.toggleEditorMode();
-      this.panelCtrl.refresh();
-    }
+  egressValueChanged() {
+    this.panelCtrl.refresh();
   }
 
   onChangeInternal() {

@@ -289,7 +289,7 @@ export default class IrondbDatasource {
         continue;
       }
       hasTargets = true;
-      if ( !target['isCaql'] && target['query'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') ) ) {
+      if ( !target['isCaql'] && target['query'] && ( target['query'].includes('*') || target['query'].includes('?') || target['query'].includes('[') || target['query'].includes(']') || target['query'].includes('(') || target['query'].includes(')') || target['query'].includes('{') || target['query'].includes('}') || target['query'].includes(';') ) ) {
         hasWildcards = true;
       }
     }
@@ -298,15 +298,23 @@ export default class IrondbDatasource {
       return {};
     }
 
+    for (i = 0; i < options.targets.length; i++) {
+      target = options.targets[i];
+      if (target.hide || !target['query'] || target['query'].length == 0) {
+        continue;
+      }
+      if (target.isCaql) {
+        cleanOptions['caql']['names'].push(target['query']);
+      }
+    }
+
     if (!hasWildcards) {
       for (i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
         if (target.hide || !target['query'] || target['query'].length == 0) {
           continue;
         }
-        if (target.isCaql) {
-          cleanOptions['caql']['names'].push(target['query']);
-        } else {
+        if (!target.isCaql) {
           //console.log(`target['query'] (_buildIrondbParamsAsync): ${JSON.stringify(target['query'], null, 2)}`);
           if ('hosted' == this.irondbType) {
             cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
@@ -328,9 +336,10 @@ export default class IrondbDatasource {
             if (result[i]['target'].hide) {
               continue;
             }
-            if (target.isCaql) {
-              cleanOptions['caql']['names'].push(result[i]['name']);
-              } else {
+            if (!target.isCaql) {
+              if (target.egressoverride != "default") {
+                result[i]['leaf_data'].egress_function = target.egressoverride;
+              }
               if ('hosted' == this.irondbType) {
                 cleanOptions['std']['names'].push({ leaf_name: this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
               } else {

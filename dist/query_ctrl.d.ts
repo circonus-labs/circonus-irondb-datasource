@@ -7,12 +7,19 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     static templateUrl: string;
     defaults: {};
     queryModel: IrondbQuery;
+    pointTypeOptions: {
+        id: string;
+        name: string;
+    }[];
+    egressTypeOptions: {
+        id: string;
+        name: string;
+    }[];
     segments: any[];
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
-    getOptions(query: any): any;
-    toggleEditorMode(): void;
-    switchCaql(): void;
+    typeValueChanged(): void;
+    egressValueChanged(): void;
     onChangeInternal(): void;
     getCollapsedText(): any;
     getSegments(index: any, prefix: any): any;

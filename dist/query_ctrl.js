@@ -33,23 +33,32 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.uiSegmentSrv = uiSegmentSrv;
                     this.templateSrv = templateSrv;
                     this.defaults = {};
+                    this.pointTypeOptions = [{ id: "Metric", name: "Metric" }, { id: "CAQL", name: "CAQL" }];
+                    this.egressTypeOptions = [{ id: "default", name: "default" },
+                        { id: "avg", name: "average" },
+                        { id: "sum", name: "sum" },
+                        { id: "count", name: "count" },
+                        { id: "stddev", name: "\u03C3" },
+                        { id: "derivative", name: "derivative" },
+                        { id: "d_stddev", name: "\u03C3 derivative" },
+                        { id: "counter", name: "counter" },
+                        { id: "c_stddev", name: "\u03C3 counter" }];
                     lodash_1.default.defaultsDeep(this.target, this.defaults);
+                    this.target.isCaql = this.target.isCaql || false;
+                    this.target.egressoverride = this.target.egressoverride || "default";
+                    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
                     this.target.query = this.target.query || '';
                     this.target.segments = this.target.segments || [];
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
                     this.buildSegments();
                 }
-                IrondbQueryCtrl.prototype.getOptions = function (query) {
-                    return this.datasource.metricFindQuery(query || '');
+                IrondbQueryCtrl.prototype.typeValueChanged = function () {
+                    this.target.isCaql = (this.target.pointtype == "CAQL");
+                    this.error = null;
+                    this.panelCtrl.refresh();
                 };
-                IrondbQueryCtrl.prototype.toggleEditorMode = function () {
-                    this.target.rawQuery = !this.target.rawQuery;
-                };
-                IrondbQueryCtrl.prototype.switchCaql = function () {
-                    if (this.target.isCaql) {
-                        this.toggleEditorMode();
-                        this.panelCtrl.refresh();
-                    }
+                IrondbQueryCtrl.prototype.egressValueChanged = function () {
+                    this.panelCtrl.refresh();
                 };
                 IrondbQueryCtrl.prototype.onChangeInternal = function () {
                     this.panelCtrl.refresh(); // Asks the panel to refresh data.

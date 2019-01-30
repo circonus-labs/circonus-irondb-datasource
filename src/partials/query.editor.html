@@ -1,24 +1,27 @@
 <query-editor-row query-ctrl="ctrl" can-collapse="true" has-text-edit-mode="true">
 
-  <div ng-if="ctrl.target.rawQuery">
-    <div class="gf-form">
-      <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="IRONdb Metric" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
-    </div>
-  </div>
-
-  <div ng-if="!ctrl.target.rawQuery">
     <div class="gf-form-inline">
-      <div class="gf-form">
-        <label class="gf-form-label query-keyword">Metric</label>
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <select name="pointtype" ng-model="ctrl.target.pointtype" ng-change="ctrl.typeValueChanged()" style="width:auto;">
+          <option ng-repeat="option in ctrl.pointTypeOptions" value="{{option.id}}">{{option.name}}</option>
+        </select>
       </div>
-      <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
-        <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+      <div ng-if="ctrl.target.isCaql" class="gf-form gf-form--grow">
+        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="IRONdb Metric" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
       </div>
-      <div class="gf-form gf-form--grow">
-        <div class="gf-form-label gf-form-label--grow"></div>
+      <div ng-if="!ctrl.target.isCaql" class="gf-form">
+        <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
+          <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+        </div>
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow">f(x)</div>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+          <select name="egressoverride" ng-model="ctrl.target.egressoverride" ng-change="ctrl.egressValueChanged()" style="width:auto;">
+            <option ng-repeat="option in ctrl.egressTypeOptions" value="{{option.id}}">{{option.name}}</option>
+          </select>
+        </div>
       </div>
-      <gf-form-switch class="gf-form" label="CAQL" checked="ctrl.target.isCaql" ng-model="ctrl.target.isCaql" ng-change="ctrl.refresh()" on-change="ctrl.switchCaql()"></gf-form-switch>
     </div>
-  </div>
 
 </query-editor-row>
