@@ -927,6 +927,7 @@ System.register(['lodash'], function(exports_1) {
                         i === 37 ||
                         i === 35 ||
                         i === 61 ||
+                        i === 59 ||
                         (i >= 97 && i <= 122); // a-z
             }
             identifierPartTable = identifierStartTable;

@@ -23,7 +23,6 @@ System.register(['lodash', './parser'], function(exports_1) {
                 IrondbQuery.prototype.parseTarget = function () {
                     this.segments = [];
                     this.error = null;
-                    //console.log(`this.target (parseTarget): ${JSON.stringify(this.target, null, 2)}`);
                     if (this.target.rawQuery) {
                         return;
                     }
@@ -50,10 +49,7 @@ System.register(['lodash', './parser'], function(exports_1) {
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {
                     var arr = this.segments.slice(0, index);
-                    //console.log(`arr (getSegmentPathUpTo): ${JSON.stringify(arr, null, 2)}`);
                     return lodash_1.default.reduce(arr, function (result, segment) {
-                        //console.log(`segment (getSegmentPathUpTo): ${JSON.stringify(segment, null, 2)}`);
-                        //console.log(`result (getSegmentPathUpTo): ${JSON.stringify(result, null, 2)}`);
                         return result ? result + segment.value + '.' : segment.value + '.';
                     }, '');
                 };
@@ -75,12 +71,8 @@ System.register(['lodash', './parser'], function(exports_1) {
                 };
                 IrondbQuery.prototype.updateModelTarget = function (targets) {
                     // render query
-                    //console.log(`this.segments.length (updateModelTarget): ${JSON.stringify(this.segments.length, null, 2)}`);
-                    //console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
                     this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
-                    //console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
                     this.target.query = this.target.query.replace(/\.$/, '');
-                    //console.log(`this.target.query (updateModelTarget): ${JSON.stringify(this.target.query, null, 2)}`);
                     this.updateRenderedTarget(this.target, targets);
                     // loop through other queries and update targetFull as needed
                     for (var _i = 0, _a = targets || []; _i < _a.length; _i++) {
@@ -91,11 +83,8 @@ System.register(['lodash', './parser'], function(exports_1) {
                     }
                 };
                 IrondbQuery.prototype.updateRenderedTarget = function (target, targets) {
-                    //console.log(`target (updateRenderedTarget): ${JSON.stringify(target, null, 2)}`);
-                    //console.log(`targets (updateRenderedTarget): ${JSON.stringify(targets, null, 2)}`);
                     // render nested query
                     var targetsByRefId = lodash_1.default.keyBy(targets, 'refId');
-                    //console.log(`targetsByRefId (updateRenderedTarget): ${JSON.stringify(targetsByRefId, null, 2)}`);
                     // no references to self
                     delete targetsByRefId[target.refId];
                     var targetWithNestedQueries = target.query;
@@ -109,7 +98,6 @@ System.register(['lodash', './parser'], function(exports_1) {
                         targetsByRefId[refId].refCount = refCount;
                     }
                     lodash_1.default.each(targetsByRefId, function (t, id) {
-                        //console.log(`t (updateRenderedTarget): ${JSON.stringify(t, null, 2)}`);
                         countTargetRefs(targetsByRefId, id);
                     });
                     delete target.targetFull;

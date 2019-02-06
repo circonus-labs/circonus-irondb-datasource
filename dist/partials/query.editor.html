@@ -13,6 +13,8 @@
         <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
           <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
         </div>
+      </div>
+      <div ng-if="!ctrl.target.isCaql" class="gf-form">
         <div class="gf-form gf-form--grow">
           <div class="gf-form-label gf-form-label--grow">f(x)</div>
         </div>
