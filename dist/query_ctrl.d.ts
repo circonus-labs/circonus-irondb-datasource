@@ -8,12 +8,12 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     defaults: {};
     queryModel: IrondbQuery;
     pointTypeOptions: {
-        id: string;
-        name: string;
+        value: string;
+        text: string;
     }[];
     egressTypeOptions: {
-        id: string;
-        name: string;
+        value: string;
+        text: string;
     }[];
     segments: any[];
     /** @ngInject **/
