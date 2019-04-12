@@ -2,9 +2,10 @@
 
     <div class="gf-form-inline">
       <div role="menuitem" class="gf-form" style="align-self:flex-start;">
-        <select name="pointtype" ng-model="ctrl.target.pointtype" ng-change="ctrl.typeValueChanged()" style="width:auto;">
-          <option ng-repeat="option in ctrl.pointTypeOptions" value="{{option.id}}">{{option.name}}</option>
-        </select>
+        <gf-form-dropdown name="pointtype" model="ctrl.target.pointtype" on-change="ctrl.typeValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.pointTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
       </div>
       <div ng-if="ctrl.target.isCaql" class="gf-form gf-form--grow">
         <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="IRONdb Metric" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
@@ -19,9 +20,10 @@
           <div class="gf-form-label gf-form-label--grow">f(x)</div>
         </div>
         <div role="menuitem" class="gf-form" style="align-self:flex-start;">
-          <select name="egressoverride" ng-model="ctrl.target.egressoverride" ng-change="ctrl.egressValueChanged()" style="width:auto;">
-            <option ng-repeat="option in ctrl.egressTypeOptions" value="{{option.id}}">{{option.name}}</option>
-          </select>
+          <gf-form-dropdown name="egressoverride" model="ctrl.target.egressoverride" on-change="ctrl.egressValueChanged()" css-class="gf-size-auto"
+            get-options="ctrl.egressTypeOptions"
+            lookup-text="true">
+          </gf-form-dropdown>
         </div>
       </div>
     </div>
