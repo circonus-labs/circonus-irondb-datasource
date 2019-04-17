@@ -7,6 +7,13 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
     };
     var lodash_1, irondb_query_1, sdk_1;
     var IrondbQueryCtrl;
+    function tagless_name(name) {
+        var tag_start = name.indexOf("ST[");
+        if (tag_start != -1) {
+            name = name.substring(0, tag_start - 1);
+        }
+        return name;
+    }
     function mapToDropdownOptions(results) {
         return lodash_1.default.map(results, function (value) {
             return { text: value, value: value };
@@ -68,18 +75,24 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.getSegments = function (index, prefix) {
                     var _this = this;
+                    console.log("getSegments() " + index + " " + prefix);
                     var query = prefix && prefix.length > 0 ? prefix : '';
                     if (index > 0) {
                         query = this.queryModel.getSegmentPathUpTo(index) + query;
                     }
                     return this.datasource
                         .metricFindQuery(query + '*')
-                        .then(function (segments) {
-                        var allSegments = lodash_1.default.map(segments.data, function (segment) {
-                            var queryRegExp = new RegExp(_this.escapeRegExp(query), 'i');
+                        .then(function (results) {
+                        var metricnames = lodash_1.default.map(results.data, function (result) {
+                            return tagless_name(result.metric_name);
+                        });
+                        metricnames = lodash_1.default.uniq(metricnames);
+                        console.log(JSON.stringify(metricnames));
+                        var allSegments = lodash_1.default.map(metricnames, function (segment) {
+                            //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
                             return _this.uiSegmentSrv.newSegment({
-                                value: segment.name.replace(queryRegExp, ''),
-                                expandable: !segment.leaf,
+                                value: segment,
+                                expandable: false //!segment.leaf,
                             });
                         });
                         if (index > 0 && allSegments.length === 0) {
@@ -121,8 +134,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
                     var _this = this;
+                    console.log("checkOtherSegments()");
                     if (fromIndex === 0) {
-                        this.addSelectMetricSegment();
+                        //this.addSelectMetricSegment();
                         return;
                     }
                     var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);

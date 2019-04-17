@@ -26,6 +26,8 @@ System.register(['lodash', './parser'], function(exports_1) {
                     if (this.target.rawQuery) {
                         return;
                     }
+                    this.segments = [{ type: 'segment', value: this.target.query || '*' }];
+                    return;
                     var parser = new parser_1.Parser(this.target.query);
                     var astNode = parser.getAst();
                     if (astNode === null) {

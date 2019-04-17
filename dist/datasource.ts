@@ -33,7 +33,7 @@ export default class IrondbDatasource {
   }
 
   query(options) {
-    //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
+    console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
 
     if (_.isEmpty(options['targets'][0])) {
@@ -65,8 +65,9 @@ export default class IrondbDatasource {
   }
 
   metricFindQuery(query: string) {
-    var queryUrl = '/' + this.queryPrefix;
-    queryUrl = queryUrl + '/metrics/find?query=' + query;
+    var queryUrl = '/find/' + this.accountId + '/tags?query=';
+    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
@@ -127,7 +128,6 @@ export default class IrondbDatasource {
       headers['X-Circonus-App-Name'] = this.appName;
     }
     if ('standalone' == this.irondbType && !isCaql) {
-      baseUrl = baseUrl + '/graphite/' + this.accountId;
       if (!isFind) {
         baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
       }
@@ -142,12 +142,12 @@ export default class IrondbDatasource {
       headers: headers,
     };
 
-    //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
+    console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
     return this.backendSrv.datasourceRequest(options);
   }
 
   _irondbRequest(irondbOptions, isCaql = false) {
-    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+    console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
     var queries = [];
@@ -161,27 +161,41 @@ export default class IrondbDatasource {
       headers['X-Circonus-Account'] = this.accountId;
     }
     if (irondbOptions['std']['names'].length) {
-      options = {};
-      options.url = this.url;
-      if ('hosted' == this.irondbType) {
-        options.url = options.url + '/irondb';
-        options.url = options.url + '/graphite/series_multi';
-      }
-      options.method = 'POST';
-      if ('standalone' == this.irondbType) {
-        options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
-      }
+      for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
+        options = {};
+        options.url = this.url;
+        if ('hosted' == this.irondbType) {
+          options.url = options.url + '/irondb';
+          options.url = options.url + '/graphite/series_multi';
+        }
+        options.method = 'GET';
+        if ('standalone' == this.irondbType) {
+          options.url = options.url + '/rollup';
+        }
+        var interval = irondbOptions['std']['interval'];
+        var start = irondbOptions['std']['start'];
+        var end = irondbOptions['std']['end'];
+        start = start - (start % interval);
+        end = end - (end % interval);
 
-      options.data = irondbOptions['std'];
-      options.headers = headers;
-      if (this.basicAuth || this.withCredentials) {
-        options.withCredentials = true;
+        options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+        options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
+        options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
+        options.url = options.url + '&end_ts=' + end + '.000';
+        options.url = options.url + '&rollup_span=' + interval + 's';
+        options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+        options.name = irondbOptions['std']['names'][i]['leaf_name'];
+
+        options.headers = headers;
+        if (this.basicAuth || this.withCredentials) {
+          options.withCredentials = true;
+        }
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        options.isCaql = false;
+        queries.push(options);
       }
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
-      }
-      options.isCaql = false;
-      queries.push(options);
     }
     if (irondbOptions['caql']['names'].length) {
       for (var i = 0; i < irondbOptions['caql']['names'].length; i++) {
@@ -213,7 +227,7 @@ export default class IrondbDatasource {
         queries.push(options);
       }
     }
-    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
+    console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
     return Promise.all(queries.map(query =>
       this.backendSrv.datasourceRequest(query).then( result => {
@@ -222,7 +236,7 @@ export default class IrondbDatasource {
         if (query['isCaql']) {
           queryInterimResults = this._convertIrondbCaqlDataToGrafana(result, query);
         } else {
-          queryInterimResults = this._convertIrondbDataToGrafana(result);
+          queryInterimResults = this._convertIrondbDataToGrafana(result, query);
         }
         return queryInterimResults;
       }).then( result => {
@@ -308,8 +322,8 @@ export default class IrondbDatasource {
       }
     }
 
-    if (!hasWildcards) {
-      for (i = 0; i < options.targets.length; i++) {
+    if (target.isCaql) {
+      /*for (i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
         if (target.hide || !target['query'] || target['query'].length == 0) {
           continue;
@@ -322,10 +336,11 @@ export default class IrondbDatasource {
             cleanOptions['std']['names'].push(target['query']);
           }
         }
-      }
+      }*/
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
+        console.log("target " + JSON.stringify(target));
         return this.metricFindQuery(target['query']).then( result => {
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;
@@ -337,13 +352,17 @@ export default class IrondbDatasource {
               continue;
             }
             if (!target.isCaql) {
+              result[i]['leaf_data'] = {
+                egress_function: 'average',
+                uuid: result[i]['uuid']
+              };
               if (target.egressoverride != "default") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
               if ('hosted' == this.irondbType) {
                 cleanOptions['std']['names'].push({ leaf_name: this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
               } else {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
               }
             }
           }
@@ -369,34 +388,25 @@ export default class IrondbDatasource {
     });
   }
 
-  _convertIrondbDataToGrafana(result) {
+  _convertIrondbDataToGrafana(result, query) {
     var data = result.data
     var cleanData = [];
 
     var timestamp, origDatapoint, datapoint;
 
-    if (!data || !data.series) return { data: cleanData };
-    if (data.series && data.step && data.from && data.to) {
-      /* Report values in millisecs */
-      data.step *= 1000;
-      data.from *= 1000;
-      data.to *= 1000;
-      for (var name in data.series) {
-        timestamp = data.from - data.step;
-        origDatapoint = data.series[name];
-        datapoint = [];
-        cleanData.push({
-          target: name,
-          datapoints: datapoint
-        });
-        for (var i = 0; i < origDatapoint.length; i++) {
-          timestamp += data.step;
-          if (null == origDatapoint[i]) {
-            continue;
-          }
-          datapoint.push([ origDatapoint[i], timestamp ]);
-        }
+    if (!data) return { data: cleanData };
+    origDatapoint = data;
+    datapoint = [];
+    cleanData.push({
+      target: query.name,
+      datapoints: datapoint
+    });
+    for (var i = 0; i < origDatapoint.length; i++) {
+      timestamp = origDatapoint[i][0] * 1000;
+      if (null == origDatapoint[i][1]) {
+        continue;
       }
+      datapoint.push([ origDatapoint[i][1], timestamp ]);
     }
     return { data: cleanData };
   }

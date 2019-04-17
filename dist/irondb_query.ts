@@ -26,6 +26,9 @@ export default class IrondbQuery {
       return;
     }
 
+    this.segments = [{ type: 'segment', value: this.target.query || '*' }];
+    return;
+
     var parser = new Parser(this.target.query);
     var astNode = parser.getAst();
     if (astNode === null) {

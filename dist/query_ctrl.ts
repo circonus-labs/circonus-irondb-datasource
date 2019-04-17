@@ -5,6 +5,14 @@ import IrondbQuery from './irondb_query';
 import {QueryCtrl} from 'app/plugins/sdk';
 import './css/query_editor.css!';
 
+function tagless_name(name) {
+  var tag_start = name.indexOf("ST[");
+  if (tag_start != -1) {
+    name = name.substring(0, tag_start - 1);
+  }
+  return name;
+}
+
 export class IrondbQueryCtrl extends QueryCtrl {
   static templateUrl = 'partials/query.editor.html';
 
@@ -56,6 +64,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getSegments(index, prefix) {
+    console.log("getSegments() " + index + " " + prefix);
     var query = prefix && prefix.length > 0 ? prefix : '';
 
     if (index > 0) {
@@ -64,13 +73,19 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     return this.datasource
       .metricFindQuery( query + '*' )
-      .then( segments => {
-        var allSegments = _.map(segments.data, segment => {
-          var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+      .then( results => {
+        var metricnames = _.map(results.data, result => {
+          return tagless_name(result.metric_name);
+        });
+        metricnames = _.uniq(metricnames);
+        console.log(JSON.stringify(metricnames));
+
+        var allSegments = _.map(metricnames, segment => {
+          //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
 
           return this.uiSegmentSrv.newSegment({
-            value: segment.name.replace(queryRegExp,''),
-            expandable: !segment.leaf,
+            value: segment, //.replace(queryRegExp,''),
+            expandable: false//!segment.leaf,
           });
         });
 
@@ -118,8 +133,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   checkOtherSegments(fromIndex) {
+    console.log("checkOtherSegments()");
     if (fromIndex === 0) {
-      this.addSelectMetricSegment();
+      //this.addSelectMetricSegment();
       return;
     }
 

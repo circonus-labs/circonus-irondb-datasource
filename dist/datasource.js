@@ -28,7 +28,7 @@ System.register(['lodash'], function(exports_1) {
                 }
                 IrondbDatasource.prototype.query = function (options) {
                     var _this = this;
-                    //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
+                    console.log("options (query): " + JSON.stringify(options, null, 2));
                     var scopedVars = options.scopedVars;
                     if (lodash_1.default.isEmpty(options['targets'][0])) {
                         return this.$q.when({ data: [] });
@@ -56,8 +56,9 @@ System.register(['lodash'], function(exports_1) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query) {
-                    var queryUrl = '/' + this.queryPrefix;
-                    queryUrl = queryUrl + '/metrics/find?query=' + query;
+                    var queryUrl = '/find/' + this.accountId + '/tags?query=';
+                    queryUrl = queryUrl + 'and(__name:' + query + ')';
+                    console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
@@ -122,7 +123,6 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
                     if ('standalone' == this.irondbType && !isCaql) {
-                        baseUrl = baseUrl + '/graphite/' + this.accountId;
                         if (!isFind) {
                             baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
                         }
@@ -135,13 +135,13 @@ System.register(['lodash'], function(exports_1) {
                         url: baseUrl + url,
                         headers: headers,
                     };
-                    //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
+                    console.log("simple query (_irondbSimpleRequest): " + JSON.stringify(options, null, 2));
                     return this.backendSrv.datasourceRequest(options);
                 };
                 IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
-                    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+                    console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
                     var queries = [];
@@ -155,26 +155,39 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-Account'] = this.accountId;
                     }
                     if (irondbOptions['std']['names'].length) {
-                        options = {};
-                        options.url = this.url;
-                        if ('hosted' == this.irondbType) {
-                            options.url = options.url + '/irondb';
-                            options.url = options.url + '/graphite/series_multi';
+                        for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
+                            options = {};
+                            options.url = this.url;
+                            if ('hosted' == this.irondbType) {
+                                options.url = options.url + '/irondb';
+                                options.url = options.url + '/graphite/series_multi';
+                            }
+                            options.method = 'GET';
+                            if ('standalone' == this.irondbType) {
+                                options.url = options.url + '/rollup';
+                            }
+                            var interval = irondbOptions['std']['interval'];
+                            var start = irondbOptions['std']['start'];
+                            var end = irondbOptions['std']['end'];
+                            start = start - (start % interval);
+                            end = end - (end % interval);
+                            options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+                            options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
+                            options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
+                            options.url = options.url + '&end_ts=' + end + '.000';
+                            options.url = options.url + '&rollup_span=' + interval + 's';
+                            options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+                            options.name = irondbOptions['std']['names'][i]['leaf_name'];
+                            options.headers = headers;
+                            if (this.basicAuth || this.withCredentials) {
+                                options.withCredentials = true;
+                            }
+                            if (this.basicAuth) {
+                                options.headers.Authorization = this.basicAuth;
+                            }
+                            options.isCaql = false;
+                            queries.push(options);
                         }
-                        options.method = 'POST';
-                        if ('standalone' == this.irondbType) {
-                            options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
-                        }
-                        options.data = irondbOptions['std'];
-                        options.headers = headers;
-                        if (this.basicAuth || this.withCredentials) {
-                            options.withCredentials = true;
-                        }
-                        if (this.basicAuth) {
-                            options.headers.Authorization = this.basicAuth;
-                        }
-                        options.isCaql = false;
-                        queries.push(options);
                     }
                     if (irondbOptions['caql']['names'].length) {
                         for (var i = 0; i < irondbOptions['caql']['names'].length; i++) {
@@ -206,7 +219,7 @@ System.register(['lodash'], function(exports_1) {
                             queries.push(options);
                         }
                     }
-                    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
+                    console.log("queries (_irondbRequest): " + JSON.stringify(queries, null, 2));
                     return Promise.all(queries.map(function (query) {
                         return _this.backendSrv.datasourceRequest(query).then(function (result) {
                             //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
@@ -215,7 +228,7 @@ System.register(['lodash'], function(exports_1) {
                                 queryInterimResults = _this._convertIrondbCaqlDataToGrafana(result, query);
                             }
                             else {
-                                queryInterimResults = _this._convertIrondbDataToGrafana(result);
+                                queryInterimResults = _this._convertIrondbDataToGrafana(result, query);
                             }
                             return queryInterimResults;
                         }).then(function (result) {
@@ -296,26 +309,26 @@ System.register(['lodash'], function(exports_1) {
                             cleanOptions['caql']['names'].push(target['query']);
                         }
                     }
-                    if (!hasWildcards) {
-                        for (i = 0; i < options.targets.length; i++) {
-                            target = options.targets[i];
-                            if (target.hide || !target['query'] || target['query'].length == 0) {
-                                continue;
+                    if (target.isCaql) {
+                        /*for (i = 0; i < options.targets.length; i++) {
+                          target = options.targets[i];
+                          if (target.hide || !target['query'] || target['query'].length == 0) {
+                            continue;
+                          }
+                          if (!target.isCaql) {
+                            //console.log(`target['query'] (_buildIrondbParamsAsync): ${JSON.stringify(target['query'], null, 2)}`);
+                            if ('hosted' == this.irondbType) {
+                              cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
+                            } else {
+                              cleanOptions['std']['names'].push(target['query']);
                             }
-                            if (!target.isCaql) {
-                                //console.log(`target['query'] (_buildIrondbParamsAsync): ${JSON.stringify(target['query'], null, 2)}`);
-                                if ('hosted' == this.irondbType) {
-                                    cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
-                                }
-                                else {
-                                    cleanOptions['std']['names'].push(target['query']);
-                                }
-                            }
-                        }
+                          }
+                        }*/
                         return cleanOptions;
                     }
                     else {
                         var promises = options.targets.map(function (target) {
+                            console.log("target " + JSON.stringify(target));
                             return _this.metricFindQuery(target['query']).then(function (result) {
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;
@@ -327,6 +340,10 @@ System.register(['lodash'], function(exports_1) {
                                         continue;
                                     }
                                     if (!target.isCaql) {
+                                        result[i]['leaf_data'] = {
+                                            egress_function: 'average',
+                                            uuid: result[i]['uuid']
+                                        };
                                         if (target.egressoverride != "default") {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
@@ -334,7 +351,7 @@ System.register(['lodash'], function(exports_1) {
                                             cleanOptions['std']['names'].push({ leaf_name: _this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                         else {
-                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                     }
                                 }
@@ -357,33 +374,24 @@ System.register(['lodash'], function(exports_1) {
                         resolve(self._buildIrondbParamsAsync(options));
                     });
                 };
-                IrondbDatasource.prototype._convertIrondbDataToGrafana = function (result) {
+                IrondbDatasource.prototype._convertIrondbDataToGrafana = function (result, query) {
                     var data = result.data;
                     var cleanData = [];
                     var timestamp, origDatapoint, datapoint;
-                    if (!data || !data.series)
+                    if (!data)
                         return { data: cleanData };
-                    if (data.series && data.step && data.from && data.to) {
-                        /* Report values in millisecs */
-                        data.step *= 1000;
-                        data.from *= 1000;
-                        data.to *= 1000;
-                        for (var name in data.series) {
-                            timestamp = data.from - data.step;
-                            origDatapoint = data.series[name];
-                            datapoint = [];
-                            cleanData.push({
-                                target: name,
-                                datapoints: datapoint
-                            });
-                            for (var i = 0; i < origDatapoint.length; i++) {
-                                timestamp += data.step;
-                                if (null == origDatapoint[i]) {
-                                    continue;
-                                }
-                                datapoint.push([origDatapoint[i], timestamp]);
-                            }
+                    origDatapoint = data;
+                    datapoint = [];
+                    cleanData.push({
+                        target: query.name,
+                        datapoints: datapoint
+                    });
+                    for (var i = 0; i < origDatapoint.length; i++) {
+                        timestamp = origDatapoint[i][0] * 1000;
+                        if (null == origDatapoint[i][1]) {
+                            continue;
                         }
+                        datapoint.push([origDatapoint[i][1], timestamp]);
                     }
                     return { data: cleanData };
                 };

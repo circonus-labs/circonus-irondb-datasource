@@ -27,7 +27,7 @@ export default class IrondbDatasource {
     _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
     _buildIrondbParamsAsync(options: any): {};
     _buildIrondbParams(options: any): Promise<{}>;
-    _convertIrondbDataToGrafana(result: any): {
+    _convertIrondbDataToGrafana(result: any, query: any): {
         data: any[];
     };
     _convertIrondbCaqlDataToGrafana(result: any, query: any): {
