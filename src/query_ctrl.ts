@@ -21,14 +21,17 @@ export class IrondbQueryCtrl extends QueryCtrl {
   queryModel: IrondbQuery;
   pointTypeOptions = [ { value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" } ];
   egressTypeOptions = [ { value: "default", text: "default" },
-                        { value: "avg", text: "average" },
-                        { value: "sum", text: "sum" },
                         { value: "count", text: "count" },
-                        { value: "stddev", text: "\u03C3" },
-                        { value: "derivative", text: "derivative" },
-                        { value: "d_stddev", text: "\u03C3 derivative" },
+                        { value: "average", text: "average" },
+                        { value: "average_stddev", text: "average_stddev" },
+                        { value: "derive", text: "derive" },
+                        { value: "derive_stddev", text: "derive_stddev" },
                         { value: "counter", text: "counter" },
-                        { value: "c_stddev", text: "\u03C3 counter" } ];
+                        { value: "counter_stddev", text: "counter_stddev" },
+                        { value: "derive2", text: "derive2" },
+                        { value: "derive2_stddev", text: "derive2_stddev" },
+                        { value: "counter2", text: "counter2" },
+                        { value: "counter2_stddev", text: "counter2_stddev" } ];
   segments: any[];
 
   /** @ngInject **/
