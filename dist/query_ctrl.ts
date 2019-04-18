@@ -105,10 +105,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
           });
         }
 
-        // de-dupe segments
-        allSegments = _.uniqBy(allSegments, 'value');
-        // add wildcard option
-        allSegments.unshift(this.uiSegmentSrv.newSegment('*'));
         return allSegments;
       })
       .catch(err => {

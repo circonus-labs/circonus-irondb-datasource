@@ -109,10 +109,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 }
                             });
                         }
-                        // de-dupe segments
-                        allSegments = lodash_1.default.uniqBy(allSegments, 'value');
-                        // add wildcard option
-                        allSegments.unshift(_this.uiSegmentSrv.newSegment('*'));
                         return allSegments;
                     })
                         .catch(function (err) {
