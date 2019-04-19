@@ -33,6 +33,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                         { value: "counter2", text: "counter2" },
                         { value: "counter2_stddev", text: "counter2_stddev" } ];
   segments: any[];
+  loadSegments: boolean;
 
   /** @ngInject **/
   constructor($scope, $injector, private uiSegmentSrv, private templateSrv) {
@@ -46,6 +47,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
+    this.loadSegments = false;
   }
 
   typeValueChanged() {
@@ -70,8 +72,57 @@ export class IrondbQueryCtrl extends QueryCtrl {
     console.log("getSegments() " + index + " " + prefix);
     var query = prefix && prefix.length > 0 ? prefix : '';
 
-    if (index > 0) {
-      query = this.queryModel.getSegmentPathUpTo(index) + query;
+    if (index === 1) {
+      var metricName = this.segments[0].value;
+      console.log("getSegments() tags for " + metricName);
+      return this.datasource
+        .metricTagCatsQuery(metricName)
+        .then(segments => {
+          if (segments.data && segments.data.length > 0) {
+            var tagCats = segments.data;
+            var tagSegments = [];
+            for(var tagCat of tagCats) {
+              tagSegments.push(this.uiSegmentSrv.newSegment({
+                value: "tag: " + tagCat,
+                expandable: true
+              }));
+            }
+            return tagSegments;
+          }
+        })
+        .catch(err => {
+          console.log(err);
+          return [];
+        });
+    }
+    else if (index === 2) {
+      var metricName = this.segments[0].value;
+      var tagCat = this.segments[1].value;
+      tagCat = tagCat.slice(5);
+      console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
+      return this.datasource
+        .metricTagValsQuery(metricName, tagCat)
+        .then(segments => {
+          if (segments.data && segments.data.length > 0) {
+            var tagVals = segments.data;
+            var tagSegments = [];
+            tagSegments.push(this.uiSegmentSrv.newSegment({
+              value: '*',
+              expandable: true
+            }));
+            for(var tagVal of tagVals) {
+              tagSegments.push(this.uiSegmentSrv.newSegment({
+                value: tagVal,
+                expandable: true
+              }));
+            }
+            return tagSegments;
+          }
+        })
+        .catch(err => {
+          console.log(err);
+          return [];
+        });
     }
 
     return this.datasource
@@ -88,13 +139,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
           return this.uiSegmentSrv.newSegment({
             value: segment, //.replace(queryRegExp,''),
-            expandable: false//!segment.leaf,
+            expandable: true//!segment.leaf,
           });
         });
 
-        if (index > 0 && allSegments.length === 0) {
+        /*if (index > 0 && allSegments.length === 0) {
           return allSegments;
-        }
+        }*/
 
         // add query references
         if (index === 0) {
@@ -108,6 +159,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         return allSegments;
       })
       .catch(err => {
+        console.log("getSegments() " + err.toString());
         return [];
       });
   }
@@ -131,14 +183,48 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.segments.push(this.uiSegmentSrv.newSelectMetric());
   }
 
+  addSelectTagCatSegment() {
+    //this.queryModel.addSelectMetricSegment();
+    var tagCatSegment = this.uiSegmentSrv.newPlusButton();
+    tagCatSegment.html += ' tag';
+    this.segments.push(tagCatSegment);
+  }
+
+  addSelectTagValSegment() {
+    //this.queryModel.addSelectMetricSegment();
+    var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
+    this.segments.push(tagValSegment);
+  }
+
   checkOtherSegments(fromIndex) {
-    console.log("checkOtherSegments()");
+    console.log("checkOtherSegments() " + fromIndex);
     if (fromIndex === 0) {
       //this.addSelectMetricSegment();
+      if (!this.loadSegments) {
+        if (this.target.query !== '' && this.segments.length === 1) {
+          this.addSelectTagCatSegment();
+        }
+        this.loadSegments = true;
+      }
       return;
     }
-
-    var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);
+    else if(fromIndex === 1) {
+      this.addSelectTagCatSegment();
+    }
+    else if(fromIndex === 2) {
+      this.addSelectTagValSegment();
+    }
+    else if(fromIndex === 3) {
+      var metricName = this.segments[0].value;
+      var tagCat = this.segments[1].value;
+      var tagVal = this.segments[2].value;
+      tagCat = tagCat.slice(5);
+      metricName += "," + tagCat + ":" + tagVal;
+      console.log(metricName);
+      this.target.query = metricName;
+    }
+    return Promise.resolve();
+    /*var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);
     if (path === '') {
       return Promise.resolve();
     }
@@ -165,7 +251,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
       })
       .catch(err => {
-      });
+      });*/
   }
 
   setSegmentFocus(segmentIndex) {
@@ -175,6 +261,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentValueChanged(segment, segmentIndex) {
+    console.log("segmentValueChanged()");
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
@@ -203,10 +290,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   updateModelTarget() {
-    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    console.log("updateModelTarget()");
+    if (this.segments.length < 3) {
+      this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    }
   }
 
   targetChanged() {
+    console.log("targetChanged()");
     if (this.queryModel.error) {
       return;
     }

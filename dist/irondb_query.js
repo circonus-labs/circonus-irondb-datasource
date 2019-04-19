@@ -26,8 +26,22 @@ System.register(['lodash', './parser'], function(exports_1) {
                     if (this.target.rawQuery) {
                         return;
                     }
-                    this.segments = [{ type: 'segment', value: this.target.query || '*' }];
-                    return;
+                    console.log("parseTarget() " + JSON.stringify(this.target));
+                    var metricName = this.target.query || '*';
+                    var tags = metricName.split(',');
+                    if (tags.length === 1) {
+                        this.segments = [{ type: 'segment', value: metricName }];
+                        return;
+                    }
+                    else {
+                        metricName = tags[0];
+                        tags = tags[1].split(':');
+                        var tagCat = 'tag: ' + tags[0];
+                        var tagVal = tags[1];
+                        var segments = [metricName, tagCat, tagVal];
+                        this.segments = segments.map(function (s) { return ({ type: 'segment', value: s }); });
+                        return;
+                    }
                     var parser = new parser_1.Parser(this.target.query);
                     var astNode = parser.getAst();
                     if (astNode === null) {
@@ -66,7 +80,10 @@ System.register(['lodash', './parser'], function(exports_1) {
                     }
                 };
                 IrondbQuery.prototype.updateSegmentValue = function (segment, index) {
-                    this.segments[index].value = segment.value;
+                    console.log("updateSegmentValue() " + index + " " + JSON.stringify(segment));
+                    if (this.segments[index] !== undefined) {
+                        this.segments[index].value = segment.value;
+                    }
                 };
                 IrondbQuery.prototype.addSelectMetricSegment = function () {
                     this.segments.push({ value: 'select metric' });

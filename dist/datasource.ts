@@ -33,7 +33,7 @@ export default class IrondbDatasource {
   }
 
   query(options) {
-    console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
+    //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
     var scopedVars = options.scopedVars;
 
     if (_.isEmpty(options['targets'][0])) {
@@ -66,6 +66,20 @@ export default class IrondbDatasource {
 
   metricFindQuery(query: string) {
     var queryUrl = '/find/' + this.accountId + '/tags?query=';
+    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    console.log(queryUrl);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+  }
+
+  metricTagCatsQuery(query: string) {
+    var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
+    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    console.log(queryUrl);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+  }
+
+  metricTagValsQuery(query: string, cat: string) {
+    var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
@@ -142,12 +156,12 @@ export default class IrondbDatasource {
       headers: headers,
     };
 
-    console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
+    //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
     return this.backendSrv.datasourceRequest(options);
   }
 
   _irondbRequest(irondbOptions, isCaql = false) {
-    console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
     var queries = [];
@@ -227,7 +241,7 @@ export default class IrondbDatasource {
         queries.push(options);
       }
     }
-    console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
+    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
     return Promise.all(queries.map(query =>
       this.backendSrv.datasourceRequest(query).then( result => {

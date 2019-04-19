@@ -21,6 +21,8 @@ export default class IrondbDatasource {
     query(options: any): any;
     annotationQuery(options: any): void;
     metricFindQuery(query: string): any;
+    metricTagCatsQuery(query: string): any;
+    metricTagValsQuery(query: string, cat: string): any;
     testDatasource(): any;
     _throwerr(err: any): void;
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean): any;

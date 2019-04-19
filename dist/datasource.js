@@ -28,7 +28,7 @@ System.register(['lodash'], function(exports_1) {
                 }
                 IrondbDatasource.prototype.query = function (options) {
                     var _this = this;
-                    console.log("options (query): " + JSON.stringify(options, null, 2));
+                    //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
                     var scopedVars = options.scopedVars;
                     if (lodash_1.default.isEmpty(options['targets'][0])) {
                         return this.$q.when({ data: [] });
@@ -57,6 +57,18 @@ System.register(['lodash'], function(exports_1) {
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query) {
                     var queryUrl = '/find/' + this.accountId + '/tags?query=';
+                    queryUrl = queryUrl + 'and(__name:' + query + ')';
+                    console.log(queryUrl);
+                    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+                };
+                IrondbDatasource.prototype.metricTagCatsQuery = function (query) {
+                    var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
+                    queryUrl = queryUrl + 'and(__name:' + query + ')';
+                    console.log(queryUrl);
+                    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+                };
+                IrondbDatasource.prototype.metricTagValsQuery = function (query, cat) {
+                    var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
                     console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
@@ -135,13 +147,13 @@ System.register(['lodash'], function(exports_1) {
                         url: baseUrl + url,
                         headers: headers,
                     };
-                    console.log("simple query (_irondbSimpleRequest): " + JSON.stringify(options, null, 2));
+                    //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
                     return this.backendSrv.datasourceRequest(options);
                 };
                 IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
-                    console.log("irondbOptions (_irondbRequest): " + JSON.stringify(irondbOptions, null, 2));
+                    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
                     var queries = [];
@@ -219,7 +231,7 @@ System.register(['lodash'], function(exports_1) {
                             queries.push(options);
                         }
                     }
-                    console.log("queries (_irondbRequest): " + JSON.stringify(queries, null, 2));
+                    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
                     return Promise.all(queries.map(function (query) {
                         return _this.backendSrv.datasourceRequest(query).then(function (result) {
                             //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);

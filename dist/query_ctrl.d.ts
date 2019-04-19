@@ -16,6 +16,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
         text: string;
     }[];
     segments: any[];
+    loadSegments: boolean;
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
     typeValueChanged(): void;
@@ -26,9 +27,11 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     parseTarget(): void;
     buildSegments(): void;
     addSelectMetricSegment(): void;
-    checkOtherSegments(fromIndex: any): any;
+    addSelectTagCatSegment(): void;
+    addSelectTagValSegment(): void;
+    checkOtherSegments(fromIndex: any): Promise<void>;
     setSegmentFocus(segmentIndex: any): void;
-    segmentValueChanged(segment: any, segmentIndex: any): any;
+    segmentValueChanged(segment: any, segmentIndex: any): Promise<void>;
     spliceSegments(index: any): void;
     emptySegments(): void;
     updateModelTarget(): void;
