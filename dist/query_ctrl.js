@@ -14,6 +14,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
         }
         return name;
     }
+    function isEven(x) {
+        return x % 2 == 0;
+    }
     function mapToDropdownOptions(results) {
         return lodash_1.default.map(results, function (value) {
             return { text: value, value: value };
@@ -81,7 +84,41 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var _this = this;
                     console.log("getSegments() " + index + " " + prefix);
                     var query = prefix && prefix.length > 0 ? prefix : '';
-                    if (index === 1) {
+                    if (index === 0) {
+                        return this.datasource
+                            .metricFindQuery(query + '*')
+                            .then(function (results) {
+                            var metricnames = lodash_1.default.map(results.data, function (result) {
+                                return tagless_name(result.metric_name);
+                            });
+                            metricnames = lodash_1.default.uniq(metricnames);
+                            console.log(JSON.stringify(metricnames));
+                            var allSegments = lodash_1.default.map(metricnames, function (segment) {
+                                //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+                                return _this.uiSegmentSrv.newSegment({
+                                    value: segment,
+                                    expandable: true //!segment.leaf,
+                                });
+                            });
+                            /*if (index > 0 && allSegments.length === 0) {
+                              return allSegments;
+                            }*/
+                            // add query references
+                            if (index === 0) {
+                                lodash_1.default.eachRight(_this.panelCtrl.panel.targets, function (target) {
+                                    if (target.refId === _this.queryModel.target.refId) {
+                                        return;
+                                    }
+                                });
+                            }
+                            return allSegments;
+                        })
+                            .catch(function (err) {
+                            console.log("getSegments() " + err.toString());
+                            return [];
+                        });
+                    }
+                    else if (!isEven(index)) {
                         var metricName = this.segments[0].value;
                         console.log("getSegments() tags for " + metricName);
                         return this.datasource
@@ -105,9 +142,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return [];
                         });
                     }
-                    else if (index === 2) {
+                    else if (isEven(index)) {
                         var metricName = this.segments[0].value;
-                        var tagCat = this.segments[1].value;
+                        var tagCat = this.segments[index - 1].value;
                         tagCat = tagCat.slice(5);
                         console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
@@ -135,38 +172,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return [];
                         });
                     }
-                    return this.datasource
-                        .metricFindQuery(query + '*')
-                        .then(function (results) {
-                        var metricnames = lodash_1.default.map(results.data, function (result) {
-                            return tagless_name(result.metric_name);
-                        });
-                        metricnames = lodash_1.default.uniq(metricnames);
-                        console.log(JSON.stringify(metricnames));
-                        var allSegments = lodash_1.default.map(metricnames, function (segment) {
-                            //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-                            return _this.uiSegmentSrv.newSegment({
-                                value: segment,
-                                expandable: true //!segment.leaf,
-                            });
-                        });
-                        /*if (index > 0 && allSegments.length === 0) {
-                          return allSegments;
-                        }*/
-                        // add query references
-                        if (index === 0) {
-                            lodash_1.default.eachRight(_this.panelCtrl.panel.targets, function (target) {
-                                if (target.refId === _this.queryModel.target.refId) {
-                                    return;
-                                }
-                            });
-                        }
-                        return allSegments;
-                    })
-                        .catch(function (err) {
-                        console.log("getSegments() " + err.toString());
-                        return [];
-                    });
                 };
                 IrondbQueryCtrl.prototype.parseTarget = function () {
                     this.queryModel.parseTarget();
@@ -196,11 +201,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.segments.push(tagValSegment);
                 };
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
-                    console.log("checkOtherSegments() " + fromIndex);
+                    console.log("checkOtherSegments() " + fromIndex + " " + this.segments.length);
                     if (fromIndex === 0) {
                         //this.addSelectMetricSegment();
                         if (!this.loadSegments) {
-                            if (this.target.query !== '' && this.segments.length === 1) {
+                            if (this.target.query !== '') {
                                 this.addSelectTagCatSegment();
                             }
                             this.loadSegments = true;
@@ -210,16 +215,19 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     else if (fromIndex === 1) {
                         this.addSelectTagCatSegment();
                     }
-                    else if (fromIndex === 2) {
+                    else if (isEven(fromIndex)) {
                         this.addSelectTagValSegment();
                     }
-                    else if (fromIndex === 3) {
-                        var metricName = this.segments[0].value;
-                        var tagCat = this.segments[1].value;
-                        var tagVal = this.segments[2].value;
-                        tagCat = tagCat.slice(5);
-                        metricName += "," + tagCat + ":" + tagVal;
-                        console.log(metricName);
+                    else if (!isEven(fromIndex)) {
+                        var segments = this.segments.slice();
+                        var metricName = segments.shift().value;
+                        for (var i = 0; i < segments.length; i += 2) {
+                            var tagCat = segments[i].value;
+                            var tagVal = segments[i + 1].value;
+                            tagCat = tagCat.slice(5);
+                            metricName += "," + tagCat + ":" + tagVal;
+                        }
+                        console.log("checkOtherSegments() " + metricName);
                         this.target.query = metricName;
                     }
                     return Promise.resolve();

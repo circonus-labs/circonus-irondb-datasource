@@ -1,5 +1,5 @@
-System.register(['lodash', './parser'], function(exports_1) {
-    var lodash_1, parser_1;
+System.register(['lodash'], function(exports_1) {
+    var lodash_1;
     var IrondbQuery;
     function wrapFunction(target, func) {
         return func.render(target);
@@ -8,9 +8,6 @@ System.register(['lodash', './parser'], function(exports_1) {
         setters:[
             function (lodash_1_1) {
                 lodash_1 = lodash_1_1;
-            },
-            function (parser_1_1) {
-                parser_1 = parser_1_1;
             }],
         execute: function() {
             IrondbQuery = (function () {
@@ -29,39 +26,17 @@ System.register(['lodash', './parser'], function(exports_1) {
                     console.log("parseTarget() " + JSON.stringify(this.target));
                     var metricName = this.target.query || '*';
                     var tags = metricName.split(',');
-                    if (tags.length === 1) {
-                        this.segments = [{ type: 'segment', value: metricName }];
-                        return;
+                    metricName = tags.shift();
+                    this.segments.push({ type: 'segment', value: metricName });
+                    for (var _i = 0; _i < tags.length; _i++) {
+                        var tag = tags[_i];
+                        tag = tag.split(':');
+                        var tagCat = 'tag: ' + tag[0];
+                        var tagVal = tag[1];
+                        this.segments.push({ type: 'segment', value: tagCat });
+                        this.segments.push({ type: 'segment', value: tagVal });
                     }
-                    else {
-                        metricName = tags[0];
-                        tags = tags[1].split(':');
-                        var tagCat = 'tag: ' + tags[0];
-                        var tagVal = tags[1];
-                        var segments = [metricName, tagCat, tagVal];
-                        this.segments = segments.map(function (s) { return ({ type: 'segment', value: s }); });
-                        return;
-                    }
-                    var parser = new parser_1.Parser(this.target.query);
-                    var astNode = parser.getAst();
-                    if (astNode === null) {
-                        this.checkOtherSegmentsIndex = 0;
-                        return;
-                    }
-                    if (astNode.type === 'error') {
-                        this.error = astNode.message + ' at position: ' + astNode.pos;
-                        this.target.rawQuery = true;
-                        return;
-                    }
-                    try {
-                        this.parseTargetRecursive(astNode, null);
-                    }
-                    catch (err) {
-                        console.log('error parsing target:', err.message);
-                        this.error = err.message;
-                        this.target.rawQuery = true;
-                    }
-                    this.checkOtherSegmentsIndex = this.segments.length - 1;
+                    console.log("parseTarget() " + JSON.stringify(this.segments));
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {
                     var arr = this.segments.slice(0, index);

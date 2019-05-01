@@ -29,42 +29,18 @@ export default class IrondbQuery {
     console.log("parseTarget() " + JSON.stringify(this.target));
     var metricName = this.target.query || '*';
     var tags = metricName.split(',');
-    if (tags.length === 1) {
-      this.segments = [{ type: 'segment', value: metricName }];
-      return;
-    }
-    else {
-      metricName = tags[0];
-      tags = tags[1].split(':');
-      var tagCat = 'tag: ' + tags[0];
-      var tagVal = tags[1];
-      var segments = [metricName, tagCat, tagVal];
-      this.segments = segments.map(s => ({ type: 'segment', value: s }));
-      return;
+    metricName = tags.shift();
+    this.segments.push({ type: 'segment', value: metricName });
+
+    for(var tag of tags) {
+      tag = tag.split(':');
+      var tagCat = 'tag: ' + tag[0];
+      var tagVal = tag[1];
+      this.segments.push({ type: 'segment', value: tagCat });
+      this.segments.push({ type: 'segment', value: tagVal });
     }
 
-    var parser = new Parser(this.target.query);
-    var astNode = parser.getAst();
-    if (astNode === null) {
-      this.checkOtherSegmentsIndex = 0;
-      return;
-    }
-
-    if (astNode.type === 'error') {
-      this.error = astNode.message + ' at position: ' + astNode.pos;
-      this.target.rawQuery = true;
-      return;
-    }
-
-    try {
-      this.parseTargetRecursive(astNode, null);
-    } catch (err) {
-      console.log('error parsing target:', err.message);
-      this.error = err.message;
-      this.target.rawQuery = true;
-    }
-
-    this.checkOtherSegmentsIndex = this.segments.length - 1;
+    console.log("parseTarget() " + JSON.stringify(this.segments));
   }
 
   getSegmentPathUpTo(index) {
