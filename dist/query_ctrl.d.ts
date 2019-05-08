@@ -25,6 +25,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     getCollapsedText(): any;
     getSegments(index: any, prefix: any): any;
     parseTarget(): void;
+    mapSegment(segment: any): any;
     buildSegments(): void;
     addSelectMetricSegment(): void;
     addSelectTagCatSegment(): void;

@@ -354,7 +354,7 @@ export default class IrondbDatasource {
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
-        console.log("target " + JSON.stringify(target));
+        console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
         return this.metricFindQuery(target['query']).then( result => {
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;

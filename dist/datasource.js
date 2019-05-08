@@ -340,7 +340,7 @@ System.register(['lodash'], function(exports_1) {
                     }
                     else {
                         var promises = options.targets.map(function (target) {
-                            console.log("target " + JSON.stringify(target));
+                            console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
                             return _this.metricFindQuery(target['query']).then(function (result) {
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;

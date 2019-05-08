@@ -1,6 +1,6 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
-    var IrondbQuery;
+    var SegmentType, IrondbQuery;
     function wrapFunction(target, func) {
         return func.render(target);
     }
@@ -10,6 +10,18 @@ System.register(['lodash'], function(exports_1) {
                 lodash_1 = lodash_1_1;
             }],
         execute: function() {
+            (function (SegmentType) {
+                SegmentType[SegmentType["MetricName"] = 0] = "MetricName";
+                SegmentType[SegmentType["TagCat"] = 1] = "TagCat";
+                SegmentType[SegmentType["TagVal"] = 2] = "TagVal";
+                SegmentType[SegmentType["TagOpAnd"] = 3] = "TagOpAnd";
+                SegmentType[SegmentType["TagOpOr"] = 4] = "TagOpOr";
+                SegmentType[SegmentType["TagOpNot"] = 5] = "TagOpNot";
+                SegmentType[SegmentType["TagPair"] = 6] = "TagPair";
+                SegmentType[SegmentType["TagEnd"] = 7] = "TagEnd";
+            })(SegmentType || (SegmentType = {}));
+            exports_1("SegmentType", SegmentType);
+            ;
             IrondbQuery = (function () {
                 /** @ngInject */
                 function IrondbQuery(datasource, target, templateSrv, scopedVars) {
@@ -23,20 +35,25 @@ System.register(['lodash'], function(exports_1) {
                     if (this.target.rawQuery) {
                         return;
                     }
-                    console.log("parseTarget() " + JSON.stringify(this.target));
+                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
                     var metricName = this.target.query || '*';
                     var tags = metricName.split(',');
                     metricName = tags.shift();
-                    this.segments.push({ type: 'segment', value: metricName });
+                    this.segments.push({ type: SegmentType.MetricName, value: metricName });
+                    if (tags.length > 0)
+                        this.segments.push({ type: SegmentType.TagOpAnd });
                     for (var _i = 0; _i < tags.length; _i++) {
                         var tag = tags[_i];
                         tag = tag.split(':');
-                        var tagCat = 'tag: ' + tag[0];
+                        var tagCat = tag[0];
                         var tagVal = tag[1];
-                        this.segments.push({ type: 'segment', value: tagCat });
-                        this.segments.push({ type: 'segment', value: tagVal });
+                        this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+                        this.segments.push({ type: SegmentType.TagPair });
+                        this.segments.push({ type: SegmentType.TagVal, value: tagVal });
                     }
-                    console.log("parseTarget() " + JSON.stringify(this.segments));
+                    if (tags.length > 0)
+                        this.segments.push({ type: SegmentType.TagEnd });
+                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.segments));
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {
                     var arr = this.segments.slice(0, index);
@@ -55,7 +72,8 @@ System.register(['lodash'], function(exports_1) {
                     }
                 };
                 IrondbQuery.prototype.updateSegmentValue = function (segment, index) {
-                    console.log("updateSegmentValue() " + index + " " + JSON.stringify(segment));
+                    console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
+                    console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
                     if (this.segments[index] !== undefined) {
                         this.segments[index].value = segment.value;
                     }
@@ -64,9 +82,10 @@ System.register(['lodash'], function(exports_1) {
                     this.segments.push({ value: 'select metric' });
                 };
                 IrondbQuery.prototype.updateModelTarget = function (targets) {
+                    console.log("IrondbQuery.updateModelTarget() " + JSON.stringify(targets));
                     // render query
-                    this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
-                    this.target.query = this.target.query.replace(/\.$/, '');
+                    //this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
+                    //this.target.query = this.target.query.replace(/\.$/, '');
                     this.updateRenderedTarget(this.target, targets);
                     // loop through other queries and update targetFull as needed
                     for (var _i = 0, _a = targets || []; _i < _a.length; _i++) {
