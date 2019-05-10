@@ -129,6 +129,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 expandable: true
               }));
             }
+            if( segmentType === SegmentType.TagPlus ) {
+                // For Plus, we want to allow new operators, so put those on the front
+                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "and(" }) );
+                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "not(" }) );
+                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "or("  }) );
+            }
             return tagSegments;
           }
         })
@@ -232,11 +238,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.segments.push(this.buildSelectTagPlusSegment());
   }
 
-  addSelectTagValSegment() {
-    //this.queryModel.addSelectMetricSegment();
+  newSelectTagValSegment() {
     var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
     tagValSegment._type = SegmentType.TagVal;
-    this.segments.push(tagValSegment);
+    return tagValSegment;
   }
 
   checkOtherSegments(fromIndex) {
@@ -255,8 +260,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
           // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
           this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagOp, value: "and(" }));
         }
-        this.segments.push(this.mapSegment({ type: SegmentType.TagPair }));
-        this.addSelectTagValSegment();
+        this.segments.push(this.mapSegment({ type: SegmentType.TagPair }),
+            this.newSelectTagValSegment()
+        );
         this.addSelectTagPlusSegment();
         this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
       }
@@ -321,8 +327,27 @@ export class IrondbQueryCtrl extends QueryCtrl {
         return;
     }
     else if( segment._type === SegmentType.TagPlus ) {
-        segment._type = SegmentType.TagCat;
-        // TODO - add TagOp here
+        if( segment.value === "and(" ||
+            segment.value === "not(" ||
+            segment.value === "or(" )
+        {
+            // Remove myself, and replace it with a TagOp + friends
+            this.segments.splice(segmentIndex, 1, 
+                this.mapSegment({ type: SegmentType.TagSep }),
+                this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
+                this.mapSegment({ type: SegmentType.TagCat }),
+                this.mapSegment({ type: SegmentType.TagPair }),
+                this.newSelectTagValSegment(),
+                this.buildSelectTagPlusSegment(),
+                this.mapSegment({ type: SegmentType.TagEnd }),
+                this.buildSelectTagPlusSegment()
+             );
+             // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
+             this.setSegmentFocus(segmentIndex + 2);
+             return;
+        } else {
+            segment._type = SegmentType.TagCat;
+        }
     }
 
     this.spliceSegments(segmentIndex + 1);
