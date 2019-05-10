@@ -180,9 +180,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else if (segment.type === SegmentType.TagEnd) {
       uiSegment = this.uiSegmentSrv.newOperator(")");
+      uiSegment.isLabel = true;
     }
     else if (segment.type === SegmentType.TagPair) {
       uiSegment = this.uiSegmentSrv.newCondition(":");
+      uiSegment.isLabel = true;
     }
     else {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
