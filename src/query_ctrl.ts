@@ -273,63 +273,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.addSelectTagPlusSegment();
       }
     }
-    /*if (fromIndex === 0) {
-      //this.addSelectMetricSegment();
-      if (!this.loadSegments) {
-        if (this.target.query !== '') {
-          this.addSelectTagPlusSegment();
-        }
-        this.loadSegments = true;
-      }
-      return;
-    }
-    else if(fromIndex === 1) {
-      this.addSelectTagPlusSegment();
-    }
-    else if(isEven(fromIndex)) {
-      this.addSelectTagValSegment();
-    }
-    else if(!isEven(fromIndex)) {
-      var segments = this.segments.slice();
-      var metricName = segments.shift().value;
-      for (var i = 0; i < segments.length; i += 2) {
-        var tagCat = segments[i].value;
-        var tagVal = segments[i + 1].value;
-        metricName += "," + tagCat + ":" + tagVal;
-      }
-      console.log("checkOtherSegments() " + JSON.stringify(segments));
-      console.log("checkOtherSegments() " + metricName);
-      this.target.query = metricName;
-    }*/
     return Promise.resolve();
-    /*var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);
-    if (path === '') {
-      return Promise.resolve();
-    }
-
-    return this.datasource
-      .metricFindQuery( path + '*' )
-      .then(segments => {
-        if (segments.data.length === 0) {
-          if (path !== '') {
-            this.queryModel.segments = this.queryModel.segments.splice(0, fromIndex + 1);
-            this.segments = this.segments.splice(0, fromIndex + 1);
-          }
-        } else {
-          _.map(segments.data, segment => {
-            var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
-            var segmentName = segment.name.replace(pathRegExp,'');
-            segment.name = segmentName;
-          });
-          if (this.segments.length === fromIndex) {
-            this.addSelectMetricSegment();
-          } else {
-            return this.checkOtherSegments(fromIndex + 1);
-          }
-        }
-      })
-      .catch(err => {
-      });*/
   }
 
   setSegmentFocus(segmentIndex) {
