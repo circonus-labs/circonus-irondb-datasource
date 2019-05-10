@@ -372,8 +372,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.segments = head.concat( tail, optionalPlus );
         }
         // else Changing an Operator doesn't need to affect any other segments
-
-        // fall through so targetChange() is called and we re-evaluate the metrics to graph
+        this.targetChanged();
+        return;
     }
     else if( segment._type === SegmentType.TagPlus ) {
         segment._type = SegmentType.TagCat;
@@ -415,7 +415,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if( type === SegmentType.TagPlus ) {
             continue;
         }
-        console.log("type: " + type);
         if( !noComma && type !== SegmentType.TagEnd && type !==SegmentType.TagSep ) {
             query += ","
         }
@@ -425,33 +424,17 @@ export class IrondbQueryCtrl extends QueryCtrl {
             noComma = false; 
         }
 
-        //if( type === SegmentType.TagVal && segment.value === "*" ) {
-        //    query += "/./";
-        //} else {
-            query += segment.value;
-            //}
+        query += segment.value;
     }
     query += ")";
-    console.log(query);
+    console.log("QUERY: " + query);
     return query;
-    //var streamTags = _.map(segments, function (segment) {
-    //  var str = segment.value || "";
-    //  if (segment._type === SegmentType.TagOp) {
-    //    str = str.toLowerCase().split(" ").join("");
-    //  }
-    //  return str;
-    //});
-    //metricName = "__name:" + metricName + ",";
-    //streamTags.splice(1, 0, metricName);
-    //return streamTags.join("");
   }
 
   updateModelTarget() {
     var streamTags = this.segmentsToStreamTags();
     console.log("updateModelTarget() " + streamTags);
-    //if (this.segments.length < 3) {
-      this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
-    //}
+    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
     this.queryModel.target.query = streamTags;
   }
 
