@@ -331,19 +331,25 @@ export class IrondbQueryCtrl extends QueryCtrl {
             segment.value === "not(" ||
             segment.value === "or(" )
         {
-            // Remove myself, and replace it with a TagOp + friends
-            this.segments.splice(segmentIndex, 1, 
-                this.mapSegment({ type: SegmentType.TagSep }),
+            // Remove myself
+            this.segments.splice(segmentIndex, 1);
+            if( segmentIndex > 2 ) {
+                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
+            }
+            // and replace it with a TagOp + friends
+            this.segments.splice(segmentIndex + 1, 0,
                 this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-                this.mapSegment({ type: SegmentType.TagCat }),
+                this.mapSegment({ type: SegmentType.TagCat, value: "undefined" }),
                 this.mapSegment({ type: SegmentType.TagPair }),
                 this.newSelectTagValSegment(),
                 this.buildSelectTagPlusSegment(),
-                this.mapSegment({ type: SegmentType.TagEnd }),
-                this.buildSelectTagPlusSegment()
+                this.mapSegment({ type: SegmentType.TagEnd })
              );
+             if( segmentIndex > 2 ) {
+                 this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment() );
+             }
              // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
-             this.setSegmentFocus(segmentIndex + 2);
+             this.setSegmentFocus(segmentIndex + 3);
              return;
         } else {
             segment._type = SegmentType.TagCat;
