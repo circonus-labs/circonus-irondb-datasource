@@ -5,12 +5,11 @@ export enum SegmentType {
   MetricName,
   TagCat,
   TagVal,
-  TagOpAnd,
-  TagOpOr,
-  TagOpNot,
   TagPair,
   TagSep,
-  TagEnd
+  TagEnd,
+  TagOp,
+  TagPlus
 };
 
 export default class IrondbQuery {
@@ -47,7 +46,7 @@ export default class IrondbQuery {
     this.segments.push({ type: SegmentType.MetricName, value: metricName });
 
     var first = true;
-    if (tags.length > 0) this.segments.push({ type: SegmentType.TagOpAnd });
+    if (tags.length > 0) this.segments.push({ type: SegmentType.TagOp, value: "AND (" });
     for(var tag of tags) {
       if (first) {
         first = false;
