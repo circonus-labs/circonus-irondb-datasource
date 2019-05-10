@@ -186,6 +186,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
       uiSegment = this.uiSegmentSrv.newCondition(":");
       uiSegment.isLabel = true;
     }
+    else if (segment.type === SegmentType.TagSep) {
+      uiSegment = this.uiSegmentSrv.newCondition(",");
+      uiSegment.isLabel = true;
+    }
     else {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
     }
@@ -207,12 +211,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.segments.push(segment);
   }
 
-  addSelectTagCatSegment() {
+  buildSelectTagCatSegment() {
     //this.queryModel.addSelectMetricSegment();
     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
     tagCatSegment.html += ' tag';
     tagCatSegment._type = SegmentType.TagCat;
-    this.segments.push(tagCatSegment);
+    return tagCatSegment;
+  }
+
+  addSelectTagCatSegment() {
+    this.segments.push(this.buildSelectTagCatSegment());
   }
 
   addSelectTagValSegment() {
@@ -231,12 +239,26 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.addSelectTagCatSegment();
       }
       else if (segmentType === SegmentType.TagCat) {
+        if (this.segments[fromIndex - 2]._type === SegmentType.TagVal) {
+          this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagSep }));
+        }
         this.segments.push(this.mapSegment({ type: SegmentType.TagPair }));
         this.addSelectTagValSegment();
+        this.addSelectTagCatSegment();
         this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
       }
       else if (segmentType === SegmentType.TagVal) {
+        this.addSelectTagCatSegment();
         this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
+      }
+    }
+    else {
+      var lastSegment = this.segments[this.segments.length - 1];
+      if (lastSegment._type === SegmentType.TagEnd) {
+        this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagCatSegment());
+      }
+      else {
+        this.addSelectTagCatSegment();
       }
     }
     /*if (fromIndex === 0) {

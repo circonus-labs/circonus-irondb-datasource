@@ -9,6 +9,7 @@ export enum SegmentType {
   TagOpOr,
   TagOpNot,
   TagPair,
+  TagSep,
   TagEnd
 };
 
@@ -43,8 +44,15 @@ export default class IrondbQuery {
     metricName = tags.shift();
     this.segments.push({ type: SegmentType.MetricName, value: metricName });
 
+    var first = true;
     if (tags.length > 0) this.segments.push({ type: SegmentType.TagOpAnd });
     for(var tag of tags) {
+      if (first) {
+        first = false;
+      }
+      else {
+        this.segments.push({ type: SegmentType.TagSep });
+      }
       tag = tag.split(':');
       var tagCat = tag[0];
       var tagVal = tag[1];

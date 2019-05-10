@@ -18,7 +18,8 @@ System.register(['lodash'], function(exports_1) {
                 SegmentType[SegmentType["TagOpOr"] = 4] = "TagOpOr";
                 SegmentType[SegmentType["TagOpNot"] = 5] = "TagOpNot";
                 SegmentType[SegmentType["TagPair"] = 6] = "TagPair";
-                SegmentType[SegmentType["TagEnd"] = 7] = "TagEnd";
+                SegmentType[SegmentType["TagSep"] = 7] = "TagSep";
+                SegmentType[SegmentType["TagEnd"] = 8] = "TagEnd";
             })(SegmentType || (SegmentType = {}));
             exports_1("SegmentType", SegmentType);
             ;
@@ -40,10 +41,17 @@ System.register(['lodash'], function(exports_1) {
                     var tags = metricName.split(',');
                     metricName = tags.shift();
                     this.segments.push({ type: SegmentType.MetricName, value: metricName });
+                    var first = true;
                     if (tags.length > 0)
                         this.segments.push({ type: SegmentType.TagOpAnd });
                     for (var _i = 0; _i < tags.length; _i++) {
                         var tag = tags[_i];
+                        if (first) {
+                            first = false;
+                        }
+                        else {
+                            this.segments.push({ type: SegmentType.TagSep });
+                        }
                         tag = tag.split(':');
                         var tagCat = tag[0];
                         var tagVal = tag[1];

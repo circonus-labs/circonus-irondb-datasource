@@ -6,7 +6,8 @@ export declare enum SegmentType {
     TagOpOr = 4,
     TagOpNot = 5,
     TagPair = 6,
-    TagEnd = 7,
+    TagSep = 7,
+    TagEnd = 8,
 }
 export default class IrondbQuery {
     datasource: any;

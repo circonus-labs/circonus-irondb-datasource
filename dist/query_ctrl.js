@@ -183,9 +183,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagEnd) {
                         uiSegment = this.uiSegmentSrv.newOperator(")");
+                        uiSegment.isLabel = true;
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagPair) {
                         uiSegment = this.uiSegmentSrv.newCondition(":");
+                        uiSegment.isLabel = true;
+                    }
+                    else if (segment.type === irondb_query_2.SegmentType.TagSep) {
+                        uiSegment = this.uiSegmentSrv.newCondition(",");
+                        uiSegment.isLabel = true;
                     }
                     else {
                         uiSegment = this.uiSegmentSrv.newSegment(segment);
@@ -205,12 +211,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     segment._type = irondb_query_2.SegmentType.MetricName;
                     this.segments.push(segment);
                 };
-                IrondbQueryCtrl.prototype.addSelectTagCatSegment = function () {
+                IrondbQueryCtrl.prototype.buildSelectTagCatSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
                     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
                     tagCatSegment.html += ' tag';
                     tagCatSegment._type = irondb_query_2.SegmentType.TagCat;
-                    this.segments.push(tagCatSegment);
+                    return tagCatSegment;
+                };
+                IrondbQueryCtrl.prototype.addSelectTagCatSegment = function () {
+                    this.segments.push(this.buildSelectTagCatSegment());
                 };
                 IrondbQueryCtrl.prototype.addSelectTagValSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
@@ -227,12 +236,26 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             this.addSelectTagCatSegment();
                         }
                         else if (segmentType === irondb_query_2.SegmentType.TagCat) {
+                            if (this.segments[fromIndex - 2]._type === irondb_query_2.SegmentType.TagVal) {
+                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
+                            }
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }));
                             this.addSelectTagValSegment();
+                            this.addSelectTagCatSegment();
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
                         }
                         else if (segmentType === irondb_query_2.SegmentType.TagVal) {
+                            this.addSelectTagCatSegment();
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
+                        }
+                    }
+                    else {
+                        var lastSegment = this.segments[this.segments.length - 1];
+                        if (lastSegment._type === irondb_query_2.SegmentType.TagEnd) {
+                            this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagCatSegment());
+                        }
+                        else {
+                            this.addSelectTagCatSegment();
                         }
                     }
                     /*if (fromIndex === 0) {

@@ -28,6 +28,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     mapSegment(segment: any): any;
     buildSegments(): void;
     addSelectMetricSegment(): void;
+    buildSelectTagCatSegment(): any;
     addSelectTagCatSegment(): void;
     addSelectTagValSegment(): void;
     checkOtherSegments(fromIndex: any): Promise<void>;
