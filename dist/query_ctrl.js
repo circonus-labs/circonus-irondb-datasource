@@ -347,11 +347,29 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.queryModel.segments = [];
                     this.segments = [];
                 };
+                IrondbQueryCtrl.prototype.segmentsToStreamTags = function () {
+                    var segments = this.segments.slice();
+                    var metricName = segments.shift();
+                    var streamTags = lodash_1.default.map(segments, function (segment) {
+                        var str = segment.value || "";
+                        if (segment._type === irondb_query_2.SegmentType.TagOpAnd ||
+                            segment._type === irondb_query_2.SegmentType.TagOpOr ||
+                            segment._type === irondb_query_2.SegmentType.TagOpNot) {
+                            str = str.toLowerCase().split(" ").join("");
+                        }
+                        return str;
+                    });
+                    metricName = "__name:" + metricName.value + ",";
+                    streamTags.splice(1, 0, metricName);
+                    return streamTags.join("");
+                };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
-                    console.log("updateModelTarget()");
+                    var streamTags = this.segmentsToStreamTags();
+                    console.log("updateModelTarget() " + streamTags);
                     //if (this.segments.length < 3) {
                     this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
                     //}
+                    this.queryModel.target.query = streamTags;
                 };
                 IrondbQueryCtrl.prototype.targetChanged = function () {
                     console.log("targetChanged()");

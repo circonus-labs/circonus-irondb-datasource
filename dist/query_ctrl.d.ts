@@ -36,6 +36,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     segmentValueChanged(segment: any, segmentIndex: any): Promise<void>;
     spliceSegments(index: any): void;
     emptySegments(): void;
+    segmentsToStreamTags(): any;
     updateModelTarget(): void;
     targetChanged(): void;
     showDelimiter(index: any): boolean;

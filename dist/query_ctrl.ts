@@ -355,11 +355,30 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.segments = [];
   }
 
+  segmentsToStreamTags() {
+    var segments = this.segments.slice();
+    var metricName = segments.shift();
+    var streamTags = _.map(segments, function (segment) {
+      var str = segment.value || "";
+      if (segment._type === SegmentType.TagOpAnd ||
+          segment._type === SegmentType.TagOpOr ||
+          segment._type === SegmentType.TagOpNot) {
+        str = str.toLowerCase().split(" ").join("");
+      }
+      return str;
+    });
+    metricName = "__name:" + metricName.value + ",";
+    streamTags.splice(1, 0, metricName);
+    return streamTags.join("");
+  }
+
   updateModelTarget() {
-    console.log("updateModelTarget()");
+    var streamTags = this.segmentsToStreamTags();
+    console.log("updateModelTarget() " + streamTags);
     //if (this.segments.length < 3) {
       this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
     //}
+    this.queryModel.target.query = streamTags;
   }
 
   targetChanged() {
