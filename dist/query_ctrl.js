@@ -133,6 +133,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                         expandable: true
                                     }));
                                 }
+                                if (segmentType === irondb_query_2.SegmentType.TagPlus) {
+                                    // For Plus, we want to allow new operators, so put those on the front
+                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
+                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "not(" }));
+                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "or(" }));
+                                }
                                 return tagSegments;
                             }
                         })
@@ -202,6 +208,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         uiSegment = this.uiSegmentSrv.newCondition(",");
                         uiSegment.isLabel = true;
                     }
+                    else if (segment.type === irondb_query_2.SegmentType.TagPlus) {
+                        uiSegment = this.buildSelectTagPlusSegment();
+                    }
                     else {
                         uiSegment = this.uiSegmentSrv.newSegment(segment);
                     }
@@ -230,11 +239,10 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.addSelectTagPlusSegment = function () {
                     this.segments.push(this.buildSelectTagPlusSegment());
                 };
-                IrondbQueryCtrl.prototype.addSelectTagValSegment = function () {
-                    //this.queryModel.addSelectMetricSegment();
+                IrondbQueryCtrl.prototype.newSelectTagValSegment = function () {
                     var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
                     tagValSegment._type = irondb_query_2.SegmentType.TagVal;
-                    this.segments.push(tagValSegment);
+                    return tagValSegment;
                 };
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
                     console.log("checkOtherSegments() " + fromIndex + " " + this.segments.length);
@@ -252,8 +260,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
                                 this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
                             }
-                            this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }));
-                            this.addSelectTagValSegment();
+                            this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment());
                             this.addSelectTagPlusSegment();
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
                         }
@@ -263,13 +270,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                     }
                     else {
-                        var lastSegment = this.segments[this.segments.length - 1];
-                        if (lastSegment._type === irondb_query_2.SegmentType.TagEnd) {
-                            this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagPlusSegment());
-                        }
-                        else {
-                            this.addSelectTagPlusSegment();
-                        }
                     }
                     return Promise.resolve();
                 };
@@ -317,17 +317,36 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         return;
                     }
                     else if (segment._type === irondb_query_2.SegmentType.TagPlus) {
-                        segment._type = irondb_query_2.SegmentType.TagCat;
+                        if (segment.value === "and(" ||
+                            segment.value === "not(" ||
+                            segment.value === "or(") {
+                            // Remove myself
+                            this.segments.splice(segmentIndex, 1);
+                            if (segmentIndex > 2) {
+                                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
+                            }
+                            // and replace it with a TagOp + friends
+                            this.segments.splice(segmentIndex + 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: segment.value }), this.mapSegment({ type: irondb_query_2.SegmentType.TagCat, value: "undefined" }), this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment(), this.buildSelectTagPlusSegment(), this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
+                            if (segmentIndex > 2) {
+                                this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
+                            }
+                            // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
+                            this.setSegmentFocus(segmentIndex + 3);
+                            return;
+                        }
+                        else {
+                            segment._type = irondb_query_2.SegmentType.TagCat;
+                        }
                     }
-                    this.spliceSegments(segmentIndex + 1);
+                    if (segmentIndex == 0) {
+                        // If we changed the start metric, all the filters are invalid
+                        this.spliceSegments(segmentIndex + 1);
+                    }
                     if (segment.expandable) {
                         return this.checkOtherSegments(segmentIndex + 1).then(function () {
                             _this.setSegmentFocus(segmentIndex + 1);
                             _this.targetChanged();
                         });
-                    }
-                    else {
-                        this.spliceSegments(segmentIndex + 1);
                     }
                     this.setSegmentFocus(segmentIndex + 1);
                     this.targetChanged();

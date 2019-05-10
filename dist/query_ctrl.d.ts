@@ -30,7 +30,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     addSelectMetricSegment(): void;
     buildSelectTagPlusSegment(): any;
     addSelectTagPlusSegment(): void;
-    addSelectTagValSegment(): void;
+    newSelectTagValSegment(): any;
     checkOtherSegments(fromIndex: any): Promise<void>;
     setSegmentFocus(segmentIndex: any): void;
     segmentValueChanged(segment: any, segmentIndex: any): Promise<void>;

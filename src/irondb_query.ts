@@ -70,13 +70,16 @@ export default class IrondbQuery {
       }
       this.segments.push({ type: SegmentType.TagCat, value: tagCat });
       this.segments.push({ type: SegmentType.TagPair });
-      var end = false;
-      if (tagVal.endsWith(")")) {
+      var end = 0;
+      while (tagVal.endsWith(")")) {
         tagVal = tagVal.slice(0, -1);
-        end = true;
+        end++;
       }
       this.segments.push({ type: SegmentType.TagVal, value: tagVal });
-      if (end) this.segments.push({ type: SegmentType.TagEnd });
+      for (var i = 0; i < end; i++) {
+        this.segments.push({ type: SegmentType.TagPlus });
+        this.segments.push({ type: SegmentType.TagEnd });
+      }
     }
 
     console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));

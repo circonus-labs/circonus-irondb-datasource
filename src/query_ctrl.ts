@@ -205,6 +205,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
       uiSegment = this.uiSegmentSrv.newCondition(",");
       uiSegment.isLabel = true;
     }
+    else if (segment.type === SegmentType.TagPlus) {
+      uiSegment = this.buildSelectTagPlusSegment();
+    }
     else {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
     }
@@ -272,13 +275,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
     }
     else {
-      var lastSegment = this.segments[this.segments.length - 1];
+      /*var lastSegment = this.segments[this.segments.length - 1];
       if (lastSegment._type === SegmentType.TagEnd) {
         this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagPlusSegment());
       }
       else {
         this.addSelectTagPlusSegment();
-      }
+      }*/
     }
     return Promise.resolve();
   }
