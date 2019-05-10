@@ -12,7 +12,8 @@
       </div>
       <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form-inline">
         <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
-          <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+          <metric-segment ng-if="!segment.isLabel" segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+          <div ng-if="segment.isLabel" class="gf-form-label" style="color:#eb7b18"><b>{{segment.value}}</b></div>
         </div>
       </div>
       <div ng-if="!ctrl.target.isCaql" class="gf-form">
