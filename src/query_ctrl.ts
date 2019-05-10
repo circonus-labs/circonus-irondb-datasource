@@ -372,7 +372,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.segments = head.concat( tail, optionalPlus );
         }
         // else Changing an Operator doesn't need to affect any other segments
-        return;
+
+        // fall through so targetChange() is called and we re-evaluate the metrics to graph
     }
     else if( segment._type === SegmentType.TagPlus ) {
         segment._type = SegmentType.TagCat;
