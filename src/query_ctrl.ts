@@ -356,15 +356,17 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
     }
 
-    this.spliceSegments(segmentIndex + 1);
+    if( segmentIndex == 0 ) {
+        // If we changed the start metric, all the filters are invalid
+        this.spliceSegments(segmentIndex + 1);
+    }
+
     if (segment.expandable) {
       return this.checkOtherSegments(segmentIndex + 1).then(() => {
         this.setSegmentFocus(segmentIndex + 1);
         this.targetChanged();
       });
-    } else {
-      this.spliceSegments(segmentIndex + 1);
-    }
+    } 
 
     this.setSegmentFocus(segmentIndex + 1);
     this.targetChanged();
