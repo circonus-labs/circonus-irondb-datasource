@@ -117,7 +117,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return [];
                         });
                     }
-                    else if (segmentType === irondb_query_2.SegmentType.TagCat) {
+                    else if (segmentType === irondb_query_2.SegmentType.TagCat || segmentType === irondb_query_2.SegmentType.TagPlus) {
                         var metricName = this.segments[0].value;
                         console.log("getSegments() tags for " + metricName);
                         return this.datasource
@@ -140,6 +140,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             console.log(err);
                             return [];
                         });
+                    }
+                    else if (segmentType === irondb_query_2.SegmentType.TagOp) {
+                        var tagSegments = [
+                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "REMOVE" }),
+                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }),
+                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "not(" }),
+                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "or(" })
+                        ];
+                        return Promise.resolve(tagSegments);
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagVal) {
                         var metricName = this.segments[0].value;
@@ -178,8 +187,8 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.mapSegment = function (segment) {
                     var uiSegment;
-                    if (segment.type === irondb_query_2.SegmentType.TagOpAnd) {
-                        uiSegment = this.uiSegmentSrv.newOperator("AND (");
+                    if (segment.type === irondb_query_2.SegmentType.TagOp) {
+                        uiSegment = this.uiSegmentSrv.newOperator(segment.value);
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagEnd) {
                         uiSegment = this.uiSegmentSrv.newOperator(")");
@@ -211,15 +220,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     segment._type = irondb_query_2.SegmentType.MetricName;
                     this.segments.push(segment);
                 };
-                IrondbQueryCtrl.prototype.buildSelectTagCatSegment = function () {
+                IrondbQueryCtrl.prototype.buildSelectTagPlusSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
                     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
                     tagCatSegment.html += ' tag';
-                    tagCatSegment._type = irondb_query_2.SegmentType.TagCat;
+                    tagCatSegment._type = irondb_query_2.SegmentType.TagPlus;
                     return tagCatSegment;
                 };
-                IrondbQueryCtrl.prototype.addSelectTagCatSegment = function () {
-                    this.segments.push(this.buildSelectTagCatSegment());
+                IrondbQueryCtrl.prototype.addSelectTagPlusSegment = function () {
+                    this.segments.push(this.buildSelectTagPlusSegment());
                 };
                 IrondbQueryCtrl.prototype.addSelectTagValSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
@@ -233,91 +242,36 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         var segmentType = this.segments[fromIndex - 1]._type;
                         console.log("checkOtherSegments() " + (fromIndex - 1) + " " + irondb_query_2.SegmentType[segmentType]);
                         if (segmentType === irondb_query_2.SegmentType.MetricName) {
-                            this.addSelectTagCatSegment();
+                            this.addSelectTagPlusSegment();
                         }
                         else if (segmentType === irondb_query_2.SegmentType.TagCat) {
                             if (this.segments[fromIndex - 2]._type === irondb_query_2.SegmentType.TagVal) {
                                 this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
                             }
-                            else {
-                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOpAnd }));
+                            else if (fromIndex == 2) {
+                                // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
+                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
                             }
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }));
                             this.addSelectTagValSegment();
-                            this.addSelectTagCatSegment();
+                            this.addSelectTagPlusSegment();
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
                         }
                         else if (segmentType === irondb_query_2.SegmentType.TagVal) {
-                            this.addSelectTagCatSegment();
+                            this.addSelectTagPlusSegment();
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
                         }
                     }
                     else {
                         var lastSegment = this.segments[this.segments.length - 1];
                         if (lastSegment._type === irondb_query_2.SegmentType.TagEnd) {
-                            this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagCatSegment());
+                            this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagPlusSegment());
                         }
                         else {
-                            this.addSelectTagCatSegment();
+                            this.addSelectTagPlusSegment();
                         }
                     }
-                    /*if (fromIndex === 0) {
-                      //this.addSelectMetricSegment();
-                      if (!this.loadSegments) {
-                        if (this.target.query !== '') {
-                          this.addSelectTagCatSegment();
-                        }
-                        this.loadSegments = true;
-                      }
-                      return;
-                    }
-                    else if(fromIndex === 1) {
-                      this.addSelectTagCatSegment();
-                    }
-                    else if(isEven(fromIndex)) {
-                      this.addSelectTagValSegment();
-                    }
-                    else if(!isEven(fromIndex)) {
-                      var segments = this.segments.slice();
-                      var metricName = segments.shift().value;
-                      for (var i = 0; i < segments.length; i += 2) {
-                        var tagCat = segments[i].value;
-                        var tagVal = segments[i + 1].value;
-                        metricName += "," + tagCat + ":" + tagVal;
-                      }
-                      console.log("checkOtherSegments() " + JSON.stringify(segments));
-                      console.log("checkOtherSegments() " + metricName);
-                      this.target.query = metricName;
-                    }*/
                     return Promise.resolve();
-                    /*var path = this.queryModel.getSegmentPathUpTo(fromIndex + 1);
-                    if (path === '') {
-                      return Promise.resolve();
-                    }
-                
-                    return this.datasource
-                      .metricFindQuery( path + '*' )
-                      .then(segments => {
-                        if (segments.data.length === 0) {
-                          if (path !== '') {
-                            this.queryModel.segments = this.queryModel.segments.splice(0, fromIndex + 1);
-                            this.segments = this.segments.splice(0, fromIndex + 1);
-                          }
-                        } else {
-                          _.map(segments.data, segment => {
-                            var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
-                            var segmentName = segment.name.replace(pathRegExp,'');
-                            segment.name = segmentName;
-                          });
-                          if (this.segments.length === fromIndex) {
-                            this.addSelectMetricSegment();
-                          } else {
-                            return this.checkOtherSegments(fromIndex + 1);
-                          }
-                        }
-                      })
-                      .catch(err => {
-                      });*/
                 };
                 IrondbQueryCtrl.prototype.setSegmentFocus = function (segmentIndex) {
                     lodash_1.default.each(this.segments, function (segment, index) {
@@ -329,6 +283,42 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     console.log("segmentValueChanged()");
                     this.error = null;
                     this.queryModel.updateSegmentValue(segment, segmentIndex);
+                    if (segment._type === irondb_query_2.SegmentType.TagOp) {
+                        if (segment.value === "REMOVE") {
+                            // We need to remove ourself, as well as every other segment until our TagEnd
+                            // For every TagOp we hit, we need to get one more TagEnd to remove any sub-ops
+                            var endIndex = segmentIndex + 1;
+                            var endsNeeded = 1;
+                            var lastIndex = this.segments.length;
+                            while (endsNeeded > 0 && endIndex < lastIndex) {
+                                var type = this.segments[endIndex]._type;
+                                if (type === irondb_query_2.SegmentType.TagOp) {
+                                    endsNeeded++;
+                                }
+                                else if (type === irondb_query_2.SegmentType.TagEnd) {
+                                    endsNeeded--;
+                                    break;
+                                }
+                                endIndex++; // keep going
+                            }
+                            // everything after my tagEnd
+                            var tail = this.segments.splice(endIndex + 1, 0);
+                            // everything up until me
+                            var head = this.segments.splice(0, segmentIndex);
+                            var optionalPlus = [];
+                            if (lastIndex === endIndex + 1) {
+                                // If these match, we removed the outermost operator, so we need a new + button
+                                optionalPlus.push(this.buildSelectTagPlusSegment());
+                            }
+                            this.segments = head.concat(tail, optionalPlus);
+                        }
+                        // else Changing an Operator doesn't need to affect any other segments
+                        this.targetChanged();
+                        return;
+                    }
+                    else if (segment._type === irondb_query_2.SegmentType.TagPlus) {
+                        segment._type = irondb_query_2.SegmentType.TagCat;
+                    }
                     this.spliceSegments(segmentIndex + 1);
                     if (segment.expandable) {
                         return this.checkOtherSegments(segmentIndex + 1).then(function () {
@@ -352,29 +342,35 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.segmentsToStreamTags = function () {
                     var segments = this.segments.slice();
+                    // First element is always metric name
                     var metricName = segments.shift().value;
-                    if (segments.length === 1) {
-                        return "and(__name:" + metricName + ")";
-                    }
-                    var streamTags = lodash_1.default.map(segments, function (segment) {
-                        var str = segment.value || "";
-                        if (segment._type === irondb_query_2.SegmentType.TagOpAnd ||
-                            segment._type === irondb_query_2.SegmentType.TagOpOr ||
-                            segment._type === irondb_query_2.SegmentType.TagOpNot) {
-                            str = str.toLowerCase().split(" ").join("");
+                    var query = "and(__name:" + metricName;
+                    var noComma = false; // because last was a tag:pair
+                    for (var _i = 0; _i < segments.length; _i++) {
+                        var segment = segments[_i];
+                        var type = segment._type;
+                        if (type === irondb_query_2.SegmentType.TagPlus) {
+                            continue;
                         }
-                        return str;
-                    });
-                    metricName = "__name:" + metricName + ",";
-                    streamTags.splice(1, 0, metricName);
-                    return streamTags.join("");
+                        if (!noComma && type !== irondb_query_2.SegmentType.TagEnd && type !== irondb_query_2.SegmentType.TagSep) {
+                            query += ",";
+                        }
+                        if (type === irondb_query_2.SegmentType.TagOp || type === irondb_query_2.SegmentType.TagPair || type === irondb_query_2.SegmentType.TagCat || type === irondb_query_2.SegmentType.TagSep) {
+                            noComma = true;
+                        }
+                        else {
+                            noComma = false;
+                        }
+                        query += segment.value;
+                    }
+                    query += ")";
+                    console.log("QUERY: " + query);
+                    return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
                     var streamTags = this.segmentsToStreamTags();
                     console.log("updateModelTarget() " + streamTags);
-                    //if (this.segments.length < 3) {
                     this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
-                    //}
                     this.queryModel.target.query = streamTags;
                 };
                 IrondbQueryCtrl.prototype.targetChanged = function () {

@@ -28,15 +28,15 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     mapSegment(segment: any): any;
     buildSegments(): void;
     addSelectMetricSegment(): void;
-    buildSelectTagCatSegment(): any;
-    addSelectTagCatSegment(): void;
+    buildSelectTagPlusSegment(): any;
+    addSelectTagPlusSegment(): void;
     addSelectTagValSegment(): void;
     checkOtherSegments(fromIndex: any): Promise<void>;
     setSegmentFocus(segmentIndex: any): void;
     segmentValueChanged(segment: any, segmentIndex: any): Promise<void>;
     spliceSegments(index: any): void;
     emptySegments(): void;
-    segmentsToStreamTags(): any;
+    segmentsToStreamTags(): string;
     updateModelTarget(): void;
     targetChanged(): void;
     showDelimiter(index: any): boolean;

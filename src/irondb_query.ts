@@ -46,7 +46,6 @@ export default class IrondbQuery {
     this.segments.push({ type: SegmentType.MetricName, value: metricName });
 
     var first = true;
-    if (tags.length > 0) this.segments.push({ type: SegmentType.TagOp, value: "AND (" });
     for(var tag of tags) {
       if (first) {
         first = false;
@@ -57,13 +56,22 @@ export default class IrondbQuery {
       tag = tag.split(':');
       var tagCat = tag[0];
       var tagVal = tag[1];
+      if (tagCat.startsWith("and(")) {
+        this.segments.push({ type: SegmentType.TagOp, value: "and(" });
+        tagCat = tagCat.slice(4);
+      }
       this.segments.push({ type: SegmentType.TagCat, value: tagCat });
       this.segments.push({ type: SegmentType.TagPair });
+      var end = false;
+      if (tagVal.endsWith(")")) {
+        tagVal = tagVal.slice(0, -1);
+        end = true;
+      }
       this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      if (end) this.segments.push({ type: SegmentType.TagEnd });
     }
-    if (tags.length > 0) this.segments.push({ type: SegmentType.TagEnd });
 
-    console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.segments));
+    console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
   getSegmentPathUpTo(index) {

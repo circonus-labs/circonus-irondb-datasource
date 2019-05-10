@@ -14,12 +14,11 @@ System.register(['lodash'], function(exports_1) {
                 SegmentType[SegmentType["MetricName"] = 0] = "MetricName";
                 SegmentType[SegmentType["TagCat"] = 1] = "TagCat";
                 SegmentType[SegmentType["TagVal"] = 2] = "TagVal";
-                SegmentType[SegmentType["TagOpAnd"] = 3] = "TagOpAnd";
-                SegmentType[SegmentType["TagOpOr"] = 4] = "TagOpOr";
-                SegmentType[SegmentType["TagOpNot"] = 5] = "TagOpNot";
-                SegmentType[SegmentType["TagPair"] = 6] = "TagPair";
-                SegmentType[SegmentType["TagSep"] = 7] = "TagSep";
-                SegmentType[SegmentType["TagEnd"] = 8] = "TagEnd";
+                SegmentType[SegmentType["TagPair"] = 3] = "TagPair";
+                SegmentType[SegmentType["TagSep"] = 4] = "TagSep";
+                SegmentType[SegmentType["TagEnd"] = 5] = "TagEnd";
+                SegmentType[SegmentType["TagOp"] = 6] = "TagOp";
+                SegmentType[SegmentType["TagPlus"] = 7] = "TagPlus";
             })(SegmentType || (SegmentType = {}));
             exports_1("SegmentType", SegmentType);
             ;
@@ -44,8 +43,6 @@ System.register(['lodash'], function(exports_1) {
                     metricName = tags.shift();
                     this.segments.push({ type: SegmentType.MetricName, value: metricName });
                     var first = true;
-                    if (tags.length > 0)
-                        this.segments.push({ type: SegmentType.TagOpAnd });
                     for (var _i = 0; _i < tags.length; _i++) {
                         var tag = tags[_i];
                         if (first) {
@@ -57,13 +54,22 @@ System.register(['lodash'], function(exports_1) {
                         tag = tag.split(':');
                         var tagCat = tag[0];
                         var tagVal = tag[1];
+                        if (tagCat.startsWith("and(")) {
+                            this.segments.push({ type: SegmentType.TagOp, value: "and(" });
+                            tagCat = tagCat.slice(4);
+                        }
                         this.segments.push({ type: SegmentType.TagCat, value: tagCat });
                         this.segments.push({ type: SegmentType.TagPair });
+                        var end = false;
+                        if (tagVal.endsWith(")")) {
+                            tagVal = tagVal.slice(0, -1);
+                            end = true;
+                        }
                         this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+                        if (end)
+                            this.segments.push({ type: SegmentType.TagEnd });
                     }
-                    if (tags.length > 0)
-                        this.segments.push({ type: SegmentType.TagEnd });
-                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.segments));
+                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(lodash_1.default.map(this.segments, function (s) { return SegmentType[s.type]; })));
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {
                     var arr = this.segments.slice(0, index);
