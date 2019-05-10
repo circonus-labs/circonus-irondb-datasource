@@ -192,14 +192,15 @@ export default class IrondbDatasource {
         var interval = irondbOptions['std']['interval'];
         var start = irondbOptions['std']['start'];
         var end = irondbOptions['std']['end'];
-        start = start - (start % interval);
+        start = Math.floor(start - (start % interval));
         end = end - (end % interval);
+        interval *= 1000;
 
         options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
         options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
         options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
         options.url = options.url + '&end_ts=' + end + '.000';
-        options.url = options.url + '&rollup_span=' + interval + 's';
+        options.url = options.url + '&rollup_span=' + interval + 'ms';
         options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
         options.name = irondbOptions['std']['names'][i]['leaf_name'];
 
