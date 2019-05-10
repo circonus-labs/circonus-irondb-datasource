@@ -310,20 +310,24 @@ export class IrondbQueryCtrl extends QueryCtrl {
                     endsNeeded++;
                 } else if( type === SegmentType.TagEnd ) {
                     endsNeeded--;
-                    break; 
+                    if( endsNeeded == 0 ) {
+                        break; // don't increment endIndex
+                    } 
                 }
                 endIndex++; // keep going
             }
-            // everything after my tagEnd
-            var tail = this.segments.splice( endIndex + 1, 0 );
-            // everything up until me
-            var head = this.segments.splice( 0, segmentIndex );
-            var optionalPlus = [];
+            let deleteStart = segmentIndex;
+            let countDelete = endIndex - segmentIndex + 1;
+            if( segmentIndex > 2 ) {
+                // If I'm not the very first operator, then i have a comma in front of me that needs killing
+                deleteStart--;
+                countDelete++;
+            }
+            this.segments.splice( deleteStart, countDelete );
             if( lastIndex === endIndex + 1 ) { 
                 // If these match, we removed the outermost operator, so we need a new + button
-                optionalPlus.push( this.buildSelectTagPlusSegment() );
+                this.segments.push( this.buildSelectTagPlusSegment() );
             }
-            this.segments = head.concat( tail, optionalPlus );
         }
         // else Changing an Operator doesn't need to affect any other segments
         this.targetChanged();
@@ -408,7 +412,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
         query += segment.value;
     }
     query += ")";
-    console.log("QUERY: " + query);
     return query;
   }
 
