@@ -65,8 +65,11 @@ export default class IrondbDatasource {
   }
 
   metricFindQuery(query: string) {
+    if (query === "" || query === undefined) {
+      return Promise.resolve({ data: [] });
+    }
     var queryUrl = '/find/' + this.accountId + '/tags?query=';
-    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    queryUrl = queryUrl + query;
     console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }

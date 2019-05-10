@@ -37,7 +37,9 @@ System.register(['lodash'], function(exports_1) {
                         return;
                     }
                     console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
-                    var metricName = this.target.query || '*';
+                    var metricName = this.target.query;
+                    // Strip 'and(__name:)' from metric name
+                    metricName = metricName.slice(11, -1) || '*';
                     var tags = metricName.split(',');
                     metricName = tags.shift();
                     this.segments.push({ type: SegmentType.MetricName, value: metricName });

@@ -77,7 +77,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     console.log("getSegments() " + index + " " + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       return this.datasource
-        .metricFindQuery( query + '*' )
+        .metricFindQuery("and(__name:*)")
         .then( results => {
           var metricnames = _.map(results.data, result => {
             return tagless_name(result.metric_name);
@@ -242,6 +242,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if (this.segments[fromIndex - 2]._type === SegmentType.TagVal) {
           this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagSep }));
         }
+        else {
+          this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagOpAnd }));
+        }
         this.segments.push(this.mapSegment({ type: SegmentType.TagPair }));
         this.addSelectTagValSegment();
         this.addSelectTagCatSegment();
@@ -357,7 +360,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   segmentsToStreamTags() {
     var segments = this.segments.slice();
-    var metricName = segments.shift();
+    var metricName = segments.shift().value;
+    if (segments.length === 1) {
+      return "and(__name:" + metricName + ")";
+    }
     var streamTags = _.map(segments, function (segment) {
       var str = segment.value || "";
       if (segment._type === SegmentType.TagOpAnd ||
@@ -367,7 +373,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       return str;
     });
-    metricName = "__name:" + metricName.value + ",";
+    metricName = "__name:" + metricName + ",";
     streamTags.splice(1, 0, metricName);
     return streamTags.join("");
   }

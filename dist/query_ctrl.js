@@ -85,7 +85,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     console.log("getSegments() " + index + " " + irondb_query_2.SegmentType[segmentType]);
                     if (segmentType === irondb_query_2.SegmentType.MetricName) {
                         return this.datasource
-                            .metricFindQuery(query + '*')
+                            .metricFindQuery("and(__name:*)")
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
                                 return tagless_name(result.metric_name);
@@ -239,6 +239,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             if (this.segments[fromIndex - 2]._type === irondb_query_2.SegmentType.TagVal) {
                                 this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
                             }
+                            else {
+                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOpAnd }));
+                            }
                             this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }));
                             this.addSelectTagValSegment();
                             this.addSelectTagCatSegment();
@@ -349,7 +352,10 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.segmentsToStreamTags = function () {
                     var segments = this.segments.slice();
-                    var metricName = segments.shift();
+                    var metricName = segments.shift().value;
+                    if (segments.length === 1) {
+                        return "and(__name:" + metricName + ")";
+                    }
                     var streamTags = lodash_1.default.map(segments, function (segment) {
                         var str = segment.value || "";
                         if (segment._type === irondb_query_2.SegmentType.TagOpAnd ||
@@ -359,7 +365,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                         return str;
                     });
-                    metricName = "__name:" + metricName.value + ",";
+                    metricName = "__name:" + metricName + ",";
                     streamTags.splice(1, 0, metricName);
                     return streamTags.join("");
                 };

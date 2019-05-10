@@ -56,8 +56,11 @@ System.register(['lodash'], function(exports_1) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query) {
+                    if (query === "" || query === undefined) {
+                        return Promise.resolve({ data: [] });
+                    }
                     var queryUrl = '/find/' + this.accountId + '/tags?query=';
-                    queryUrl = queryUrl + 'and(__name:' + query + ')';
+                    queryUrl = queryUrl + query;
                     console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
