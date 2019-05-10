@@ -248,13 +248,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   checkOtherSegments(fromIndex) {
-    if (fromIndex === this.segments.length) {
-      var segmentType = this.segments[fromIndex - 1]._type;
-      console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
-      if (segmentType === SegmentType.MetricName) {
-        this.addSelectTagPlusSegment();
-      }
-    }
     return Promise.resolve();
   }
 
