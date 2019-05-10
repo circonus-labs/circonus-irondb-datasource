@@ -248,40 +248,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   checkOtherSegments(fromIndex) {
-    console.log("checkOtherSegments() " + fromIndex + " " + this.segments.length);
     if (fromIndex === this.segments.length) {
       var segmentType = this.segments[fromIndex - 1]._type;
       console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
       if (segmentType === SegmentType.MetricName) {
         this.addSelectTagPlusSegment();
       }
-      else if (segmentType === SegmentType.TagCat) {
-        if (this.segments[fromIndex - 2]._type === SegmentType.TagVal) {
-          this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagSep }));
-        }
-        else if( fromIndex == 2 ) {
-          // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
-          this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagOp, value: "and(" }));
-        }
-        this.segments.push(this.mapSegment({ type: SegmentType.TagPair }),
-            this.newSelectTagValSegment()
-        );
-        this.addSelectTagPlusSegment();
-        this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
-      }
-      else if (segmentType === SegmentType.TagVal) {
-        this.addSelectTagPlusSegment();
-        this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
-      }
-    }
-    else {
-      /*var lastSegment = this.segments[this.segments.length - 1];
-      if (lastSegment._type === SegmentType.TagEnd) {
-        this.segments.splice(this.segments.length - 1, 0, this.buildSelectTagPlusSegment());
-      }
-      else {
-        this.addSelectTagPlusSegment();
-      }*/
     }
     return Promise.resolve();
   }
@@ -359,7 +331,26 @@ export class IrondbQueryCtrl extends QueryCtrl {
              this.setSegmentFocus(segmentIndex + 3);
              return;
         } else {
-            segment._type = SegmentType.TagCat;
+            // Remove myself
+            this.segments.splice(segmentIndex, 1);
+            if( segmentIndex > 2 ) {
+                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
+            }
+            // and replace it with a TagOp + friends
+            this.segments.splice(segmentIndex + 1, 0,
+                this.mapSegment({ type: SegmentType.TagCat, value: segment.value }),
+                this.mapSegment({ type: SegmentType.TagPair }),
+                this.newSelectTagValSegment(),
+                this.buildSelectTagPlusSegment()
+            );
+
+            if( segmentIndex == 1 ) {
+                // if index is 1 (immediatley after metric name), it's the first add and we're a tagCat 
+                // so that means we need to add in the implicit and() in the front
+                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagOp, value: "and(" }));
+                this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
+            }
+            // Fall through so targetChanged gets called
         }
     }
 
