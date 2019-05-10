@@ -54,9 +54,17 @@ System.register(['lodash'], function(exports_1) {
                         tag = tag.split(':');
                         var tagCat = tag[0];
                         var tagVal = tag[1];
-                        if (tagCat.startsWith("and(")) {
-                            this.segments.push({ type: SegmentType.TagOp, value: "and(" });
-                            tagCat = tagCat.slice(4);
+                        var tagOp = false, tagIndex = 4;
+                        if (tagCat.startsWith("and(") || tagCat.startsWith("not(")) {
+                            tagOp = true;
+                        }
+                        else if (tagCat.startsWith("or(")) {
+                            tagOp = true;
+                            tagIndex = 3;
+                        }
+                        if (tagOp) {
+                            this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
+                            tagCat = tagCat.slice(tagIndex);
                         }
                         this.segments.push({ type: SegmentType.TagCat, value: tagCat });
                         this.segments.push({ type: SegmentType.TagPair });
