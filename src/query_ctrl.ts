@@ -317,7 +317,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
             // everything after my tagEnd
             var tail = this.segments.splice( endIndex + 1, 0 );
             // everything up until me
-            var head = this.segments.splice( 0, segmentIndex );
+            let upToMe = segmentIndex;
+            if( segmentIndex > 2 ) {
+                // If I'm not the very first operator, then i have a comma in front of me that needs killing
+                upToMe--;
+            }
+            var head = this.segments.splice( 0, upToMe );
             var optionalPlus = [];
             if( lastIndex === endIndex + 1 ) { 
                 // If these match, we removed the outermost operator, so we need a new + button
