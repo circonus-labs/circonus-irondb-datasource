@@ -251,7 +251,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if (this.segments[fromIndex - 2]._type === SegmentType.TagVal) {
           this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagSep }));
         }
-        else {
+        else if( fromIndex == 2 ) {
+          // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
           this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: SegmentType.TagOp, value: "and(" }));
         }
         this.segments.push(this.mapSegment({ type: SegmentType.TagPair }));
