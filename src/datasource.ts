@@ -9,6 +9,7 @@ export default class IrondbDatasource {
   accountId: number;
   irondbType: string;
   queryPrefix: string;
+  resultsLimit: string;
   url: any;
   apiToken: string;
   appName: string;
@@ -25,6 +26,7 @@ export default class IrondbDatasource {
     this.accountId = (instanceSettings.jsonData || {}).accountId;
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
     this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
+    this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
@@ -144,6 +146,7 @@ export default class IrondbDatasource {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
+    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
     if ('standalone' == this.irondbType && !isCaql) {
       if (!isFind) {
         baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
@@ -177,6 +180,7 @@ export default class IrondbDatasource {
     } else {
       headers['X-Circonus-Account'] = this.accountId;
     }
+    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
     if (irondbOptions['std']['names'].length) {
       for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
         options = {};
