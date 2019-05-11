@@ -81,6 +81,9 @@ export default class IrondbQuery {
         this.segments.push({ type: SegmentType.TagEnd });
       }
     }
+    if (tags.length === 0) {
+      this.segments.push({ type: SegmentType.TagPlus });
+    }
 
     console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
