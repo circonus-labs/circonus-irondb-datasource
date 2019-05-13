@@ -198,15 +198,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagEnd) {
                         uiSegment = this.uiSegmentSrv.newOperator(")");
-                        uiSegment.isLabel = true;
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagPair) {
                         uiSegment = this.uiSegmentSrv.newCondition(":");
-                        uiSegment.isLabel = true;
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagSep) {
                         uiSegment = this.uiSegmentSrv.newCondition(",");
-                        uiSegment.isLabel = true;
                     }
                     else if (segment.type === irondb_query_2.SegmentType.TagPlus) {
                         uiSegment = this.buildSelectTagPlusSegment();
@@ -215,6 +212,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         uiSegment = this.uiSegmentSrv.newSegment(segment);
                     }
                     uiSegment._type = segment.type;
+                    uiSegment._typeName = irondb_query_2.SegmentType[segment.type];
                     return uiSegment;
                 };
                 IrondbQueryCtrl.prototype.buildSegments = function () {
@@ -245,31 +243,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     return tagValSegment;
                 };
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
-                    console.log("checkOtherSegments() " + fromIndex + " " + this.segments.length);
                     if (fromIndex === this.segments.length) {
                         var segmentType = this.segments[fromIndex - 1]._type;
                         console.log("checkOtherSegments() " + (fromIndex - 1) + " " + irondb_query_2.SegmentType[segmentType]);
                         if (segmentType === irondb_query_2.SegmentType.MetricName) {
                             this.addSelectTagPlusSegment();
                         }
-                        else if (segmentType === irondb_query_2.SegmentType.TagCat) {
-                            if (this.segments[fromIndex - 2]._type === irondb_query_2.SegmentType.TagVal) {
-                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
-                            }
-                            else if (fromIndex == 2) {
-                                // if fromIndex is to, and we're a tagCat, it means we need to add in the implicit and() in the front
-                                this.segments.splice(this.segments.length - 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
-                            }
-                            this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment());
-                            this.addSelectTagPlusSegment();
-                            this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
-                        }
-                        else if (segmentType === irondb_query_2.SegmentType.TagVal) {
-                            this.addSelectTagPlusSegment();
-                            this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
-                        }
-                    }
-                    else {
                     }
                     return Promise.resolve();
                 };
@@ -339,7 +318,19 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return;
                         }
                         else {
-                            segment._type = irondb_query_2.SegmentType.TagCat;
+                            // Remove myself
+                            this.segments.splice(segmentIndex, 1);
+                            if (segmentIndex > 2) {
+                                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
+                            }
+                            // and replace it with a TagOp + friends
+                            this.segments.splice(segmentIndex + 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagCat, value: segment.value }), this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment(), this.buildSelectTagPlusSegment());
+                            if (segmentIndex == 1) {
+                                // if index is 1 (immediatley after metric name), it's the first add and we're a tagCat 
+                                // so that means we need to add in the implicit and() in the front
+                                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
+                                this.segments.push(this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
+                            }
                         }
                     }
                     if (segmentIndex == 0) {

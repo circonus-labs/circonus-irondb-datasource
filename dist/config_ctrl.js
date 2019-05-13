@@ -13,6 +13,7 @@ System.register([], function(exports_1) {
                     else if ('hosted' == this.current.jsonData.irondbType) {
                         this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefix || 'reconnoiter.';
                     }
+                    this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
                 }
                 IrondbConfigCtrl.prototype.updateDefaultQueryPrefix = function () {
                     if ('standalone' == this.current.jsonData.irondbType) {

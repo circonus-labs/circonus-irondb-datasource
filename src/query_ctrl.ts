@@ -195,15 +195,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else if (segment.type === SegmentType.TagEnd) {
       uiSegment = this.uiSegmentSrv.newOperator(")");
-      uiSegment.isLabel = true;
     }
     else if (segment.type === SegmentType.TagPair) {
       uiSegment = this.uiSegmentSrv.newCondition(":");
-      uiSegment.isLabel = true;
     }
     else if (segment.type === SegmentType.TagSep) {
       uiSegment = this.uiSegmentSrv.newCondition(",");
-      uiSegment.isLabel = true;
     }
     else if (segment.type === SegmentType.TagPlus) {
       uiSegment = this.buildSelectTagPlusSegment();
@@ -212,6 +209,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
     }
     uiSegment._type = segment.type;
+    uiSegment._typeName = SegmentType[segment.type];
     return uiSegment;
   }
 

@@ -79,6 +79,9 @@ System.register(['lodash'], function(exports_1) {
                             this.segments.push({ type: SegmentType.TagEnd });
                         }
                     }
+                    if (tags.length === 0) {
+                        this.segments.push({ type: SegmentType.TagPlus });
+                    }
                     console.log("IrondbQuery.parseTarget() " + JSON.stringify(lodash_1.default.map(this.segments, function (s) { return SegmentType[s.type]; })));
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {

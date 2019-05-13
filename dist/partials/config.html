@@ -40,5 +40,13 @@
           <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
       </info-popover>
     </div>
+    <div class="gf-form">
+      <span class="gf-form-label width-9">Results Limit</span>
+      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
+      <info-popover mode="right-absolute">
+        <p>Limit number of search results items fetched.</p>
+        <p>Setting it to -1 or "none" removes the limit.</p>
+      </info-popover>
+    </div>
   </div>
 </div>
