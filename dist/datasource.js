@@ -20,6 +20,7 @@ System.register(['lodash'], function(exports_1) {
                     this.accountId = (instanceSettings.jsonData || {}).accountId;
                     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
                     this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
+                    this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
                     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
                     this.url = instanceSettings.url;
                     this.supportAnnotations = false;
@@ -77,7 +78,7 @@ System.register(['lodash'], function(exports_1) {
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
-                    return this.metricFindQuery('ametric').then(function (res) {
+                    return this.metricFindQuery('and(__name:ametric)').then(function (res) {
                         var error = lodash_1.default.get(res, 'results[0].error');
                         if (error) {
                             return {
@@ -92,9 +93,13 @@ System.register(['lodash'], function(exports_1) {
                             title: 'Success'
                         };
                     }).catch(function (err) {
+                        var message = err.data.message;
+                        if (message === undefined) {
+                            message = "Error " + err.status + " " + err.statusText;
+                        }
                         return {
                             status: 'error',
-                            message: err.message,
+                            message: message,
                             title: 'Error'
                         };
                     });
@@ -137,6 +142,7 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-Auth-Token'] = this.apiToken;
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
+                    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
                     if ('standalone' == this.irondbType && !isCaql) {
                         if (!isFind) {
                             baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
@@ -169,6 +175,7 @@ System.register(['lodash'], function(exports_1) {
                     else {
                         headers['X-Circonus-Account'] = this.accountId;
                     }
+                    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
                     if (irondbOptions['std']['names'].length) {
                         for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
                             options = {};

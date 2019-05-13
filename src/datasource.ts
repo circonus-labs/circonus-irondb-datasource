@@ -91,7 +91,7 @@ export default class IrondbDatasource {
   }
 
   testDatasource() {
-    return this.metricFindQuery('ametric').then( res => {
+    return this.metricFindQuery('and(__name:ametric)').then( res => {
       let error = _.get(res, 'results[0].error');
       if (error) {
         return {
@@ -106,9 +106,13 @@ export default class IrondbDatasource {
         title: 'Success'
       };
     }).catch( err => {
+      var message = err.data.message;
+      if (message === undefined) {
+        message = "Error " + err.status + " " + err.statusText;
+      }
       return {
         status: 'error',
-        message: err.message,
+        message: message,
         title: 'Error'
       };
     });

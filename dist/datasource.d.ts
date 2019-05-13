@@ -9,6 +9,7 @@ export default class IrondbDatasource {
     accountId: number;
     irondbType: string;
     queryPrefix: string;
+    resultsLimit: string;
     url: any;
     apiToken: string;
     appName: string;
