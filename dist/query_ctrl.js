@@ -85,7 +85,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     console.log("getSegments() " + index + " " + irondb_query_2.SegmentType[segmentType]);
                     if (segmentType === irondb_query_2.SegmentType.MetricName) {
                         return this.datasource
-                            .metricFindQuery("and(__name:*)")
+                            .metricFindQuery("and(__name:" + query + "*)")
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
                                 return tagless_name(result.metric_name);

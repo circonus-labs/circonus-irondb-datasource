@@ -77,7 +77,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     console.log("getSegments() " + index + " " + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       return this.datasource
-        .metricFindQuery("and(__name:*)")
+        .metricFindQuery("and(__name:" + query + "*)")
         .then( results => {
           var metricnames = _.map(results.data, result => {
             return tagless_name(result.metric_name);
