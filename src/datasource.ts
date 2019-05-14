@@ -71,11 +71,13 @@ export default class IrondbDatasource {
     if (query !== "" && variable !== undefined) {
       var metricName = query;
       var tagCat = variable.tagValuesQuery;
-      return this.metricTagValsQuery(metricName, tagCat).then(results => {
+      if (variable.useTags && tagCat !== "") {
+        return this.metricTagValsQuery(metricName, tagCat).then(results => {
           return _.map(results.data, result => {
             return { value: result };
           });
-      });
+        });
+      }
     }
     return Promise.resolve([]);
   }

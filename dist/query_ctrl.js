@@ -171,13 +171,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                     expandable: true
                                 }));
                                 lodash_1.default.eachRight(_this.templateSrv.variables, function (variable) {
-                                    //if (variable.useTags && variable.tagValuesQuery !== "") {
                                     tagSegments.push(_this.uiSegmentSrv.newSegment({
                                         type: 'template',
                                         value: '$' + variable.name,
                                         expandable: true,
                                     }));
-                                    // }
                                 });
                                 for (var _i = 0; _i < tagVals.length; _i++) {
                                     var tagVal = tagVals[_i];

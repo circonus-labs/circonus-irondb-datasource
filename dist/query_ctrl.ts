@@ -167,13 +167,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
               expandable: true
             }));
             _.eachRight(this.templateSrv.variables, variable => {
-            //if (variable.useTags && variable.tagValuesQuery !== "") {
                 tagSegments.push(this.uiSegmentSrv.newSegment({
                   type: 'template',
                   value: '$' + variable.name,
                   expandable: true,
                 }));
-                // }
             });
             for(var tagVal of tagVals) {
               tagSegments.push(this.uiSegmentSrv.newSegment({
