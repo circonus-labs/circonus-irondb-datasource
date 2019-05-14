@@ -57,6 +57,18 @@ System.register(['lodash'], function(exports_1) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
                 IrondbDatasource.prototype.metricFindQuery = function (query, options) {
+                    var variable = options.variable;
+                    if (query !== "" && variable !== undefined) {
+                        var metricName = query;
+                        var tagCat = variable.tagValuesQuery;
+                        if (variable.useTags && tagCat !== "") {
+                            return this.metricTagValsQuery(metricName, tagCat).then(function (results) {
+                                return lodash_1.default.map(results.data, function (result) {
+                                    return { value: result };
+                                });
+                            });
+                        }
+                    }
                     return Promise.resolve([]);
                 };
                 IrondbDatasource.prototype.metricTagsQuery = function (query) {
@@ -355,7 +367,8 @@ System.register(['lodash'], function(exports_1) {
                     else {
                         var promises = options.targets.map(function (target) {
                             console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
-                            return _this.metricTagsQuery(target['query']).then(function (result) {
+                            var rawQuery = _this.templateSrv.replace(target['query']);
+                            return _this.metricTagsQuery(rawQuery).then(function (result) {
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;
                                 }

@@ -67,6 +67,18 @@ export default class IrondbDatasource {
   }
 
   metricFindQuery(query: string, options: any) {
+    var variable = options.variable;
+    if (query !== "" && variable !== undefined) {
+      var metricName = query;
+      var tagCat = variable.tagValuesQuery;
+      if (variable.useTags && tagCat !== "") {
+        return this.metricTagValsQuery(metricName, tagCat).then(results => {
+          return _.map(results.data, result => {
+            return { value: result };
+          });
+        });
+      }
+    }
     return Promise.resolve([]);
   }
 
@@ -371,7 +383,8 @@ export default class IrondbDatasource {
     } else {
       var promises = options.targets.map(target => {
         console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
-        return this.metricTagsQuery(target['query']).then( result => {
+        var rawQuery = this.templateSrv.replace(target['query']);
+        return this.metricTagsQuery(rawQuery).then( result => {
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;
           }
