@@ -40,3 +40,14 @@
 .irondb-tag-sep .gf-form-label {
     color: #888 !important;
 }
+.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a {
+    color: #bb002c !important;
+}
+.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a {
+    color: #eb7b18 !important;
+}
