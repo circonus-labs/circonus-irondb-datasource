@@ -239,7 +239,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   buildSelectTagPlusSegment() {
     //this.queryModel.addSelectMetricSegment();
     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
-    tagCatSegment.html += ' tag';
     tagCatSegment._type = SegmentType.TagPlus;
     return tagCatSegment;
   }

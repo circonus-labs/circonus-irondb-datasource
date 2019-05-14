@@ -17,3 +17,26 @@
 .gf-form-select-wrapper--caret-indent.gf-form-select-wrapper::after {
   right: 0.775rem
 }
+
+.irondb-tag-key .gf-form-label {
+    color: #598 !important;
+    padding-right: 1px;
+    margin-right: 0;
+}
+.irondb-tag-pair .gf-form-label {
+    color: #888 !important;
+    padding-right: 0;
+    padding-left: 0;
+    border-left-width: 0;
+    border-radius: 0;
+    margin-right: 0;
+}
+.irondb-tag-value .gf-form-label {
+    color: #5ca !important;
+    padding-left: 1px;
+    border-left-width: 0;
+    border-radius: 0;
+}
+.irondb-tag-sep .gf-form-label {
+    color: #888 !important;
+}

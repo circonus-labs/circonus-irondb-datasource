@@ -13,10 +13,10 @@
       <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form-inline">
         <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
           <div ng-switch="segment._typeName">
-            <div ng-switch-when="TagPair|TagEnd|TagSep" ng-switch-when-separator="|">
+            <div ng-switch-when="TagPair|TagEnd|TagSep" ng-switch-when-separator="|" ng-class="{'irondb-tag-pair':segment._typeName=='TagPair','irondb-tag-sep':segment._typeName=='TagSep'}">
               <div class="gf-form-label" style="color:#eb7b18"><b>{{segment.value}}</b></div>
             </div>
-            <div ng-switch-default>
+            <div ng-switch-default ng-class="{'irondb-tag-key':segment._typeName=='TagCat','irondb-tag-value':segment._typeName=='TagVal','irondb-tag-plus':segment._typeName=='TagPlus'}">
               <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
           </div>

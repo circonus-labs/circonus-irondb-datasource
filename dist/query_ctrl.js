@@ -239,7 +239,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.buildSelectTagPlusSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
                     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
-                    tagCatSegment.html += ' tag';
                     tagCatSegment._type = irondb_query_2.SegmentType.TagPlus;
                     return tagCatSegment;
                 };
