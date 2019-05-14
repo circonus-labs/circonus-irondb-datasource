@@ -98,7 +98,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           var allSegments = _.map(metricnames, segment => {
             //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
 
-            return this.uiSegmentSrv.newSegment({
+            return this.newSegment(SegmentType.MetricName, {
               value: segment, //.replace(queryRegExp,''),
               expandable: true//!segment.leaf,
             });
@@ -134,16 +134,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
             var tagCats = segments.data;
             var tagSegments = [];
             for(var tagCat of tagCats) {
-              tagSegments.push(this.uiSegmentSrv.newSegment({
+              tagSegments.push(this.newSegment(SegmentType.TagCat, {
                 value: tagCat,
                 expandable: true
               }));
             }
             if( segmentType === SegmentType.TagPlus ) {
                 // For Plus, we want to allow new operators, so put those on the front
-                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "and(" }) );
-                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "not(" }) );
-                tagSegments.unshift( this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "or("  }) );
+                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "and(" }) );
+                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "not(" }) );
+                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "or("  }) );
             }
             return tagSegments;
           }
@@ -155,10 +155,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else if (segmentType === SegmentType.TagOp) {
         var tagSegments = [
-            this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "REMOVE" }),
-            this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "and(" }),
-            this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "not(" }),
-            this.uiSegmentSrv.newSegment({ type: SegmentType.TagOp, value: "or("  })
+            this.newSegment(SegmentType.TagOp, { value: "REMOVE" }),
+            this.newSegment(SegmentType.TagOp, { value: "and(" }),
+            this.newSegment(SegmentType.TagOp, { value: "not(" }),
+            this.newSegment(SegmentType.TagOp, { value: "or("  })
         ];
         return Promise.resolve(tagSegments);
     }
@@ -172,19 +172,19 @@ export class IrondbQueryCtrl extends QueryCtrl {
           if (segments.data && segments.data.length > 0) {
             var tagVals = segments.data;
             var tagSegments = [];
-            tagSegments.push(this.uiSegmentSrv.newSegment({
+            tagSegments.push(this.newSegment(SegmentType.TagVal, {
               value: '*',
               expandable: true
             }));
             _.eachRight(this.templateSrv.variables, variable => {
-                tagSegments.push(this.uiSegmentSrv.newSegment({
+                tagSegments.push(this.newSegment(SegmentType.TagVal, {
                   type: 'template',
                   value: '$' + variable.name,
                   expandable: true,
                 }));
             });
             for(var tagVal of tagVals) {
-              tagSegments.push(this.uiSegmentSrv.newSegment({
+              tagSegments.push(this.newSegment(SegmentType.TagVal, {
                 value: tagVal,
                 expandable: true
               }));
@@ -203,6 +203,17 @@ export class IrondbQueryCtrl extends QueryCtrl {
   parseTarget() {
     this.queryModel.parseTarget();
     this.buildSegments();
+  }
+
+  setSegmentType(segment: any, type: SegmentType) {
+    segment._type = type;
+    segment._typeName = SegmentType[type];
+    return segment;
+  }
+
+  newSegment(type: SegmentType, options: any) {
+    var segment = this.uiSegmentSrv.newSegment(options);
+    return this.setSegmentType(segment, type);
   }
 
   mapSegment(segment) {
@@ -225,9 +236,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     else {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
     }
-    uiSegment._type = segment.type;
-    uiSegment._typeName = SegmentType[segment.type];
-    return uiSegment;
+    return this.setSegmentType(uiSegment, segment.type);
   }
 
   buildSegments() {
@@ -240,14 +249,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
   addSelectMetricSegment() {
     this.queryModel.addSelectMetricSegment();
     var segment = this.uiSegmentSrv.newSelectMetric();
-    segment._type = SegmentType.MetricName;
+    this.setSegmentType(segment, SegmentType.MetricName);
     this.segments.push(segment);
   }
 
   buildSelectTagPlusSegment() {
     //this.queryModel.addSelectMetricSegment();
     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
-    tagCatSegment._type = SegmentType.TagPlus;
+    this.setSegmentType(tagCatSegment, SegmentType.TagPlus);
     return tagCatSegment;
   }
 
@@ -257,7 +266,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   newSelectTagValSegment() {
     var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
-    tagValSegment._type = SegmentType.TagVal;
+    this.setSegmentType(tagValSegment, SegmentType.TagVal);
     return tagValSegment;
   }
 

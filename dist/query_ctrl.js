@@ -104,7 +104,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             console.log(JSON.stringify(metricnames));
                             var allSegments = lodash_1.default.map(metricnames, function (segment) {
                                 //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-                                return _this.uiSegmentSrv.newSegment({
+                                return _this.newSegment(irondb_query_2.SegmentType.MetricName, {
                                     value: segment,
                                     expandable: true //!segment.leaf,
                                 });
@@ -138,16 +138,16 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 var tagSegments = [];
                                 for (var _i = 0; _i < tagCats.length; _i++) {
                                     var tagCat = tagCats[_i];
-                                    tagSegments.push(_this.uiSegmentSrv.newSegment({
+                                    tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagCat, {
                                         value: tagCat,
                                         expandable: true
                                     }));
                                 }
                                 if (segmentType === irondb_query_2.SegmentType.TagPlus) {
                                     // For Plus, we want to allow new operators, so put those on the front
-                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }));
-                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "not(" }));
-                                    tagSegments.unshift(_this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "or(" }));
+                                    tagSegments.unshift(_this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "and(" }));
+                                    tagSegments.unshift(_this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "not(" }));
+                                    tagSegments.unshift(_this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "or(" }));
                                 }
                                 return tagSegments;
                             }
@@ -159,10 +159,10 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagOp) {
                         var tagSegments = [
-                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "REMOVE" }),
-                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "and(" }),
-                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "not(" }),
-                            this.uiSegmentSrv.newSegment({ type: irondb_query_2.SegmentType.TagOp, value: "or(" })
+                            this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "REMOVE" }),
+                            this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "and(" }),
+                            this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "not(" }),
+                            this.newSegment(irondb_query_2.SegmentType.TagOp, { value: "or(" })
                         ];
                         return Promise.resolve(tagSegments);
                     }
@@ -176,12 +176,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             if (segments.data && segments.data.length > 0) {
                                 var tagVals = segments.data;
                                 var tagSegments = [];
-                                tagSegments.push(_this.uiSegmentSrv.newSegment({
+                                tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagVal, {
                                     value: '*',
                                     expandable: true
                                 }));
                                 lodash_1.default.eachRight(_this.templateSrv.variables, function (variable) {
-                                    tagSegments.push(_this.uiSegmentSrv.newSegment({
+                                    tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagVal, {
                                         type: 'template',
                                         value: '$' + variable.name,
                                         expandable: true,
@@ -189,7 +189,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 });
                                 for (var _i = 0; _i < tagVals.length; _i++) {
                                     var tagVal = tagVals[_i];
-                                    tagSegments.push(_this.uiSegmentSrv.newSegment({
+                                    tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagVal, {
                                         value: tagVal,
                                         expandable: true
                                     }));
@@ -207,6 +207,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.parseTarget = function () {
                     this.queryModel.parseTarget();
                     this.buildSegments();
+                };
+                IrondbQueryCtrl.prototype.setSegmentType = function (segment, type) {
+                    segment._type = type;
+                    segment._typeName = irondb_query_2.SegmentType[type];
+                    return segment;
+                };
+                IrondbQueryCtrl.prototype.newSegment = function (type, options) {
+                    var segment = this.uiSegmentSrv.newSegment(options);
+                    return this.setSegmentType(segment, type);
                 };
                 IrondbQueryCtrl.prototype.mapSegment = function (segment) {
                     var uiSegment;
@@ -228,9 +237,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     else {
                         uiSegment = this.uiSegmentSrv.newSegment(segment);
                     }
-                    uiSegment._type = segment.type;
-                    uiSegment._typeName = irondb_query_2.SegmentType[segment.type];
-                    return uiSegment;
+                    return this.setSegmentType(uiSegment, segment.type);
                 };
                 IrondbQueryCtrl.prototype.buildSegments = function () {
                     var _this = this;
@@ -241,13 +248,13 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.addSelectMetricSegment = function () {
                     this.queryModel.addSelectMetricSegment();
                     var segment = this.uiSegmentSrv.newSelectMetric();
-                    segment._type = irondb_query_2.SegmentType.MetricName;
+                    this.setSegmentType(segment, irondb_query_2.SegmentType.MetricName);
                     this.segments.push(segment);
                 };
                 IrondbQueryCtrl.prototype.buildSelectTagPlusSegment = function () {
                     //this.queryModel.addSelectMetricSegment();
                     var tagCatSegment = this.uiSegmentSrv.newPlusButton();
-                    tagCatSegment._type = irondb_query_2.SegmentType.TagPlus;
+                    this.setSegmentType(tagCatSegment, irondb_query_2.SegmentType.TagPlus);
                     return tagCatSegment;
                 };
                 IrondbQueryCtrl.prototype.addSelectTagPlusSegment = function () {
@@ -255,7 +262,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.newSelectTagValSegment = function () {
                     var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
-                    tagValSegment._type = irondb_query_2.SegmentType.TagVal;
+                    this.setSegmentType(tagValSegment, irondb_query_2.SegmentType.TagVal);
                     return tagValSegment;
                 };
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
