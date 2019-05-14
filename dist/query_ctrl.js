@@ -70,6 +70,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         this.target.query = caqlQuery;
                         console.log("typeValueChanged() CAQL " + caqlQuery);
                     }
+                    else {
+                        this.target.query = "";
+                        this.emptySegments();
+                        this.parseTarget();
+                    }
                     this.error = null;
                     this.panelCtrl.refresh();
                 };
@@ -395,7 +400,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segments = this.segments.slice();
                     // First element is always metric name
                     var metricName = segments.shift().value;
+                    if (metricName === "*") {
+                        return "";
+                    }
                     var query = "find(\"" + metricName + "\"";
+                    if (segments.length === 1 && segments[0]._type == irondb_query_2.SegmentType.TagPlus) {
+                        query += ")";
+                        return query;
+                    }
                     var firstTag = true;
                     var noComma = false; // because last was a tag:pair
                     for (var _i = 0; _i < segments.length; _i++) {
