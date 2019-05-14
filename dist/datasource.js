@@ -56,7 +56,10 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype.annotationQuery = function (options) {
                     throw new Error("Annotation Support not implemented yet.");
                 };
-                IrondbDatasource.prototype.metricFindQuery = function (query) {
+                IrondbDatasource.prototype.metricFindQuery = function (query, options) {
+                    return Promise.resolve([]);
+                };
+                IrondbDatasource.prototype.metricTagsQuery = function (query) {
                     if (query === "" || query === undefined) {
                         return Promise.resolve({ data: [] });
                     }
@@ -78,7 +81,7 @@ System.register(['lodash'], function(exports_1) {
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
-                    return this.metricFindQuery('and(__name:ametric)').then(function (res) {
+                    return this.metricTagsQuery('and(__name:ametric)').then(function (res) {
                         var error = lodash_1.default.get(res, 'results[0].error');
                         if (error) {
                             return {
@@ -352,7 +355,7 @@ System.register(['lodash'], function(exports_1) {
                     else {
                         var promises = options.targets.map(function (target) {
                             console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
-                            return _this.metricFindQuery(target['query']).then(function (result) {
+                            return _this.metricTagsQuery(target['query']).then(function (result) {
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;
                                 }

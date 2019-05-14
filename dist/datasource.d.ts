@@ -21,7 +21,8 @@ export default class IrondbDatasource {
     constructor(instanceSettings: any, $q: any, backendSrv: any, templateSrv: any);
     query(options: any): any;
     annotationQuery(options: any): void;
-    metricFindQuery(query: string): any;
+    metricFindQuery(query: string, options: any): Promise<any[]>;
+    metricTagsQuery(query: string): any;
     metricTagCatsQuery(query: string): any;
     metricTagValsQuery(query: string, cat: string): any;
     testDatasource(): any;

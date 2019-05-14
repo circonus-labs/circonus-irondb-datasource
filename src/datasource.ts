@@ -66,7 +66,11 @@ export default class IrondbDatasource {
     throw new Error("Annotation Support not implemented yet.");
   }
 
-  metricFindQuery(query: string) {
+  metricFindQuery(query: string, options: any) {
+    return Promise.resolve([]);
+  }
+
+  metricTagsQuery(query: string) {
     if (query === "" || query === undefined) {
       return Promise.resolve({ data: [] });
     }
@@ -91,7 +95,7 @@ export default class IrondbDatasource {
   }
 
   testDatasource() {
-    return this.metricFindQuery('and(__name:ametric)').then( res => {
+    return this.metricTagsQuery('and(__name:ametric)').then( res => {
       let error = _.get(res, 'results[0].error');
       if (error) {
         return {
@@ -367,7 +371,7 @@ export default class IrondbDatasource {
     } else {
       var promises = options.targets.map(target => {
         console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
-        return this.metricFindQuery(target['query']).then( result => {
+        return this.metricTagsQuery(target['query']).then( result => {
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;
           }
