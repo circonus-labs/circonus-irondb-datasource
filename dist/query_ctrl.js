@@ -65,6 +65,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 }
                 IrondbQueryCtrl.prototype.typeValueChanged = function () {
                     this.target.isCaql = (this.target.pointtype == "CAQL");
+                    if (this.target.isCaql) {
+                        var caqlQuery = this.segmentsToCaqlFind();
+                        this.target.query = caqlQuery;
+                        console.log("typeValueChanged() CAQL " + caqlQuery);
+                    }
                     this.error = null;
                     this.panelCtrl.refresh();
                 };
@@ -384,6 +389,37 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         query += segment.value;
                     }
                     query += ")";
+                    return query;
+                };
+                IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
+                    var segments = this.segments.slice();
+                    // First element is always metric name
+                    var metricName = segments.shift().value;
+                    var query = "find(\"" + metricName + "\"";
+                    var firstTag = true;
+                    var noComma = false; // because last was a tag:pair
+                    for (var _i = 0; _i < segments.length; _i++) {
+                        var segment = segments[_i];
+                        var type = segment._type;
+                        if (type === irondb_query_2.SegmentType.TagPlus) {
+                            continue;
+                        }
+                        if (!noComma && type !== irondb_query_2.SegmentType.TagEnd && type !== irondb_query_2.SegmentType.TagSep) {
+                            query += ",";
+                            if (firstTag) {
+                                query += " \"";
+                                firstTag = false;
+                            }
+                        }
+                        if (type === irondb_query_2.SegmentType.TagOp || type === irondb_query_2.SegmentType.TagPair || type === irondb_query_2.SegmentType.TagCat || type === irondb_query_2.SegmentType.TagSep) {
+                            noComma = true;
+                        }
+                        else {
+                            noComma = false;
+                        }
+                        query += segment.value;
+                    }
+                    query += "\")";
                     return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {

@@ -53,6 +53,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   typeValueChanged() {
     this.target.isCaql = (this.target.pointtype == "CAQL");
+    if (this.target.isCaql) {
+      var caqlQuery = this.segmentsToCaqlFind();
+      this.target.query = caqlQuery;
+      console.log("typeValueChanged() CAQL " + caqlQuery);
+    }
     this.error = null;
     this.panelCtrl.refresh();
   }
@@ -407,6 +412,37 @@ export class IrondbQueryCtrl extends QueryCtrl {
         query += segment.value;
     }
     query += ")";
+    return query;
+  }
+
+  segmentsToCaqlFind() {
+    var segments = this.segments.slice();
+    // First element is always metric name
+    var metricName = segments.shift().value;
+    var query = "find(\"" + metricName + "\"";
+    var firstTag = true;
+    var noComma = false; // because last was a tag:pair
+    for ( let segment of segments ) {
+        let type = segment._type;
+        if( type === SegmentType.TagPlus ) {
+            continue;
+        }
+        if( !noComma && type !== SegmentType.TagEnd && type !==SegmentType.TagSep ) {
+            query += ","
+            if (firstTag) {
+              query += " \"";
+              firstTag = false;
+            }
+        }
+        if( type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep ) {
+            noComma = true;
+        } else {
+            noComma = false;
+        }
+
+        query += segment.value;
+    }
+    query += "\")";
     return query;
   }
 
