@@ -69,6 +69,32 @@ For this processed data to be displayed on the heatmap panel as the sample above
 
 ![](img/irondb-heatmap-tsbuckets.png)
 
+### Template Variables
+
+**How to configure a template variable for IRONdb**
+
+  * From a dashboard, first click `Settings` in the top right.
+  
+  * On the left hand side, select `Variables` section.
+  
+  * Click `+New`, and chose a name for your new variable.
+  
+  * Then make sure to select the proper data source, `IRONdb`.
+  
+  * Enter the metric without tags under `Query` you wish to use in this variable.
+  
+  * Next, enable `Include All Option` and enter `*` for `Custom all value`.
+  
+  * Click `Enabled` under `Value groups/tags` to enable tags support.
+  
+  * Enter the tag category you wish to use in your variable under `Tag values query`.
+  
+  * `Preview of values` should now auto-complete tag values if setup successfully.
+  
+  * Finish setup by clicking `Add` and then `Save`.
+  
+  * Your new template variable should now appear in the query builder.
+
 # Development
 
 The build process requires node, npm, typescrypt, and tslint
