@@ -165,6 +165,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
     else if (segmentType === SegmentType.TagVal) {
       var metricName = this.segments[0].value;
       var tagCat = this.segments[index - 2].value;
+      if (tagCat === "select tag") {
+        return Promise.resolve([]);
+      }
       console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, tagCat)
@@ -341,7 +344,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             // and replace it with a TagOp + friends
             this.segments.splice(segmentIndex + 1, 0,
                 this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-                this.mapSegment({ type: SegmentType.TagCat, value: "undefined" }),
+                this.mapSegment({ type: SegmentType.TagCat, value: "select tag", fake: true }),
                 this.mapSegment({ type: SegmentType.TagPair }),
                 this.newSelectTagValSegment(),
                 this.buildSelectTagPlusSegment(),

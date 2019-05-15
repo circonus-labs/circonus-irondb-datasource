@@ -169,6 +169,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     else if (segmentType === irondb_query_2.SegmentType.TagVal) {
                         var metricName = this.segments[0].value;
                         var tagCat = this.segments[index - 2].value;
+                        if (tagCat === "select tag") {
+                            return Promise.resolve([]);
+                        }
                         console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
                             .metricTagValsQuery(metricName, tagCat)
@@ -332,7 +335,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 this.segments.splice(segmentIndex, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagSep }));
                             }
                             // and replace it with a TagOp + friends
-                            this.segments.splice(segmentIndex + 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: segment.value }), this.mapSegment({ type: irondb_query_2.SegmentType.TagCat, value: "undefined" }), this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment(), this.buildSelectTagPlusSegment(), this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
+                            this.segments.splice(segmentIndex + 1, 0, this.mapSegment({ type: irondb_query_2.SegmentType.TagOp, value: segment.value }), this.mapSegment({ type: irondb_query_2.SegmentType.TagCat, value: "select tag", fake: true }), this.mapSegment({ type: irondb_query_2.SegmentType.TagPair }), this.newSelectTagValSegment(), this.buildSelectTagPlusSegment(), this.mapSegment({ type: irondb_query_2.SegmentType.TagEnd }));
                             if (segmentIndex > 2) {
                                 this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
                             }
