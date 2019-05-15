@@ -1,6 +1,8 @@
-# 0
 
-## 0.8
+## 0.8.7
+
+ * Use Grafana dropdown control rather than `select` element
+ * 0.8.7 is the last version of the datasource designed for use with our graphite endpoints and with graphite-centric design
 
 ## 0.8.6
 
