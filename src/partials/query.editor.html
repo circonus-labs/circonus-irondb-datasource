@@ -22,7 +22,7 @@
             <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l half join-r join-l">
                 <div class="gf-form-label"><b>{{segment.value}}</b></div>
             </div>
-            <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-key':segment.value!='select tag'}">
+            <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':segment.value!='select tag'}">
                 <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
             <div ng-switch-when="TagVal" class="irondb-tag-val mash-l join-r join-l">

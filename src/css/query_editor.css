@@ -41,7 +41,7 @@
 .irondb-tag-end .gf-form-label {
     color: #eb7b18;
 }
-.irondb-tag-key .gf-form-label {
+.irondb-tag-cat .gf-form-label {
     color: #598;
 }
 .irondb-tag-val .gf-form-label {
@@ -51,8 +51,8 @@
 .irondb-tag-sep .gf-form-label {
     color: #888;
 }
-.irondb-tag-key .gf-form-label:focus,
-.irondb-tag-key .gf-form-label:hover,
+.irondb-tag-cat .gf-form-label:focus,
+.irondb-tag-cat .gf-form-label:hover,
 .irondb-tag-val .gf-form-label:focus,
 .irondb-tag-val .gf-form-label:hover {
     color: #fff;
