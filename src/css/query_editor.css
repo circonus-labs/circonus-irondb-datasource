@@ -63,7 +63,7 @@
 .irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a {
     color: #bb002c !important;
 }
-.irondb-tag-value .typeahead.dropdown-menu [data-value^="$"] a {
+.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a {
     color: #33b5e5 !important;
 }
 .irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a,
