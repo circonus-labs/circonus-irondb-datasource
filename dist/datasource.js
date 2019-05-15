@@ -77,19 +77,19 @@ System.register(['lodash'], function(exports_1) {
                     }
                     var queryUrl = '/find/' + this.accountId + '/tags?query=';
                     queryUrl = queryUrl + query;
-                    console.log(queryUrl);
+                    //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.metricTagCatsQuery = function (query) {
                     var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
-                    console.log(queryUrl);
+                    //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.metricTagValsQuery = function (query, cat) {
                     var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
-                    console.log(queryUrl);
+                    //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
@@ -120,7 +120,7 @@ System.register(['lodash'], function(exports_1) {
                     });
                 };
                 IrondbDatasource.prototype._throwerr = function (err) {
-                    console.log(err);
+                    //console.log(err);
                     if (err.data && err.data.error) {
                         throw new Error('Circonus IRONdb Error: ' + err.data.error);
                     }
@@ -366,7 +366,7 @@ System.register(['lodash'], function(exports_1) {
                     }
                     else {
                         var promises = options.targets.map(function (target) {
-                            console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
+                            //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
                             var rawQuery = _this.templateSrv.replace(target['query']);
                             return _this.metricTagsQuery(rawQuery).then(function (result) {
                                 for (var i = 0; i < result.data.length; i++) {
@@ -400,7 +400,7 @@ System.register(['lodash'], function(exports_1) {
                         return Promise.all(promises).then(function (result) {
                             return cleanOptions;
                         }).catch(function (err) {
-                            console.log("err (_buildIrondbParams): " + JSON.stringify(err, null, 2));
+                            //console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
                             if (err.status !== 0 || err.status >= 300) {
                             }
                         });

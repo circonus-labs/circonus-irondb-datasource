@@ -88,21 +88,21 @@ export default class IrondbDatasource {
     }
     var queryUrl = '/find/' + this.accountId + '/tags?query=';
     queryUrl = queryUrl + query;
-    console.log(queryUrl);
+    //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagCatsQuery(query: string) {
     var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
-    console.log(queryUrl);
+    //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagValsQuery(query: string, cat: string) {
     var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
-    console.log(queryUrl);
+    //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
@@ -135,7 +135,7 @@ export default class IrondbDatasource {
   }
 
   _throwerr(err) {
-    console.log(err);
+    //console.log(err);
     if (err.data && err.data.error) {
       throw new Error('Circonus IRONdb Error: ' + err.data.error);
     } else if (err.data && err.data.user_error) {
@@ -382,7 +382,7 @@ export default class IrondbDatasource {
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
-        console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
+        //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
         var rawQuery = this.templateSrv.replace(target['query']);
         return this.metricTagsQuery(rawQuery).then( result => {
           for (var i = 0; i < result.data.length; i++) {
@@ -416,7 +416,7 @@ export default class IrondbDatasource {
       return Promise.all(promises).then( result => {
         return cleanOptions;
       }).catch( err => {
-        console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
+        //console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
         if (err.status !== 0 || err.status >= 300) {
         }
       });

@@ -69,7 +69,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         var caqlQuery = this.segmentsToCaqlFind();
                         caqlQuery = this.templateSrv.replace(caqlQuery);
                         this.target.query = caqlQuery;
-                        console.log("typeValueChanged() CAQL " + caqlQuery);
                     }
                     else {
                         this.target.query = "";
@@ -90,10 +89,10 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.getSegments = function (index, prefix) {
                     var _this = this;
-                    console.log("getSegments() " + index + " " + prefix);
+                    //console.log("getSegments() " + index + " " + prefix);
                     var query = prefix && prefix.length > 0 ? prefix : '';
                     var segmentType = this.segments[index]._type;
-                    console.log("getSegments() " + index + " " + irondb_query_2.SegmentType[segmentType]);
+                    //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
                     if (segmentType === irondb_query_2.SegmentType.MetricName) {
                         return this.datasource
                             .metricTagsQuery("and(__name:" + query + "*)")
@@ -102,7 +101,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 return tagless_name(result.metric_name);
                             });
                             metricnames = lodash_1.default.uniq(metricnames);
-                            console.log(JSON.stringify(metricnames));
+                            //console.log(JSON.stringify(metricnames));
                             var allSegments = lodash_1.default.map(metricnames, function (segment) {
                                 //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
                                 return _this.newSegment(irondb_query_2.SegmentType.MetricName, {
@@ -124,13 +123,13 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return allSegments;
                         })
                             .catch(function (err) {
-                            console.log("getSegments() " + err.toString());
+                            //console.log("getSegments() " + err.toString());
                             return [];
                         });
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagCat || segmentType === irondb_query_2.SegmentType.TagPlus) {
                         var metricName = this.segments[0].value;
-                        console.log("getSegments() tags for " + metricName);
+                        //console.log("getSegments() tags for " + metricName);
                         return this.datasource
                             .metricTagCatsQuery(metricName)
                             .then(function (segments) {
@@ -154,7 +153,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             }
                         })
                             .catch(function (err) {
-                            console.log(err);
+                            //console.log(err);
                             return [];
                         });
                     }
@@ -173,7 +172,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         if (tagCat === "select tag") {
                             return Promise.resolve([]);
                         }
-                        console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
+                        //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
                             .metricTagValsQuery(metricName, tagCat)
                             .then(function (segments) {
@@ -202,7 +201,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             }
                         })
                             .catch(function (err) {
-                            console.log(err);
+                            //console.log(err);
                             return [];
                         });
                     }
@@ -272,7 +271,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.checkOtherSegments = function (fromIndex) {
                     if (fromIndex === this.segments.length) {
                         var segmentType = this.segments[fromIndex - 1]._type;
-                        console.log("checkOtherSegments() " + (fromIndex - 1) + " " + irondb_query_2.SegmentType[segmentType]);
+                        //console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
                         if (segmentType === irondb_query_2.SegmentType.MetricName) {
                             this.addSelectTagPlusSegment();
                         }
@@ -286,7 +285,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.segmentValueChanged = function (segment, segmentIndex) {
                     var _this = this;
-                    console.log("segmentValueChanged()");
+                    //console.log("segmentValueChanged()");
                     this.error = null;
                     this.queryModel.updateSegmentValue(segment, segmentIndex);
                     if (segment._type === irondb_query_2.SegmentType.TagOp) {
@@ -447,12 +446,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
                     var streamTags = this.segmentsToStreamTags();
-                    console.log("updateModelTarget() " + streamTags);
+                    //console.log("updateModelTarget() " + streamTags);
                     this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
                     this.queryModel.target.query = streamTags;
                 };
                 IrondbQueryCtrl.prototype.targetChanged = function () {
-                    console.log("targetChanged()");
+                    //console.log("targetChanged()");
                     if (this.queryModel.error) {
                         return;
                     }

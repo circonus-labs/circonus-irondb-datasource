@@ -57,7 +57,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       var caqlQuery = this.segmentsToCaqlFind();
       caqlQuery = this.templateSrv.replace(caqlQuery);
       this.target.query = caqlQuery;
-      console.log("typeValueChanged() CAQL " + caqlQuery);
+      //console.log("typeValueChanged() CAQL " + caqlQuery);
     }
     else {
       this.target.query = "";
@@ -81,11 +81,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getSegments(index, prefix) {
-    console.log("getSegments() " + index + " " + prefix);
+    //console.log("getSegments() " + index + " " + prefix);
     var query = prefix && prefix.length > 0 ? prefix : '';
 
     var segmentType = this.segments[index]._type;
-    console.log("getSegments() " + index + " " + SegmentType[segmentType]);
+    //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       return this.datasource
         .metricTagsQuery("and(__name:" + query + "*)")
@@ -94,7 +94,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return tagless_name(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
-          console.log(JSON.stringify(metricnames));
+          //console.log(JSON.stringify(metricnames));
 
           var allSegments = _.map(metricnames, segment => {
             //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
@@ -121,13 +121,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
           return allSegments;
         })
         .catch(err => {
-          console.log("getSegments() " + err.toString());
+          //console.log("getSegments() " + err.toString());
           return [];
         });
     }
     else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
       var metricName = this.segments[0].value;
-      console.log("getSegments() tags for " + metricName);
+      //console.log("getSegments() tags for " + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
         .then(segments => {
@@ -150,7 +150,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch(err => {
-          console.log(err);
+          //console.log(err);
           return [];
         });
     }
@@ -169,7 +169,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       if (tagCat === "select tag") {
         return Promise.resolve([]);
       }
-      console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
+      //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, tagCat)
         .then(segments => {
@@ -197,7 +197,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch(err => {
-          console.log(err);
+          //console.log(err);
           return [];
         });
     }
@@ -277,7 +277,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   checkOtherSegments(fromIndex) {
     if (fromIndex === this.segments.length) {
       var segmentType = this.segments[fromIndex - 1]._type;
-      console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
+      //console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
       if (segmentType === SegmentType.MetricName) {
         this.addSelectTagPlusSegment();
       }
@@ -292,7 +292,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentValueChanged(segment, segmentIndex) {
-    console.log("segmentValueChanged()");
+    //console.log("segmentValueChanged()");
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
@@ -473,13 +473,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   updateModelTarget() {
     var streamTags = this.segmentsToStreamTags();
-    console.log("updateModelTarget() " + streamTags);
+    //console.log("updateModelTarget() " + streamTags);
     this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
     this.queryModel.target.query = streamTags;
   }
 
   targetChanged() {
-    console.log("targetChanged()");
+    //console.log("targetChanged()");
     if (this.queryModel.error) {
       return;
     }

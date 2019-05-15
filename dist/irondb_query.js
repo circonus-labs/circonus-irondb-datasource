@@ -35,7 +35,7 @@ System.register(['lodash'], function(exports_1) {
                     if (this.target.rawQuery) {
                         return;
                     }
-                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
+                    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
                     var metricName = this.target.query;
                     // Strip 'and(__name:)' from metric name
                     metricName = metricName.slice(11, -1) || '*';
@@ -82,7 +82,7 @@ System.register(['lodash'], function(exports_1) {
                     if (tags.length === 0) {
                         this.segments.push({ type: SegmentType.TagPlus });
                     }
-                    console.log("IrondbQuery.parseTarget() " + JSON.stringify(lodash_1.default.map(this.segments, function (s) { return SegmentType[s.type]; })));
+                    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
                 };
                 IrondbQuery.prototype.getSegmentPathUpTo = function (index) {
                     var arr = this.segments.slice(0, index);
@@ -101,8 +101,8 @@ System.register(['lodash'], function(exports_1) {
                     }
                 };
                 IrondbQuery.prototype.updateSegmentValue = function (segment, index) {
-                    console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
-                    console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
+                    //console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
+                    //console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
                     if (this.segments[index] !== undefined) {
                         this.segments[index].value = segment.value;
                     }
@@ -111,7 +111,7 @@ System.register(['lodash'], function(exports_1) {
                     this.segments.push({ value: 'select metric' });
                 };
                 IrondbQuery.prototype.updateModelTarget = function (targets) {
-                    console.log("IrondbQuery.updateModelTarget() " + JSON.stringify(targets));
+                    //console.log("IrondbQuery.updateModelTarget() " + JSON.stringify(targets));
                     // render query
                     //this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
                     //this.target.query = this.target.query.replace(/\.$/, '');

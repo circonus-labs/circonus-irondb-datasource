@@ -10,7 +10,7 @@ Read more about IRONdb here:
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
 
 ### From Releases
-1. Download [https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.6.tar.gz](https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.6.tar.gz)
+1. Download the desired [release version](https://github.com/circonus-labs/circonus-irondb-datasource/releases).
 
 2. Unzip into plugins directory.
 
@@ -68,6 +68,32 @@ Using the histogram checkbox to process returned data allows for histograms to b
 For this processed data to be displayed on the heatmap panel as the sample above, select *Time Series Buckets* as the Data Format to be used on the Heatmap panel.
 
 ![](img/irondb-heatmap-tsbuckets.png)
+
+### Template Variables
+
+**How to configure a template variable for IRONdb**
+
+1. From a dashboard, click `Settings` in the top right.
+  
+1. On the left hand side, select the `Variables` section.
+  
+1. Click `+New` and choose a name for your new variable.
+  
+1. Select the proper data source: `IRONdb`.
+  
+1. Under `Query`, enter the metric you wish to use in this variable (without tags).
+  
+1. Enable `Include All Option` and enter `*` for `Custom all value`.
+  
+1. Click `Enabled` under `Value groups/tags` to enable tags support.
+  
+1. Enter the tag category you wish to use in your variable under `Tag values query`.
+  
+1. If you successfully completed the prior steps, `Preview of values` should now auto-complete the tag values.
+  
+1. Finish setup by clicking `Add` and then `Save`.
+  
+Your new template variable should now appear in the query builder!
 
 # Development
 
