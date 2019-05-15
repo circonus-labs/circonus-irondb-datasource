@@ -207,7 +207,7 @@ System.register(['lodash'], function(exports_1) {
                             var start = irondbOptions['std']['start'];
                             var end = irondbOptions['std']['end'];
                             start = Math.floor(start - (start % interval));
-                            end = end - (end % interval);
+                            end = Math.floor(end - (end % interval));
                             interval *= 1000;
                             options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
                             options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
