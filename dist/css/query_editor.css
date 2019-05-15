@@ -18,33 +18,53 @@
   right: 0.775rem
 }
 
-.irondb-tag-key .gf-form-label {
-    color: #598 !important;
-    padding-right: 1px;
+.join-r .gf-form-label {
     margin-right: 0;
 }
-.irondb-tag-pair .gf-form-label {
-    color: #888 !important;
+.join-l .gf-form-label {
+    border-left-width: 0;
+    border-radius: 0;
+}
+.mash-r .gf-form-label {
     padding-right: 0;
+}
+.mash-l .gf-form-label {
     padding-left: 0;
-    border-left-width: 0;
-    border-radius: 0;
-    margin-right: 0;
 }
-.irondb-tag-value .gf-form-label {
-    color: #5ca !important;
-    padding-left: 1px;
-    border-left-width: 0;
-    border-radius: 0;
+.mash-r.half .gf-form-label {
+    padding-right: 4px;
 }
+.mash-l.half .gf-form-label {
+    padding-left: 4px;
+}
+.irondb-tag-op .gf-form-label,
+.irondb-tag-end .gf-form-label {
+    color: #eb7b18;
+}
+.irondb-tag-key .gf-form-label {
+    color: #598;
+}
+.irondb-tag-val .gf-form-label {
+    color: #5ca;
+}
+.irondb-tag-pair .gf-form-label,
 .irondb-tag-sep .gf-form-label {
-    color: #888 !important;
+    color: #888;
 }
+.irondb-tag-key .gf-form-label:focus,
+.irondb-tag-key .gf-form-label:hover,
+.irondb-tag-val .gf-form-label:focus,
+.irondb-tag-val .gf-form-label:hover {
+    color: #fff;
+}
+
+/* menu item color changes */
+
 .irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a {
     color: #bb002c !important;
 }
 .irondb-tag-value .typeahead.dropdown-menu [data-value^="$"] a {
-    color: #32d1df !important;
+    color: #33b5e5 !important;
 }
 .irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a,
 .irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a,
@@ -53,4 +73,22 @@
 .irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a,
 .irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a {
     color: #eb7b18 !important;
+}
+.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a:hover,
+.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a:focus,
+.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a:hover {
+    color: #fff !important;
 }
