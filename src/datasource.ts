@@ -80,25 +80,29 @@ export default class IrondbDatasource {
     return Promise.resolve([]);
   }
 
+  getAccountId() {
+    return this.irondbType === "standalone" ? ("/" + this.accountId) : "";
+  }
+
   metricTagsQuery(query: string) {
     if (query === "" || query === undefined) {
       return Promise.resolve({ data: [] });
     }
-    var queryUrl = '/find/' + this.accountId + '/tags?query=';
+    var queryUrl = '/find' + this.getAccountId() + '/tags?query=';
     queryUrl = queryUrl + query;
     //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagCatsQuery(query: string) {
-    var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
+    var queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagValsQuery(query: string, cat: string) {
-    var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
+    var queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
@@ -120,9 +124,9 @@ export default class IrondbDatasource {
         title: 'Success'
       };
     }).catch( err => {
-      var message = err.data.message;
+      var message = (err.data || {}).message;
       if (message === undefined) {
-        message = "Error " + err.status + " " + err.statusText;
+        message = "Error " + (err.status || "") + " " + (err.statusText || "");
       }
       return {
         status: 'error',
@@ -157,7 +161,7 @@ export default class IrondbDatasource {
       headers['X-Circonus-Account'] = this.accountId;
     }
     if ('hosted' == this.irondbType && !isCaql) {
-      baseUrl = baseUrl + '/irondb/graphite';
+      baseUrl = baseUrl + '/irondb';
       if (!isFind) {
         baseUrl = baseUrl + '/series_multi';
       }
@@ -205,7 +209,7 @@ export default class IrondbDatasource {
         options.url = this.url;
         if ('hosted' == this.irondbType) {
           options.url = options.url + '/irondb';
-          options.url = options.url + '/graphite/series_multi';
+          options.url = options.url + '/rollup';
         }
         options.method = 'GET';
         if ('standalone' == this.irondbType) {
@@ -401,7 +405,7 @@ export default class IrondbDatasource {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
               if ('hosted' == this.irondbType) {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
               } else {
                 cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
               }

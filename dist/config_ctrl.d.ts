@@ -3,5 +3,4 @@ export declare class IrondbConfigCtrl {
     static templateUrl: string;
     current: any;
     constructor($scope: any);
-    updateDefaultQueryPrefix(): void;
 }

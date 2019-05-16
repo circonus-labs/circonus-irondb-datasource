@@ -33,7 +33,7 @@ Read more about IRONdb here:
 * Hosted: An IRONdb instance hosted by Circonus, requires entry of API token.
  
 ### Account ID
-The Account ID associated with the account to pull metrics from. For standalone installations, this is the account_id setting as configured in the "Graphite Listener" section of the */opt/circonus/etc/irondb.conf* file.
+The Account ID associated with the account to pull metrics from.
 
 ### API Token
 The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://www.circonus.com/](https://www.circonus.com/) in the "User Profile" section.

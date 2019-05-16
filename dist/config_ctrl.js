@@ -7,22 +7,8 @@ System.register([], function(exports_1) {
             IrondbConfigCtrl = (function () {
                 function IrondbConfigCtrl($scope) {
                     this.current.jsonData.irondbType = this.current.jsonData.irondbType || 'standalone';
-                    if ('standalone' == this.current.jsonData.irondbType) {
-                        this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefix || 'graphite.';
-                    }
-                    else if ('hosted' == this.current.jsonData.irondbType) {
-                        this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefix || 'reconnoiter.';
-                    }
                     this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
                 }
-                IrondbConfigCtrl.prototype.updateDefaultQueryPrefix = function () {
-                    if ('standalone' == this.current.jsonData.irondbType) {
-                        this.current.jsonData.queryPrefix = 'graphite.';
-                    }
-                    else if ('hosted' == this.current.jsonData.irondbType) {
-                        this.current.jsonData.queryPrefix = 'reconnoiter.';
-                    }
-                };
                 IrondbConfigCtrl.templateUrl = 'partials/config.html';
                 return IrondbConfigCtrl;
             })();

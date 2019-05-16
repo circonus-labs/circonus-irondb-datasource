@@ -8,7 +8,7 @@
     <div class="gf-form">
       <span class="gf-form-label width-9">IRONdb Type</span>
       <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
-        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType' ng-change='ctrl.updateDefaultQueryPrefix()'></select>
+        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType'></select>
         <info-popover mode="right-absolute">
           <p>This option determines whether a standalone or hosted IRONdb instance is the target of this datasource.</p>
           <p>Standalone = An IRONdb cluster accessible directly.</p>

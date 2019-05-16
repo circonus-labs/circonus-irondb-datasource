@@ -70,23 +70,26 @@ System.register(['lodash'], function(exports_1) {
                     }
                     return Promise.resolve([]);
                 };
+                IrondbDatasource.prototype.getAccountId = function () {
+                    return this.irondbType === "standalone" ? ("/" + this.accountId) : "";
+                };
                 IrondbDatasource.prototype.metricTagsQuery = function (query) {
                     if (query === "" || query === undefined) {
                         return Promise.resolve({ data: [] });
                     }
-                    var queryUrl = '/find/' + this.accountId + '/tags?query=';
+                    var queryUrl = '/find' + this.getAccountId() + '/tags?query=';
                     queryUrl = queryUrl + query;
                     //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.metricTagCatsQuery = function (query) {
-                    var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
+                    var queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
                     //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
                 };
                 IrondbDatasource.prototype.metricTagValsQuery = function (query, cat) {
-                    var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
+                    var queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
                     //console.log(queryUrl);
                     return this._irondbSimpleRequest('GET', queryUrl, false, true);
@@ -107,9 +110,9 @@ System.register(['lodash'], function(exports_1) {
                             title: 'Success'
                         };
                     }).catch(function (err) {
-                        var message = err.data.message;
+                        var message = (err.data || {}).message;
                         if (message === undefined) {
-                            message = "Error " + err.status + " " + err.statusText;
+                            message = "Error " + (err.status || "") + " " + (err.statusText || "");
                         }
                         return {
                             status: 'error',
@@ -149,7 +152,7 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-Account'] = this.accountId;
                     }
                     if ('hosted' == this.irondbType && !isCaql) {
-                        baseUrl = baseUrl + '/irondb/graphite';
+                        baseUrl = baseUrl + '/irondb';
                         if (!isFind) {
                             baseUrl = baseUrl + '/series_multi';
                         }
@@ -196,7 +199,7 @@ System.register(['lodash'], function(exports_1) {
                             options.url = this.url;
                             if ('hosted' == this.irondbType) {
                                 options.url = options.url + '/irondb';
-                                options.url = options.url + '/graphite/series_multi';
+                                options.url = options.url + '/rollup';
                             }
                             options.method = 'GET';
                             if ('standalone' == this.irondbType) {
@@ -386,7 +389,7 @@ System.register(['lodash'], function(exports_1) {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
                                         if ('hosted' == _this.irondbType) {
-                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                         else {
                                             cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
