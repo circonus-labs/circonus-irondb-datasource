@@ -38,17 +38,12 @@ The Account ID associated with the account to pull metrics from. For standalone 
 ### API Token
 The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://www.circonus.com/](https://www.circonus.com/) in the "User Profile" section.
 
-### Query Prefix
-Prefix to be added to all queries sent to IRONdb.
-* For standalone installations, this defaults to "**graphite.**".
-* For hosted installations, this defaults to "**reconnoiter.**".
- 
 ## Usage
 
 1. Create a new panel and set the datasource to name selected in the IRONdb datasource configuration.
 
 ### Normal Queries
-For normal queries, use the metric browser to navigate the metric hierarchy of your IRONdb instance or type queries manually using the *Toggle Edit Mode* menu item to the right. The query prefix configured for the selected datasource is prepended to all queries against the IRONdb instance.
+For normal queries, use the metric browser to navigate the metric hierarchy of your IRONdb instance or type queries manually using the *Toggle Edit Mode* menu item to the right.
 ![](img/irondb-graph-metric-browser.png)
 
 ### CAQL Queries

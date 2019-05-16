@@ -8,7 +8,6 @@ export default class IrondbDatasource {
   type: string;
   accountId: number;
   irondbType: string;
-  queryPrefix: string;
   resultsLimit: string;
   url: any;
   apiToken: string;
@@ -25,7 +24,6 @@ export default class IrondbDatasource {
     this.id = instanceSettings.id;
     this.accountId = (instanceSettings.jsonData || {}).accountId;
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
-    this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
     this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
     this.url = instanceSettings.url;
@@ -169,7 +167,7 @@ export default class IrondbDatasource {
     headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
     if ('standalone' == this.irondbType && !isCaql) {
       if (!isFind) {
-        baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
+        baseUrl = baseUrl + '/series_multi';
       }
     }
     if (isCaql && !isFind) {
@@ -403,7 +401,7 @@ export default class IrondbDatasource {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
               if ('hosted' == this.irondbType) {
-                cleanOptions['std']['names'].push({ leaf_name: this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
               } else {
                 cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
               }

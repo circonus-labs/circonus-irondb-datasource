@@ -19,7 +19,6 @@ System.register(['lodash'], function(exports_1) {
                     this.id = instanceSettings.id;
                     this.accountId = (instanceSettings.jsonData || {}).accountId;
                     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
-                    this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
                     this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
                     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
                     this.url = instanceSettings.url;
@@ -160,7 +159,7 @@ System.register(['lodash'], function(exports_1) {
                     headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
                     if ('standalone' == this.irondbType && !isCaql) {
                         if (!isFind) {
-                            baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
+                            baseUrl = baseUrl + '/series_multi';
                         }
                     }
                     if (isCaql && !isFind) {
@@ -387,7 +386,7 @@ System.register(['lodash'], function(exports_1) {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
                                         if ('hosted' == _this.irondbType) {
-                                            cleanOptions['std']['names'].push({ leaf_name: _this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
+                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
                                         }
                                         else {
                                             cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
