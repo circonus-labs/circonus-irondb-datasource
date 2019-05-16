@@ -51,10 +51,14 @@
 .irondb-tag-sep .gf-form-label {
     color: #888;
 }
+.irondb-tag-op .gf-form-label:focus,
+.irondb-tag-op .gf-form-label:hover,
 .irondb-tag-cat .gf-form-label:focus,
 .irondb-tag-cat .gf-form-label:hover,
 .irondb-tag-val .gf-form-label:focus,
-.irondb-tag-val .gf-form-label:hover {
+.irondb-tag-val .gf-form-label:hover,
+.gf-form-label:focus .template-variable,
+.gf-form-label:hover .template-variable {
     color: #fff;
 }
 
