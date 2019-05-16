@@ -11,6 +11,7 @@ export class IrondbConfigCtrl {
     } else if ('hosted' == this.current.jsonData.irondbType) {
       this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefix || 'reconnoiter.';
     }
+    this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
   }
 
   updateDefaultQueryPrefix() {

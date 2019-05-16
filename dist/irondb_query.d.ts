@@ -1,3 +1,13 @@
+export declare enum SegmentType {
+    MetricName = 0,
+    TagCat = 1,
+    TagVal = 2,
+    TagPair = 3,
+    TagSep = 4,
+    TagEnd = 5,
+    TagOp = 6,
+    TagPlus = 7,
+}
 export default class IrondbQuery {
     datasource: any;
     target: any;

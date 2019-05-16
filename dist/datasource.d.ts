@@ -8,7 +8,7 @@ export default class IrondbDatasource {
     type: string;
     accountId: number;
     irondbType: string;
-    queryPrefix: string;
+    resultsLimit: string;
     url: any;
     apiToken: string;
     appName: string;
@@ -20,14 +20,17 @@ export default class IrondbDatasource {
     constructor(instanceSettings: any, $q: any, backendSrv: any, templateSrv: any);
     query(options: any): any;
     annotationQuery(options: any): void;
-    metricFindQuery(query: string): any;
+    metricFindQuery(query: string, options: any): any;
+    metricTagsQuery(query: string): any;
+    metricTagCatsQuery(query: string): any;
+    metricTagValsQuery(query: string, cat: string): any;
     testDatasource(): any;
     _throwerr(err: any): void;
     _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean): any;
     _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
     _buildIrondbParamsAsync(options: any): {};
     _buildIrondbParams(options: any): Promise<{}>;
-    _convertIrondbDataToGrafana(result: any): {
+    _convertIrondbDataToGrafana(result: any, query: any): {
         data: any[];
     };
     _convertIrondbCaqlDataToGrafana(result: any, query: any): {

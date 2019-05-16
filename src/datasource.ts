@@ -8,7 +8,7 @@ export default class IrondbDatasource {
   type: string;
   accountId: number;
   irondbType: string;
-  queryPrefix: string;
+  resultsLimit: string;
   url: any;
   apiToken: string;
   appName: string;
@@ -24,7 +24,7 @@ export default class IrondbDatasource {
     this.id = instanceSettings.id;
     this.accountId = (instanceSettings.jsonData || {}).accountId;
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
-    this.queryPrefix = (instanceSettings.jsonData || {}).queryPrefix;
+    this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
@@ -64,14 +64,48 @@ export default class IrondbDatasource {
     throw new Error("Annotation Support not implemented yet.");
   }
 
-  metricFindQuery(query: string) {
-    var queryUrl = '/' + this.queryPrefix;
-    queryUrl = queryUrl + '/metrics/find?query=' + query;
+  metricFindQuery(query: string, options: any) {
+    var variable = options.variable;
+    if (query !== "" && variable !== undefined) {
+      var metricName = query;
+      var tagCat = variable.tagValuesQuery;
+      if (variable.useTags && tagCat !== "") {
+        return this.metricTagValsQuery(metricName, tagCat).then(results => {
+          return _.map(results.data, result => {
+            return { value: result };
+          });
+        });
+      }
+    }
+    return Promise.resolve([]);
+  }
+
+  metricTagsQuery(query: string) {
+    if (query === "" || query === undefined) {
+      return Promise.resolve({ data: [] });
+    }
+    var queryUrl = '/find/' + this.accountId + '/tags?query=';
+    queryUrl = queryUrl + query;
+    //console.log(queryUrl);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+  }
+
+  metricTagCatsQuery(query: string) {
+    var queryUrl = '/find/' + this.accountId + '/tag_cats?query=';
+    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    //console.log(queryUrl);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+  }
+
+  metricTagValsQuery(query: string, cat: string) {
+    var queryUrl = '/find/' + this.accountId + '/tag_vals?category=' + cat + '&query=';
+    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    //console.log(queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   testDatasource() {
-    return this.metricFindQuery('ametric').then( res => {
+    return this.metricTagsQuery('and(__name:ametric)').then( res => {
       let error = _.get(res, 'results[0].error');
       if (error) {
         return {
@@ -86,16 +120,20 @@ export default class IrondbDatasource {
         title: 'Success'
       };
     }).catch( err => {
+      var message = err.data.message;
+      if (message === undefined) {
+        message = "Error " + err.status + " " + err.statusText;
+      }
       return {
         status: 'error',
-        message: err.message,
+        message: message,
         title: 'Error'
       };
     });
   }
 
   _throwerr(err) {
-    console.log(err);
+    //console.log(err);
     if (err.data && err.data.error) {
       throw new Error('Circonus IRONdb Error: ' + err.data.error);
     } else if (err.data && err.data.user_error) {
@@ -126,10 +164,10 @@ export default class IrondbDatasource {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
+    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
     if ('standalone' == this.irondbType && !isCaql) {
-      baseUrl = baseUrl + '/graphite/' + this.accountId;
       if (!isFind) {
-        baseUrl = baseUrl + '/' + this.queryPrefix + '/series_multi';
+        baseUrl = baseUrl + '/series_multi';
       }
     }
     if (isCaql && !isFind) {
@@ -160,28 +198,44 @@ export default class IrondbDatasource {
     } else {
       headers['X-Circonus-Account'] = this.accountId;
     }
+    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
     if (irondbOptions['std']['names'].length) {
-      options = {};
-      options.url = this.url;
-      if ('hosted' == this.irondbType) {
-        options.url = options.url + '/irondb';
-        options.url = options.url + '/graphite/series_multi';
-      }
-      options.method = 'POST';
-      if ('standalone' == this.irondbType) {
-        options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
-      }
+      for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
+        options = {};
+        options.url = this.url;
+        if ('hosted' == this.irondbType) {
+          options.url = options.url + '/irondb';
+          options.url = options.url + '/graphite/series_multi';
+        }
+        options.method = 'GET';
+        if ('standalone' == this.irondbType) {
+          options.url = options.url + '/rollup';
+        }
+        var interval = irondbOptions['std']['interval'];
+        var start = irondbOptions['std']['start'];
+        var end = irondbOptions['std']['end'];
+        start = Math.floor(start - (start % interval));
+        end = Math.floor(end - (end % interval));
+        interval *= 1000;
 
-      options.data = irondbOptions['std'];
-      options.headers = headers;
-      if (this.basicAuth || this.withCredentials) {
-        options.withCredentials = true;
+        options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+        options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
+        options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
+        options.url = options.url + '&end_ts=' + end + '.000';
+        options.url = options.url + '&rollup_span=' + interval + 'ms';
+        options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+        options.name = irondbOptions['std']['names'][i]['leaf_name'];
+
+        options.headers = headers;
+        if (this.basicAuth || this.withCredentials) {
+          options.withCredentials = true;
+        }
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        options.isCaql = false;
+        queries.push(options);
       }
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
-      }
-      options.isCaql = false;
-      queries.push(options);
     }
     if (irondbOptions['caql']['names'].length) {
       for (var i = 0; i < irondbOptions['caql']['names'].length; i++) {
@@ -222,7 +276,7 @@ export default class IrondbDatasource {
         if (query['isCaql']) {
           queryInterimResults = this._convertIrondbCaqlDataToGrafana(result, query);
         } else {
-          queryInterimResults = this._convertIrondbDataToGrafana(result);
+          queryInterimResults = this._convertIrondbDataToGrafana(result, query);
         }
         return queryInterimResults;
       }).then( result => {
@@ -308,8 +362,8 @@ export default class IrondbDatasource {
       }
     }
 
-    if (!hasWildcards) {
-      for (i = 0; i < options.targets.length; i++) {
+    if (target.isCaql) {
+      /*for (i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
         if (target.hide || !target['query'] || target['query'].length == 0) {
           continue;
@@ -322,11 +376,13 @@ export default class IrondbDatasource {
             cleanOptions['std']['names'].push(target['query']);
           }
         }
-      }
+      }*/
       return cleanOptions;
     } else {
       var promises = options.targets.map(target => {
-        return this.metricFindQuery(target['query']).then( result => {
+        //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
+        var rawQuery = this.templateSrv.replace(target['query']);
+        return this.metricTagsQuery(rawQuery).then( result => {
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;
           }
@@ -337,13 +393,17 @@ export default class IrondbDatasource {
               continue;
             }
             if (!target.isCaql) {
+              result[i]['leaf_data'] = {
+                egress_function: 'average',
+                uuid: result[i]['uuid']
+              };
               if (target.egressoverride != "default") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
               if ('hosted' == this.irondbType) {
-                cleanOptions['std']['names'].push({ leaf_name: this.queryPrefix + result[i]['name'], leaf_data: result[i]['leaf_data'] });
-              } else {
                 cleanOptions['std']['names'].push({ leaf_name: result[i]['name'], leaf_data: result[i]['leaf_data'] });
+              } else {
+                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
               }
             }
           }
@@ -354,7 +414,7 @@ export default class IrondbDatasource {
       return Promise.all(promises).then( result => {
         return cleanOptions;
       }).catch( err => {
-        console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
+        //console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
         if (err.status !== 0 || err.status >= 300) {
         }
       });
@@ -369,34 +429,25 @@ export default class IrondbDatasource {
     });
   }
 
-  _convertIrondbDataToGrafana(result) {
+  _convertIrondbDataToGrafana(result, query) {
     var data = result.data
     var cleanData = [];
 
     var timestamp, origDatapoint, datapoint;
 
-    if (!data || !data.series) return { data: cleanData };
-    if (data.series && data.step && data.from && data.to) {
-      /* Report values in millisecs */
-      data.step *= 1000;
-      data.from *= 1000;
-      data.to *= 1000;
-      for (var name in data.series) {
-        timestamp = data.from - data.step;
-        origDatapoint = data.series[name];
-        datapoint = [];
-        cleanData.push({
-          target: name,
-          datapoints: datapoint
-        });
-        for (var i = 0; i < origDatapoint.length; i++) {
-          timestamp += data.step;
-          if (null == origDatapoint[i]) {
-            continue;
-          }
-          datapoint.push([ origDatapoint[i], timestamp ]);
-        }
+    if (!data) return { data: cleanData };
+    origDatapoint = data;
+    datapoint = [];
+    cleanData.push({
+      target: query.name,
+      datapoints: datapoint
+    });
+    for (var i = 0; i < origDatapoint.length; i++) {
+      timestamp = origDatapoint[i][0] * 1000;
+      if (null == origDatapoint[i][1]) {
+        continue;
       }
+      datapoint.push([ origDatapoint[i][1], timestamp ]);
     }
     return { data: cleanData };
   }

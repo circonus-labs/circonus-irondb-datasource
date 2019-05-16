@@ -1,6 +1,17 @@
 import _ from 'lodash';
 import { Parser } from './parser';
 
+export enum SegmentType {
+  MetricName,
+  TagCat,
+  TagVal,
+  TagPair,
+  TagSep,
+  TagEnd,
+  TagOp,
+  TagPlus
+};
+
 export default class IrondbQuery {
   datasource: any;
   target: any;
@@ -26,28 +37,55 @@ export default class IrondbQuery {
       return;
     }
 
-    var parser = new Parser(this.target.query);
-    var astNode = parser.getAst();
-    if (astNode === null) {
-      this.checkOtherSegmentsIndex = 0;
-      return;
+    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
+    var metricName = this.target.query;
+    // Strip 'and(__name:)' from metric name
+    metricName = metricName.slice(11, -1) || '*';
+    var tags = metricName.split(',');
+    metricName = tags.shift();
+    this.segments.push({ type: SegmentType.MetricName, value: metricName });
+
+    var first = true;
+    for(var tag of tags) {
+      if (first) {
+        first = false;
+      }
+      else {
+        this.segments.push({ type: SegmentType.TagSep });
+      }
+      tag = tag.split(':');
+      var tagCat = tag[0];
+      var tagVal = tag[1];
+      var tagOp = false, tagIndex = 4;
+      if (tagCat.startsWith("and(") || tagCat.startsWith("not(")) {
+        tagOp = true;
+      }
+      else if (tagCat.startsWith("or(")) {
+        tagOp = true;
+        tagIndex = 3;
+      }
+      if (tagOp) {
+        this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
+        tagCat = tagCat.slice(tagIndex);
+      }
+      this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+      this.segments.push({ type: SegmentType.TagPair });
+      var end = 0;
+      while (tagVal.endsWith(")")) {
+        tagVal = tagVal.slice(0, -1);
+        end++;
+      }
+      this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      for (var i = 0; i < end; i++) {
+        this.segments.push({ type: SegmentType.TagPlus });
+        this.segments.push({ type: SegmentType.TagEnd });
+      }
+    }
+    if (tags.length === 0) {
+      this.segments.push({ type: SegmentType.TagPlus });
     }
 
-    if (astNode.type === 'error') {
-      this.error = astNode.message + ' at position: ' + astNode.pos;
-      this.target.rawQuery = true;
-      return;
-    }
-
-    try {
-      this.parseTargetRecursive(astNode, null);
-    } catch (err) {
-      console.log('error parsing target:', err.message);
-      this.error = err.message;
-      this.target.rawQuery = true;
-    }
-
-    this.checkOtherSegmentsIndex = this.segments.length - 1;
+    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
   getSegmentPathUpTo(index) {
@@ -75,7 +113,11 @@ export default class IrondbQuery {
   }
 
   updateSegmentValue(segment, index) {
-    this.segments[index].value = segment.value;
+    //console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
+    //console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
+    if (this.segments[index] !== undefined) {
+      this.segments[index].value = segment.value;
+    }
   }
 
   addSelectMetricSegment() {
@@ -83,9 +125,10 @@ export default class IrondbQuery {
   }
 
   updateModelTarget(targets) {
+    //console.log("IrondbQuery.updateModelTarget() " + JSON.stringify(targets));
     // render query
-    this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
-    this.target.query = this.target.query.replace(/\.$/, '');
+    //this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
+    //this.target.query = this.target.query.replace(/\.$/, '');
 
     this.updateRenderedTarget(this.target, targets);
 

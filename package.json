@@ -9,6 +9,7 @@
   "author": "Circonus",
   "license": "BSD 3-clause",
   "dependencies": {
+    "load-grunt-tasks": "^4.0.0",
     "lodash": "^4.17.4",
     "moment": "^2.18.1",
     "q": "^1.5.0",
@@ -17,7 +18,7 @@
   "devDependencies": {
     "@types/lodash": "^4.14.74",
     "grafana-sdk-mocks": "github:grafana/grafana-sdk-mocks",
-    "grunt": "^1.0.1",
+    "grunt": "^1.0.4",
     "grunt-contrib-clean": "^1.1.0",
     "grunt-contrib-copy": "^1.0.0",
     "grunt-contrib-watch": "^1.0.0",

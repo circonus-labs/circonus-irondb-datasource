@@ -21,7 +21,6 @@
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.accountId' placeholder="enter account id"></input>
       <info-popover mode="right-absolute">
           <p>The Account ID associated with the account to pull metrics from. This can be found on your user profile page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "My Accounts" section.</p>
-          <p>For standalone installations, this is the account_id setting as configured in the "Graphite Listener" section of the /opt/circonus/etc/irondb.conf file.</p>
       </info-popover>
     </div>
     <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType == 'hosted'">
@@ -32,12 +31,11 @@
       </info-popover>
     </div>
     <div class="gf-form">
-      <span class="gf-form-label width-9">Query Prefix</span>
-      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.queryPrefix' ng-init="ctrl.current.jsonData.queryPrefix"></input>
+      <span class="gf-form-label width-9">Results Limit</span>
+      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
       <info-popover mode="right-absolute">
-          <p>Prefix to be added to all queries sent to IRONdb.</p>
-          <p>For standalone installations, this defaults to "<strong>graphite.</strong>".</p>
-          <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
+        <p>Limit number of search results items fetched.</p>
+        <p>Setting it to -1 or "none" removes the limit.</p>
       </info-popover>
     </div>
   </div>

@@ -1,5 +1,6 @@
 /// <reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 import IrondbQuery from './irondb_query';
+import { SegmentType } from './irondb_query';
 import { QueryCtrl } from 'app/plugins/sdk';
 export declare class IrondbQueryCtrl extends QueryCtrl {
     private uiSegmentSrv;
@@ -16,6 +17,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
         text: string;
     }[];
     segments: any[];
+    loadSegments: boolean;
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
     typeValueChanged(): void;
@@ -24,13 +26,21 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     getCollapsedText(): any;
     getSegments(index: any, prefix: any): any;
     parseTarget(): void;
+    setSegmentType(segment: any, type: SegmentType): any;
+    newSegment(type: SegmentType, options: any): any;
+    mapSegment(segment: any): any;
     buildSegments(): void;
     addSelectMetricSegment(): void;
-    checkOtherSegments(fromIndex: any): any;
+    buildSelectTagPlusSegment(): any;
+    addSelectTagPlusSegment(): void;
+    newSelectTagValSegment(): any;
+    checkOtherSegments(fromIndex: any): Promise<void>;
     setSegmentFocus(segmentIndex: any): void;
-    segmentValueChanged(segment: any, segmentIndex: any): any;
+    segmentValueChanged(segment: any, segmentIndex: any): Promise<void>;
     spliceSegments(index: any): void;
     emptySegments(): void;
+    segmentsToStreamTags(): string;
+    segmentsToCaqlFind(): string;
     updateModelTarget(): void;
     targetChanged(): void;
     showDelimiter(index: any): boolean;

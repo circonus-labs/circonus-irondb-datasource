@@ -10,7 +10,7 @@ Read more about IRONdb here:
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
 
 ### From Releases
-1. Download [https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.6.tar.gz](https://github.com/circonus-labs/circonus-irondb-datasource/archive/v0.8.6.tar.gz)
+1. Download the desired [release version](https://github.com/circonus-labs/circonus-irondb-datasource/releases).
 
 2. Unzip into plugins directory.
 
@@ -38,17 +38,12 @@ The Account ID associated with the account to pull metrics from. For standalone 
 ### API Token
 The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://www.circonus.com/](https://www.circonus.com/) in the "User Profile" section.
 
-### Query Prefix
-Prefix to be added to all queries sent to IRONdb.
-* For standalone installations, this defaults to "**graphite.**".
-* For hosted installations, this defaults to "**reconnoiter.**".
- 
 ## Usage
 
 1. Create a new panel and set the datasource to name selected in the IRONdb datasource configuration.
 
 ### Normal Queries
-For normal queries, use the metric browser to navigate the metric hierarchy of your IRONdb instance or type queries manually using the *Toggle Edit Mode* menu item to the right. The query prefix configured for the selected datasource is prepended to all queries against the IRONdb instance.
+For normal queries, use the metric browser to navigate the metric hierarchy of your IRONdb instance or type queries manually using the *Toggle Edit Mode* menu item to the right.
 ![](img/irondb-graph-metric-browser.png)
 
 ### CAQL Queries
@@ -68,6 +63,32 @@ Using the histogram checkbox to process returned data allows for histograms to b
 For this processed data to be displayed on the heatmap panel as the sample above, select *Time Series Buckets* as the Data Format to be used on the Heatmap panel.
 
 ![](img/irondb-heatmap-tsbuckets.png)
+
+### Template Variables
+
+**How to configure a template variable for IRONdb**
+
+1. From a dashboard, click `Settings` in the top right.
+  
+1. On the left hand side, select the `Variables` section.
+  
+1. Click `+New` and choose a name for your new variable.
+  
+1. Select the proper data source: `IRONdb`.
+  
+1. Under `Query`, enter the metric you wish to use in this variable (without tags).
+  
+1. Enable `Include All Option` and enter `*` for `Custom all value`.
+  
+1. Click `Enabled` under `Value groups/tags` to enable tags support.
+  
+1. Enter the tag category you wish to use in your variable under `Tag values query`.
+  
+1. If you successfully completed the prior steps, `Preview of values` should now auto-complete the tag values.
+  
+1. Finish setup by clicking `Add` and then `Save`.
+  
+Your new template variable should now appear in the query builder!
 
 # Development
 
