@@ -241,10 +241,11 @@ System.register(['lodash'], function(exports_1) {
                             if ('hosted' == this.irondbType) {
                                 options.url = options.url + '/public';
                             }
+                            var caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i]);
                             options.url = options.url + '/caql_v1?format=DF4&start=' + irondbOptions['caql']['start'];
                             options.url = options.url + '&end=' + irondbOptions['caql']['end'];
                             options.url = options.url + '&period=' + irondbOptions['caql']['interval'];
-                            options.url = options.url + '&q=' + encodeURIComponent(irondbOptions['caql']['names'][i]);
+                            options.url = options.url + '&q=' + encodeURIComponent(caqlQuery);
                             options.name = irondbOptions['caql']['names'][i];
                             options.headers = headers;
                             options.start = irondbOptions['caql']['start'];

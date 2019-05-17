@@ -67,7 +67,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.target.isCaql = (this.target.pointtype == "CAQL");
                     if (this.target.isCaql) {
                         var caqlQuery = this.segmentsToCaqlFind();
-                        caqlQuery = this.templateSrv.replace(caqlQuery);
                         this.target.query = caqlQuery;
                     }
                     else {

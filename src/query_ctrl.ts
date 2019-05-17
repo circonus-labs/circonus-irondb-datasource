@@ -55,7 +55,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.isCaql = (this.target.pointtype == "CAQL");
     if (this.target.isCaql) {
       var caqlQuery = this.segmentsToCaqlFind();
-      caqlQuery = this.templateSrv.replace(caqlQuery);
       this.target.query = caqlQuery;
       //console.log("typeValueChanged() CAQL " + caqlQuery);
     }
