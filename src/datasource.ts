@@ -182,6 +182,7 @@ export default class IrondbDatasource {
       method: method,
       url: baseUrl + url,
       headers: headers,
+      retry: 1,
     };
 
     //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
@@ -238,6 +239,7 @@ export default class IrondbDatasource {
           options.headers.Authorization = this.basicAuth;
         }
         options.isCaql = false;
+        options.retry = 1;
         queries.push(options);
       }
     }
@@ -262,6 +264,7 @@ export default class IrondbDatasource {
         options.headers = headers;
         options.start = irondbOptions['caql']['start'];
         options.end = irondbOptions['caql']['end'];
+        options.retry = 1;
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
         }

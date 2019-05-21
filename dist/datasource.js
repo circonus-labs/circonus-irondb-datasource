@@ -172,6 +172,7 @@ System.register(['lodash'], function(exports_1) {
                         method: method,
                         url: baseUrl + url,
                         headers: headers,
+                        retry: 1,
                     };
                     //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
                     return this.backendSrv.datasourceRequest(options);
@@ -226,6 +227,7 @@ System.register(['lodash'], function(exports_1) {
                                 options.headers.Authorization = this.basicAuth;
                             }
                             options.isCaql = false;
+                            options.retry = 1;
                             queries.push(options);
                         }
                     }
@@ -250,6 +252,7 @@ System.register(['lodash'], function(exports_1) {
                             options.headers = headers;
                             options.start = irondbOptions['caql']['start'];
                             options.end = irondbOptions['caql']['end'];
+                            options.retry = 1;
                             if (this.basicAuth || this.withCredentials) {
                                 options.withCredentials = true;
                             }
