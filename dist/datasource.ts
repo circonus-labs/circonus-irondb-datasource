@@ -322,8 +322,8 @@ export default class IrondbDatasource {
     // CAQL analytics at one point per pixel is almost never what
     // someone will want.
     var estdp = Math.floor((end-start)*1000/options.intervalMs);
-    if (estdp > options.maxDataPoints/8) estdp = options.maxDataPoints/8;
-    var period = Math.ceil((end-start) / estdp)
+    if (estdp > options.maxDataPoints/2) estdp = options.maxDataPoints/2;
+    var period = Math.ceil((end-start) / estdp);
     // The period is in the right realm now, force align to something
     // that will make it pretty.
     var align = [86400,3600,1800,1200,900,300,60,30,15,10,5,1];
@@ -333,12 +333,13 @@ export default class IrondbDatasource {
         break;
       }
     }
+    if (period < 60) period = 60;
 
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
     cleanOptions['std']['end'] = end;
     cleanOptions['std']['names'] = [];
-    cleanOptions['std']['interval'] = options.intervalMs / 1000;
+    cleanOptions['std']['interval'] = period;
     cleanOptions['caql'] = {};
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
@@ -391,6 +392,8 @@ export default class IrondbDatasource {
         //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
         var rawQuery = this.templateSrv.replace(target['query']);
         return this.metricTagsQuery(rawQuery).then( result => {
+          // Don't mix numeric results with histograms and text metrics
+          result.data = _.filter(result.data, { type: "numeric" });
           for (var i = 0; i < result.data.length; i++) {
             result.data[i]['target'] = target;
           }

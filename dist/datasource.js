@@ -310,8 +310,8 @@ System.register(['lodash'], function(exports_1) {
                     // CAQL analytics at one point per pixel is almost never what
                     // someone will want.
                     var estdp = Math.floor((end - start) * 1000 / options.intervalMs);
-                    if (estdp > options.maxDataPoints / 8)
-                        estdp = options.maxDataPoints / 8;
+                    if (estdp > options.maxDataPoints / 2)
+                        estdp = options.maxDataPoints / 2;
                     var period = Math.ceil((end - start) / estdp);
                     // The period is in the right realm now, force align to something
                     // that will make it pretty.
@@ -322,11 +322,13 @@ System.register(['lodash'], function(exports_1) {
                             break;
                         }
                     }
+                    if (period < 60)
+                        period = 60;
                     cleanOptions['std'] = {};
                     cleanOptions['std']['start'] = start;
                     cleanOptions['std']['end'] = end;
                     cleanOptions['std']['names'] = [];
-                    cleanOptions['std']['interval'] = options.intervalMs / 1000;
+                    cleanOptions['std']['interval'] = period;
                     cleanOptions['caql'] = {};
                     cleanOptions['caql']['start'] = start;
                     cleanOptions['caql']['end'] = end;
@@ -376,6 +378,8 @@ System.register(['lodash'], function(exports_1) {
                             //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
                             var rawQuery = _this.templateSrv.replace(target['query']);
                             return _this.metricTagsQuery(rawQuery).then(function (result) {
+                                // Don't mix numeric results with histograms and text metrics
+                                result.data = lodash_1.default.filter(result.data, { type: "numeric" });
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;
                                 }
