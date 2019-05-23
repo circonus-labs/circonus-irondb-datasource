@@ -53,6 +53,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         { value: "derive_stddev", text: "derive_stddev" },
                         { value: "counter", text: "counter" },
                         { value: "counter_stddev", text: "counter_stddev" }];
+                    this.caqlFindFunctions = {
+                        count: "count",
+                        average: "average",
+                        average_stddev: "stddev",
+                        derive: "derivative",
+                        derive_stddev: "derivative_stddev",
+                        counter: "counter",
+                        counter_stddev: "counter_stddev" };
                     lodash_1.default.defaultsDeep(this.target, this.defaults);
                     this.target.isCaql = this.target.isCaql || false;
                     this.target.egressoverride = this.target.egressoverride || "default";
@@ -71,6 +79,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     else {
                         this.target.query = "";
+                        this.target.egressoverride = "default";
                         this.emptySegments();
                         this.parseTarget();
                     }
@@ -405,6 +414,15 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     query += ")";
                     return query;
                 };
+                IrondbQueryCtrl.prototype.queryFunctionToCaqlFind = function () {
+                    var findFunction = "find";
+                    var egressOverride = this.target.egressoverride;
+                    if (egressOverride !== "default") {
+                        egressOverride = this.caqlFindFunctions[egressOverride];
+                        findFunction += ":" + egressOverride;
+                    }
+                    return findFunction;
+                };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();
                     // First element is always metric name
@@ -413,7 +431,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     if (metricName === "*" && tagless) {
                         return "";
                     }
-                    var query = "find(\"" + metricName + "\"";
+                    var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
                     if (tagless) {
                         query += ")";
                         return query;

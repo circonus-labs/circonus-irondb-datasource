@@ -16,6 +16,15 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
         value: string;
         text: string;
     }[];
+    caqlFindFunctions: {
+        count: string;
+        average: string;
+        average_stddev: string;
+        derive: string;
+        derive_stddev: string;
+        counter: string;
+        counter_stddev: string;
+    };
     segments: any[];
     loadSegments: boolean;
     /** @ngInject **/
@@ -40,6 +49,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     spliceSegments(index: any): void;
     emptySegments(): void;
     segmentsToStreamTags(): string;
+    queryFunctionToCaqlFind(): string;
     segmentsToCaqlFind(): string;
     updateModelTarget(): void;
     targetChanged(): void;

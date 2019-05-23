@@ -33,6 +33,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
                         { value: "derive_stddev", text: "derive_stddev" },
                         { value: "counter", text: "counter" },
                         { value: "counter_stddev", text: "counter_stddev" } ];
+  caqlFindFunctions = {
+                        count: "count",
+                        average: "average",
+                        average_stddev: "stddev",
+                        derive: "derivative",
+                        derive_stddev: "derivative_stddev",
+                        counter: "counter",
+                        counter_stddev: "counter_stddev" };
   segments: any[];
   loadSegments: boolean;
 
@@ -60,6 +68,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else {
       this.target.query = "";
+      this.target.egressoverride = "default";
       this.emptySegments();
       this.parseTarget();
     }
@@ -432,6 +441,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return query;
   }
 
+  queryFunctionToCaqlFind() {
+    var findFunction = "find";
+    var egressOverride = this.target.egressoverride;
+    if (egressOverride !== "default" ) {
+      egressOverride = this.caqlFindFunctions[egressOverride];
+      findFunction += ":" + egressOverride;
+    }
+    return findFunction;
+  }
+
   segmentsToCaqlFind() {
     var segments = this.segments.slice();
     // First element is always metric name
@@ -440,7 +459,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (metricName === "*" && tagless) {
       return "";
     }
-    var query = "find(\"" + metricName + "\"";
+    var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
     if (tagless) {
       query += ")";
       return query;
