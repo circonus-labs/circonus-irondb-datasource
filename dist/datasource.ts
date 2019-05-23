@@ -84,8 +84,8 @@ export default class IrondbDatasource {
     return this.irondbType === "standalone" ? ("/" + this.accountId) : "";
   }
 
-  metricTagsQuery(query: string) {
-    if (query === "" || query === undefined) {
+  metricTagsQuery(query: string, allowEmptyWildcard: boolean = false) {
+    if (query === "" || query === undefined || (!allowEmptyWildcard && query === "and(__name:*)")) {
       return Promise.resolve({ data: [] });
     }
     var queryUrl = '/find' + this.getAccountId() + '/tags?query=';

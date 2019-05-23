@@ -22,7 +22,7 @@ export default class IrondbDatasource {
     annotationQuery(options: any): void;
     metricFindQuery(query: string, options: any): any;
     getAccountId(): string;
-    metricTagsQuery(query: string): any;
+    metricTagsQuery(query: string, allowEmptyWildcard?: boolean): any;
     metricTagCatsQuery(query: string): any;
     metricTagValsQuery(query: string, cat: string): any;
     testDatasource(): any;

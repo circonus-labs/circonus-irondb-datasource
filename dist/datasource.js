@@ -73,8 +73,9 @@ System.register(['lodash'], function(exports_1) {
                 IrondbDatasource.prototype.getAccountId = function () {
                     return this.irondbType === "standalone" ? ("/" + this.accountId) : "";
                 };
-                IrondbDatasource.prototype.metricTagsQuery = function (query) {
-                    if (query === "" || query === undefined) {
+                IrondbDatasource.prototype.metricTagsQuery = function (query, allowEmptyWildcard) {
+                    if (allowEmptyWildcard === void 0) { allowEmptyWildcard = false; }
+                    if (query === "" || query === undefined || (!allowEmptyWildcard && query === "and(__name:*)")) {
                         return Promise.resolve({ data: [] });
                     }
                     var queryUrl = '/find' + this.getAccountId() + '/tags?query=';
