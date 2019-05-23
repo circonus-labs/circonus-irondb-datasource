@@ -409,11 +409,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segments = this.segments.slice();
                     // First element is always metric name
                     var metricName = segments.shift().value;
-                    if (metricName === "*") {
+                    var tagless = segments.length === 1 && segments[0]._type == irondb_query_2.SegmentType.TagPlus;
+                    if (metricName === "*" && tagless) {
                         return "";
                     }
                     var query = "find(\"" + metricName + "\"";
-                    if (segments.length === 1 && segments[0]._type == irondb_query_2.SegmentType.TagPlus) {
+                    if (tagless) {
                         query += ")";
                         return query;
                     }

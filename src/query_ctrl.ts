@@ -436,11 +436,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     var segments = this.segments.slice();
     // First element is always metric name
     var metricName = segments.shift().value;
-    if (metricName === "*") {
+    var tagless = segments.length === 1 && segments[0]._type == SegmentType.TagPlus;
+    if (metricName === "*" && tagless) {
       return "";
     }
     var query = "find(\"" + metricName + "\"";
-    if (segments.length === 1 && segments[0]._type == SegmentType.TagPlus) {
+    if (tagless) {
       query += ")";
       return query;
     }
