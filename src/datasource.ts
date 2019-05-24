@@ -98,14 +98,14 @@ export default class IrondbDatasource {
     var queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     //console.log(queryUrl);
-    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   metricTagValsQuery(query: string, cat: string) {
     var queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     //console.log(queryUrl);
-    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   testDatasource() {
@@ -153,7 +153,7 @@ export default class IrondbDatasource {
       throw new Error('Error: ' + (err ? err.toString() : "unknown"));
     }
   }
-  _irondbSimpleRequest(method, url, isCaql = false, isFind = false) {
+  _irondbSimpleRequest(method, url, isCaql = false, isFind = false, isLimited = true) {
     var baseUrl = this.url;
     var headers = { "Content-Type": "application/json" };
 
@@ -168,7 +168,7 @@ export default class IrondbDatasource {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
-    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
+    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
     if ('standalone' == this.irondbType && !isCaql) {
       if (!isFind) {
         baseUrl = baseUrl + '/series_multi';
@@ -189,7 +189,7 @@ export default class IrondbDatasource {
     return this.backendSrv.datasourceRequest(options);
   }
 
-  _irondbRequest(irondbOptions, isCaql = false) {
+  _irondbRequest(irondbOptions, isCaql = false, isLimited = true) {
     //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     var headers = { "Content-Type": "application/json" };
     var options: any = {};
@@ -203,7 +203,7 @@ export default class IrondbDatasource {
     } else {
       headers['X-Circonus-Account'] = this.accountId;
     }
-    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
+    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
     if (irondbOptions['std']['names'].length) {
       for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
         options = {};

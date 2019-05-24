@@ -87,13 +87,13 @@ System.register(['lodash'], function(exports_1) {
                     var queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
                     //console.log(queryUrl);
-                    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+                    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
                 };
                 IrondbDatasource.prototype.metricTagValsQuery = function (query, cat) {
                     var queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
                     queryUrl = queryUrl + 'and(__name:' + query + ')';
                     //console.log(queryUrl);
-                    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+                    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
                 };
                 IrondbDatasource.prototype.testDatasource = function () {
                     return this.metricTagsQuery('and(__name:ametric)').then(function (res) {
@@ -144,9 +144,10 @@ System.register(['lodash'], function(exports_1) {
                         throw new Error('Error: ' + (err ? err.toString() : "unknown"));
                     }
                 };
-                IrondbDatasource.prototype._irondbSimpleRequest = function (method, url, isCaql, isFind) {
+                IrondbDatasource.prototype._irondbSimpleRequest = function (method, url, isCaql, isFind, isLimited) {
                     if (isCaql === void 0) { isCaql = false; }
                     if (isFind === void 0) { isFind = false; }
+                    if (isLimited === void 0) { isLimited = true; }
                     var baseUrl = this.url;
                     var headers = { "Content-Type": "application/json" };
                     if ('hosted' != this.irondbType) {
@@ -160,7 +161,7 @@ System.register(['lodash'], function(exports_1) {
                         headers['X-Circonus-Auth-Token'] = this.apiToken;
                         headers['X-Circonus-App-Name'] = this.appName;
                     }
-                    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
+                    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
                     if ('standalone' == this.irondbType && !isCaql) {
                         if (!isFind) {
                             baseUrl = baseUrl + '/series_multi';
@@ -178,9 +179,10 @@ System.register(['lodash'], function(exports_1) {
                     //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
                     return this.backendSrv.datasourceRequest(options);
                 };
-                IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql) {
+                IrondbDatasource.prototype._irondbRequest = function (irondbOptions, isCaql, isLimited) {
                     var _this = this;
                     if (isCaql === void 0) { isCaql = false; }
+                    if (isLimited === void 0) { isLimited = true; }
                     //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
                     var headers = { "Content-Type": "application/json" };
                     var options = {};
@@ -194,7 +196,7 @@ System.register(['lodash'], function(exports_1) {
                     else {
                         headers['X-Circonus-Account'] = this.accountId;
                     }
-                    headers['X-Snowth-Advisory-Limit'] = this.resultsLimit;
+                    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
                     if (irondbOptions['std']['names'].length) {
                         for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
                             options = {};

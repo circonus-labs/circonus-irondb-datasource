@@ -27,8 +27,8 @@ export default class IrondbDatasource {
     metricTagValsQuery(query: string, cat: string): any;
     testDatasource(): any;
     _throwerr(err: any): void;
-    _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean): any;
-    _irondbRequest(irondbOptions: any, isCaql?: boolean): Promise<{}>;
+    _irondbSimpleRequest(method: any, url: any, isCaql?: boolean, isFind?: boolean, isLimited?: boolean): any;
+    _irondbRequest(irondbOptions: any, isCaql?: boolean, isLimited?: boolean): Promise<{}>;
     _buildIrondbParamsAsync(options: any): {};
     _buildIrondbParams(options: any): Promise<{}>;
     _convertIrondbDataToGrafana(result: any, query: any): {
