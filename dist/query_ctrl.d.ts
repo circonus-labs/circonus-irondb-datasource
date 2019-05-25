@@ -12,6 +12,10 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
         value: string;
         text: string;
     }[];
+    labelTypeOptions: {
+        value: string;
+        text: string;
+    }[];
     egressTypeOptions: {
         value: string;
         text: string;
@@ -30,6 +34,9 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
     typeValueChanged(): void;
+    labelTypeValueChanged(): void;
+    loadMetricLabel(): void;
+    metricLabelValueChanged(): void;
     egressValueChanged(): void;
     onChangeInternal(): void;
     getCollapsedText(): any;
@@ -50,6 +57,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     emptySegments(): void;
     segmentsToStreamTags(): string;
     queryFunctionToCaqlFind(): string;
+    buildCaqlLabel(): string;
     segmentsToCaqlFind(): string;
     updateModelTarget(): void;
     targetChanged(): void;

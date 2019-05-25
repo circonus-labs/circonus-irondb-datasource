@@ -45,6 +45,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.templateSrv = templateSrv;
                     this.defaults = {};
                     this.pointTypeOptions = [{ value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" }];
+                    this.labelTypeOptions = [{ value: "default", text: "default" }, { value: "custom", text: "custom" }];
                     this.egressTypeOptions = [{ value: "default", text: "default" },
                         { value: "count", text: "count" },
                         { value: "average", text: "average" },
@@ -64,11 +65,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     lodash_1.default.defaultsDeep(this.target, this.defaults);
                     this.target.isCaql = this.target.isCaql || false;
                     this.target.egressoverride = this.target.egressoverride || "default";
+                    this.target.metriclabel = this.target.metriclabel || "";
+                    this.target.labeltype = this.target.labeltype || "default";
                     this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
                     this.target.query = this.target.query || '';
                     this.target.segments = this.target.segments || [];
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
                     this.buildSegments();
+                    this.loadMetricLabel();
                     this.loadSegments = false;
                 }
                 IrondbQueryCtrl.prototype.typeValueChanged = function () {
@@ -80,10 +84,23 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     else {
                         this.target.query = "";
                         this.target.egressoverride = "default";
+                        this.target.labeltype = "default";
                         this.emptySegments();
                         this.parseTarget();
                     }
                     this.error = null;
+                    this.panelCtrl.refresh();
+                };
+                IrondbQueryCtrl.prototype.labelTypeValueChanged = function () {
+                    this.panelCtrl.refresh();
+                };
+                IrondbQueryCtrl.prototype.loadMetricLabel = function () {
+                    if (this.target.metriclabel === "") {
+                        this.target.labeltype = "default";
+                    }
+                };
+                IrondbQueryCtrl.prototype.metricLabelValueChanged = function () {
+                    this.loadMetricLabel();
                     this.panelCtrl.refresh();
                 };
                 IrondbQueryCtrl.prototype.egressValueChanged = function () {
@@ -423,6 +440,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     return findFunction;
                 };
+                IrondbQueryCtrl.prototype.buildCaqlLabel = function () {
+                    if (this.target.labeltype !== "default" && this.target.metriclabel !== "") {
+                        return " | label(\"" + this.target.metriclabel + "\")";
+                    }
+                    return "";
+                };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();
                     // First element is always metric name
@@ -433,7 +456,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
                     if (tagless) {
-                        query += ")";
+                        query += ")" + this.buildCaqlLabel();
                         return query;
                     }
                     var firstTag = true;
@@ -459,7 +482,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                         query += segment.value;
                     }
-                    query += "\")";
+                    query += "\")" + this.buildCaqlLabel();
                     return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {

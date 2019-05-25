@@ -238,6 +238,7 @@ export default class IrondbDatasource {
         if (this.basicAuth) {
           options.headers.Authorization = this.basicAuth;
         }
+        options.metricLabel = irondbOptions['std']['names'][i]['leaf_data']['metriclabel'];
         options.isCaql = false;
         options.retry = 1;
         queries.push(options);
@@ -411,11 +412,11 @@ export default class IrondbDatasource {
               if (target.egressoverride != "default") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
-              if ('hosted' == this.irondbType) {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
-              } else {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
+              if (target.labeltype !== "default") {
+                result[i]['leaf_data'].metriclabel = target.metriclabel;
               }
+              var leaf_name = result[i]['metric_name'];
+              cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
             }
           }
           return cleanOptions;
@@ -449,8 +450,12 @@ export default class IrondbDatasource {
     if (!data) return { data: cleanData };
     origDatapoint = data;
     datapoint = [];
+    var name = query.name;
+    if (query.metricLabel !== undefined && query.metricLabel !== "") {
+      name = query.metricLabel;
+    }
     cleanData.push({
-      target: query.name,
+      target: name,
       datapoints: datapoint
     });
     for (var i = 0; i < origDatapoint.length; i++) {

@@ -25,6 +25,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   };
   queryModel: IrondbQuery;
   pointTypeOptions = [ { value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" } ];
+  labelTypeOptions = [ { value: "default", text: "default" }, { value: "custom", text: "custom" } ];
   egressTypeOptions = [ { value: "default", text: "default" },
                         { value: "count", text: "count" },
                         { value: "average", text: "average" },
@@ -51,11 +52,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     _.defaultsDeep(this.target, this.defaults);
     this.target.isCaql = this.target.isCaql || false;
     this.target.egressoverride = this.target.egressoverride || "default";
+    this.target.metriclabel = this.target.metriclabel || "";
+    this.target.labeltype = this.target.labeltype || "default";
     this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
+    this.loadMetricLabel();
     this.loadSegments = false;
   }
 
@@ -69,10 +73,26 @@ export class IrondbQueryCtrl extends QueryCtrl {
     else {
       this.target.query = "";
       this.target.egressoverride = "default";
+      this.target.labeltype = "default";
       this.emptySegments();
       this.parseTarget();
     }
     this.error = null;
+    this.panelCtrl.refresh();
+  }
+
+  labelTypeValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  loadMetricLabel() {
+    if (this.target.metriclabel === "") {
+      this.target.labeltype = "default";
+    }
+  }
+
+  metricLabelValueChanged() {
+    this.loadMetricLabel();
     this.panelCtrl.refresh();
   }
 
@@ -451,6 +471,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return findFunction;
   }
 
+  buildCaqlLabel() {
+    if (this.target.labeltype !== "default" && this.target.metriclabel !== "") {
+      return " | label(\"" + this.target.metriclabel + "\")";
+    }
+    return "";
+  }
+
   segmentsToCaqlFind() {
     var segments = this.segments.slice();
     // First element is always metric name
@@ -461,7 +488,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
     if (tagless) {
-      query += ")";
+      query += ")" + this.buildCaqlLabel();
       return query;
     }
     var firstTag = true;
@@ -486,7 +513,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
         query += segment.value;
     }
-    query += "\")";
+    query += "\")" + this.buildCaqlLabel();
     return query;
   }
 
