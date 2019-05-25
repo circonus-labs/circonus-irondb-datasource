@@ -25,7 +25,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   };
   queryModel: IrondbQuery;
   pointTypeOptions = [ { value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" } ];
-  labelTypeOptions = [ { value: "default", text: "default" }, { value: "custom", text: "custom" } ];
+  labelTypeOptions = [ { value: "default", text: "name and tags" }, { value: "custom", text: "custom" } ];
   egressTypeOptions = [ { value: "default", text: "default" },
                         { value: "count", text: "count" },
                         { value: "average", text: "average" },

@@ -45,7 +45,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.templateSrv = templateSrv;
                     this.defaults = {};
                     this.pointTypeOptions = [{ value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" }];
-                    this.labelTypeOptions = [{ value: "default", text: "default" }, { value: "custom", text: "custom" }];
+                    this.labelTypeOptions = [{ value: "default", text: "name and tags" }, { value: "custom", text: "custom" }];
                     this.egressTypeOptions = [{ value: "default", text: "default" },
                         { value: "count", text: "count" },
                         { value: "average", text: "average" },
