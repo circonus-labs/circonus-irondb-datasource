@@ -12,6 +12,14 @@ export enum SegmentType {
   TagPlus
 };
 
+export function taglessName(name: string) {
+  var tag_start = name.indexOf("ST[");
+  if (tag_start != -1) {
+    name = name.substring(0, tag_start - 1);
+  }
+  return name;
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;

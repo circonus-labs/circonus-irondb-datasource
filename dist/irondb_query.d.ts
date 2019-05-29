@@ -8,6 +8,7 @@ export declare enum SegmentType {
     TagOp = 6,
     TagPlus = 7,
 }
+export declare function taglessName(name: string): string;
 export default class IrondbQuery {
     datasource: any;
     target: any;

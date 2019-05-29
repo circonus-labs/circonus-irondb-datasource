@@ -56,7 +56,7 @@
               lookup-text="true">
             </gf-form-dropdown>
         </div>
-        <div ng-if="ctrl.target.labeltype!=='default'" class="gf-form gf-form--grow">
+        <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form gf-form--grow">
             <input class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-change="ctrl.metricLabelValueChanged()" placeholder="label"></input>
         </div>
       </div>

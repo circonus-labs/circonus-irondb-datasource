@@ -1,11 +1,14 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
-System.register(['lodash'], function(exports_1) {
-    var lodash_1;
+System.register(['lodash', './irondb_query'], function(exports_1) {
+    var lodash_1, irondb_query_1;
     var IrondbDatasource;
     return {
         setters:[
             function (lodash_1_1) {
                 lodash_1 = lodash_1_1;
+            },
+            function (irondb_query_1_1) {
+                irondb_query_1 = irondb_query_1_1;
             }],
         execute: function() {
             IrondbDatasource = (function () {
@@ -400,10 +403,14 @@ System.register(['lodash'], function(exports_1) {
                                         if (target.egressoverride != "default") {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
-                                        if (target.labeltype !== "default") {
-                                            result[i]['leaf_data'].metriclabel = target.metriclabel;
-                                        }
                                         var leaf_name = result[i]['metric_name'];
+                                        if (target.labeltype !== "default") {
+                                            var metriclabel = target.metriclabel;
+                                            if (target.labeltype === "name") {
+                                                metriclabel = irondb_query_1.taglessName(leaf_name);
+                                            }
+                                            result[i]['leaf_data'].metriclabel = metriclabel;
+                                        }
                                         cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
                                     }
                                 }

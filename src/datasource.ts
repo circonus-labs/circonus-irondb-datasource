@@ -1,6 +1,7 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
+import {taglessName} from './irondb_query';
 
 export default class IrondbDatasource {
   id: number;
@@ -412,10 +413,14 @@ export default class IrondbDatasource {
               if (target.egressoverride != "default") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
-              if (target.labeltype !== "default") {
-                result[i]['leaf_data'].metriclabel = target.metriclabel;
-              }
               var leaf_name = result[i]['metric_name'];
+              if (target.labeltype !== "default") {
+                var metriclabel = target.metriclabel;
+                if(target.labeltype === "name") {
+                  metriclabel = taglessName(leaf_name);
+                }
+                result[i]['leaf_data'].metriclabel = metriclabel;
+              }
               cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
             }
           }

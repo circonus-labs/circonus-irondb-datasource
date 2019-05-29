@@ -7,13 +7,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
     };
     var lodash_1, irondb_query_1, irondb_query_2, sdk_1;
     var IrondbQueryCtrl;
-    function tagless_name(name) {
-        var tag_start = name.indexOf("ST[");
-        if (tag_start != -1) {
-            name = name.substring(0, tag_start - 1);
-        }
-        return name;
-    }
     function isEven(x) {
         return x % 2 == 0;
     }
@@ -44,8 +37,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.uiSegmentSrv = uiSegmentSrv;
                     this.templateSrv = templateSrv;
                     this.defaults = {};
-                    this.pointTypeOptions = [{ value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" }];
-                    this.labelTypeOptions = [{ value: "default", text: "name and tags" }, { value: "custom", text: "custom" }];
+                    this.pointTypeOptions = [{ value: "Metric", text: "Metric" },
+                        { value: "CAQL", text: "CAQL" }];
+                    this.labelTypeOptions = [{ value: "default", text: "name and tags" },
+                        { value: "name", text: "name only" },
+                        { value: "custom", text: "custom" }];
                     this.egressTypeOptions = [{ value: "default", text: "default" },
                         { value: "count", text: "count" },
                         { value: "average", text: "average" },
@@ -95,7 +91,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.panelCtrl.refresh();
                 };
                 IrondbQueryCtrl.prototype.loadMetricLabel = function () {
-                    if (this.target.metriclabel === "") {
+                    if (this.target.metriclabel === "" && this.target.labeltype !== "name") {
                         this.target.labeltype = "default";
                     }
                 };
@@ -123,7 +119,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             .metricTagsQuery("and(__name:" + query + "*)", true)
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
-                                return tagless_name(result.metric_name);
+                                return irondb_query_2.taglessName(result.metric_name);
                             });
                             metricnames = lodash_1.default.uniq(metricnames);
                             //console.log(JSON.stringify(metricnames));
@@ -441,8 +437,13 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     return findFunction;
                 };
                 IrondbQueryCtrl.prototype.buildCaqlLabel = function () {
-                    if (this.target.labeltype !== "default" && this.target.metriclabel !== "") {
-                        return " | label(\"" + this.target.metriclabel + "\")";
+                    if (this.target.labeltype !== "default") {
+                        if (this.target.labeltype === "custom" && this.target.metriclabel !== "") {
+                            return " | label(\"" + this.target.metriclabel + "\")";
+                        }
+                        else if (this.target.labeltype === "name") {
+                            return " | label(\"%n\")";
+                        }
                     }
                     return "";
                 };
