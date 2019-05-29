@@ -468,11 +468,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   buildCaqlLabel() {
-    if (this.target.labeltype !== "default") {
-      if (this.target.labeltype === "custom" && this.target.metriclabel !== "") {
-        return " | label(\"" + this.target.metriclabel + "\")";
+    var labeltype = this.target.labeltype;
+    var metriclabel = this.target.metriclabel;
+    if (labeltype !== "default") {
+      if (labeltype === "custom" && metriclabel !== "") {
+        metriclabel = metriclabel.replace(/"/g, "'");
+        return " | label(\"" + metriclabel + "\")";
       }
-      else if (this.target.labeltype === "name") {
+      else if (labeltype === "name") {
         return " | label(\"%n\")";
       }
     }
