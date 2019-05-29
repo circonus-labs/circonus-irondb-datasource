@@ -40,25 +40,27 @@
           </div>
         </div>
       </div>
-      <div ng-if="!ctrl.target.isCaql" class="gf-form">
-        <div class="gf-form gf-form--grow">
-          <div class="gf-form-label gf-form-label--grow" style="color:#33b5e5;margin-left:2px;">f(x)</div>
-        </div>
-        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
-          <gf-form-dropdown name="egressoverride" model="ctrl.target.egressoverride" on-change="ctrl.egressValueChanged()" css-class="gf-size-auto"
-            get-options="ctrl.egressTypeOptions"
-            lookup-text="true">
-          </gf-form-dropdown>
-        </div>
-        <div ng-if="ctrl.target.labeltype!=='custom'" role="menuitem" class="gf-form" style="align-self:flex-start;">
-            <gf-form-dropdown name="labeltype" model="ctrl.target.labeltype" on-change="ctrl.labelTypeValueChanged()" css-class="gf-size-auto"
-              get-options="ctrl.labelTypeOptions"
-              lookup-text="true">
-            </gf-form-dropdown>
-        </div>
-        <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form gf-form--grow">
-            <input class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-change="ctrl.metricLabelValueChanged()" placeholder="label"></input>
-        </div>
+    </div>
+    <div ng-if="!ctrl.target.isCaql" class="gf-form">
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="labeltype" model="ctrl.target.labeltype" on-change="ctrl.labelTypeValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.labelTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form">
+        <input class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-change="ctrl.metricLabelValueChanged()" placeholder="label"></input>
+      </div>
+    </div>
+    <div ng-if="!ctrl.target.isCaql" class="gf-form">
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="egressoverride" model="ctrl.target.egressoverride" on-change="ctrl.egressValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.egressTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div class="gf-form">
+        <div class="gf-form-label" style="color:#33b5e5;margin-left:2px;">f(x)</div>
       </div>
     </div>
 
