@@ -17,8 +17,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   defaults = {
   };
   queryModel: IrondbQuery;
-  pointTypeOptions = [ { value: "Metric", text: "Metric" },
-                       { value: "CAQL", text: "CAQL" } ];
   labelTypeOptions = [ { value: "default", text: "name and tags" },
                        { value: "name", text: "name only" },
                        { value: "custom", text: "custom" } ];
@@ -49,7 +47,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.egressoverride = this.target.egressoverride || "average";
     this.target.metriclabel = this.target.metriclabel || "";
     this.target.labeltype = this.target.labeltype || "default";
-    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
@@ -58,8 +55,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.loadSegments = false;
   }
 
+  toggleEditorMode() {
+    //console.log("toggleEditorMode()");
+    this.target.isCaql = !this.target.isCaql;
+    this.typeValueChanged();
+  }
+
   typeValueChanged() {
-    this.target.isCaql = (this.target.pointtype == "CAQL");
     if (this.target.isCaql) {
       var caqlQuery = this.segmentsToCaqlFind();
       this.target.query = caqlQuery;

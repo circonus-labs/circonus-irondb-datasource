@@ -37,8 +37,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.uiSegmentSrv = uiSegmentSrv;
                     this.templateSrv = templateSrv;
                     this.defaults = {};
-                    this.pointTypeOptions = [{ value: "Metric", text: "Metric" },
-                        { value: "CAQL", text: "CAQL" }];
                     this.labelTypeOptions = [{ value: "default", text: "name and tags" },
                         { value: "name", text: "name only" },
                         { value: "custom", text: "custom" }];
@@ -62,7 +60,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.target.egressoverride = this.target.egressoverride || "average";
                     this.target.metriclabel = this.target.metriclabel || "";
                     this.target.labeltype = this.target.labeltype || "default";
-                    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
                     this.target.query = this.target.query || '';
                     this.target.segments = this.target.segments || [];
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
@@ -70,8 +67,12 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.loadMetricLabel();
                     this.loadSegments = false;
                 }
+                IrondbQueryCtrl.prototype.toggleEditorMode = function () {
+                    //console.log("toggleEditorMode()");
+                    this.target.isCaql = !this.target.isCaql;
+                    this.typeValueChanged();
+                };
                 IrondbQueryCtrl.prototype.typeValueChanged = function () {
-                    this.target.isCaql = (this.target.pointtype == "CAQL");
                     if (this.target.isCaql) {
                         var caqlQuery = this.segmentsToCaqlFind();
                         this.target.query = caqlQuery;

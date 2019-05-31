@@ -8,10 +8,6 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     static templateUrl: string;
     defaults: {};
     queryModel: IrondbQuery;
-    pointTypeOptions: {
-        value: string;
-        text: string;
-    }[];
     labelTypeOptions: {
         value: string;
         text: string;
@@ -33,6 +29,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     loadSegments: boolean;
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
+    toggleEditorMode(): void;
     typeValueChanged(): void;
     labelTypeValueChanged(): void;
     loadMetricLabel(): void;
