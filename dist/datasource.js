@@ -400,7 +400,7 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                             egress_function: 'average',
                                             uuid: result[i]['uuid']
                                         };
-                                        if (target.egressoverride != "default") {
+                                        if (target.egressoverride !== "average") {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
                                         var leaf_name = result[i]['metric_name'];

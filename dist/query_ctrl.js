@@ -42,14 +42,13 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.labelTypeOptions = [{ value: "default", text: "name and tags" },
                         { value: "name", text: "name only" },
                         { value: "custom", text: "custom" }];
-                    this.egressTypeOptions = [{ value: "default", text: "default" },
-                        { value: "count", text: "count" },
-                        { value: "average", text: "average" },
-                        { value: "average_stddev", text: "average_stddev" },
-                        { value: "derive", text: "derive" },
-                        { value: "derive_stddev", text: "derive_stddev" },
-                        { value: "counter", text: "counter" },
-                        { value: "counter_stddev", text: "counter_stddev" }];
+                    this.egressTypeOptions = [{ value: "count", text: "number of data points (count)" },
+                        { value: "average", text: "average value (gauge)" },
+                        { value: "average_stddev", text: "standard deviation a.k.a. σ (stddev)" },
+                        { value: "derive", text: "rate of change (derive)" },
+                        { value: "derive_stddev", text: "rate of change σ (derive_stddev)" },
+                        { value: "counter", text: "rate of positive change (counter)" },
+                        { value: "counter_stddev", text: "rate of positive change σ (counter_stddev)" }];
                     this.caqlFindFunctions = {
                         count: "count",
                         average: "average",
@@ -60,7 +59,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         counter_stddev: "counter_stddev" };
                     lodash_1.default.defaultsDeep(this.target, this.defaults);
                     this.target.isCaql = this.target.isCaql || false;
-                    this.target.egressoverride = this.target.egressoverride || "default";
+                    this.target.egressoverride = this.target.egressoverride || "average";
                     this.target.metriclabel = this.target.metriclabel || "";
                     this.target.labeltype = this.target.labeltype || "default";
                     this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
@@ -79,7 +78,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     else {
                         this.target.query = "";
-                        this.target.egressoverride = "default";
+                        this.target.egressoverride = "average";
                         this.target.labeltype = "default";
                         this.emptySegments();
                         this.parseTarget();
@@ -430,7 +429,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.queryFunctionToCaqlFind = function () {
                     var findFunction = "find";
                     var egressOverride = this.target.egressoverride;
-                    if (egressOverride !== "default") {
+                    if (egressOverride !== "average") {
                         egressOverride = this.caqlFindFunctions[egressOverride];
                         findFunction += ":" + egressOverride;
                     }

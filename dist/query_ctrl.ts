@@ -22,14 +22,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
   labelTypeOptions = [ { value: "default", text: "name and tags" },
                        { value: "name", text: "name only" },
                        { value: "custom", text: "custom" } ];
-  egressTypeOptions = [ { value: "default", text: "default" },
-                        { value: "count", text: "count" },
-                        { value: "average", text: "average" },
-                        { value: "average_stddev", text: "average_stddev" },
-                        { value: "derive", text: "derive" },
-                        { value: "derive_stddev", text: "derive_stddev" },
-                        { value: "counter", text: "counter" },
-                        { value: "counter_stddev", text: "counter_stddev" } ];
+  egressTypeOptions = [ { value: "count", text: "number of data points (count)" },
+                        { value: "average", text: "average value (gauge)" },
+                        { value: "average_stddev", text: "standard deviation a.k.a. σ (stddev)" },
+                        { value: "derive", text: "rate of change (derive)" },
+                        { value: "derive_stddev", text: "rate of change σ (derive_stddev)" },
+                        { value: "counter", text: "rate of positive change (counter)" },
+                        { value: "counter_stddev", text: "rate of positive change σ (counter_stddev)" } ];
   caqlFindFunctions = {
                         count: "count",
                         average: "average",
@@ -47,7 +46,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     _.defaultsDeep(this.target, this.defaults);
     this.target.isCaql = this.target.isCaql || false;
-    this.target.egressoverride = this.target.egressoverride || "default";
+    this.target.egressoverride = this.target.egressoverride || "average";
     this.target.metriclabel = this.target.metriclabel || "";
     this.target.labeltype = this.target.labeltype || "default";
     this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
@@ -68,7 +67,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else {
       this.target.query = "";
-      this.target.egressoverride = "default";
+      this.target.egressoverride = "average";
       this.target.labeltype = "default";
       this.emptySegments();
       this.parseTarget();
@@ -460,7 +459,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   queryFunctionToCaqlFind() {
     var findFunction = "find";
     var egressOverride = this.target.egressoverride;
-    if (egressOverride !== "default" ) {
+    if (egressOverride !== "average" ) {
       egressOverride = this.caqlFindFunctions[egressOverride];
       findFunction += ":" + egressOverride;
     }

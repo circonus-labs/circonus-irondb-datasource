@@ -410,7 +410,7 @@ export default class IrondbDatasource {
                 egress_function: 'average',
                 uuid: result[i]['uuid']
               };
-              if (target.egressoverride != "default") {
+              if (target.egressoverride !== "average") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
               var leaf_name = result[i]['metric_name'];
