@@ -1,6 +1,14 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
     var SegmentType, IrondbQuery;
+    function taglessName(name) {
+        var tag_start = name.indexOf("ST[");
+        if (tag_start != -1) {
+            name = name.substring(0, tag_start - 1);
+        }
+        return name;
+    }
+    exports_1("taglessName", taglessName);
     function wrapFunction(target, func) {
         return func.render(target);
     }

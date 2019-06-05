@@ -1,6 +1,7 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
+import {taglessName} from './irondb_query';
 
 export default class IrondbDatasource {
   id: number;
@@ -238,6 +239,7 @@ export default class IrondbDatasource {
         if (this.basicAuth) {
           options.headers.Authorization = this.basicAuth;
         }
+        options.metricLabel = irondbOptions['std']['names'][i]['leaf_data']['metriclabel'];
         options.isCaql = false;
         options.retry = 1;
         queries.push(options);
@@ -408,14 +410,18 @@ export default class IrondbDatasource {
                 egress_function: 'average',
                 uuid: result[i]['uuid']
               };
-              if (target.egressoverride != "default") {
+              if (target.egressoverride !== "average") {
                 result[i]['leaf_data'].egress_function = target.egressoverride;
               }
-              if ('hosted' == this.irondbType) {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
-              } else {
-                cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
+              var leaf_name = result[i]['metric_name'];
+              if (target.labeltype !== "default") {
+                var metriclabel = target.metriclabel;
+                if(target.labeltype === "name") {
+                  metriclabel = taglessName(leaf_name);
+                }
+                result[i]['leaf_data'].metriclabel = metriclabel;
               }
+              cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
             }
           }
           return cleanOptions;
@@ -449,8 +455,12 @@ export default class IrondbDatasource {
     if (!data) return { data: cleanData };
     origDatapoint = data;
     datapoint = [];
+    var name = query.name;
+    if (query.metricLabel !== undefined && query.metricLabel !== "") {
+      name = query.metricLabel;
+    }
     cleanData.push({
-      target: query.name,
+      target: name,
       datapoints: datapoint
     });
     for (var i = 0; i < origDatapoint.length; i++) {

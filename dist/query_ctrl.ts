@@ -2,17 +2,10 @@
 
 import _ from 'lodash';
 import IrondbQuery from './irondb_query';
-import {SegmentType} from './irondb_query';
+import {SegmentType,taglessName} from './irondb_query';
 import {QueryCtrl} from 'app/plugins/sdk';
 import './css/query_editor.css!';
 
-function tagless_name(name) {
-  var tag_start = name.indexOf("ST[");
-  if (tag_start != -1) {
-    name = name.substring(0, tag_start - 1);
-  }
-  return name;
-}
 
 function isEven(x) {
   return x % 2 == 0;
@@ -24,15 +17,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
   defaults = {
   };
   queryModel: IrondbQuery;
-  pointTypeOptions = [ { value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" } ];
-  egressTypeOptions = [ { value: "default", text: "default" },
-                        { value: "count", text: "count" },
-                        { value: "average", text: "average" },
-                        { value: "average_stddev", text: "average_stddev" },
-                        { value: "derive", text: "derive" },
-                        { value: "derive_stddev", text: "derive_stddev" },
-                        { value: "counter", text: "counter" },
-                        { value: "counter_stddev", text: "counter_stddev" } ];
+  labelTypeOptions = [ { value: "default", text: "name and tags" },
+                       { value: "name", text: "name only" },
+                       { value: "custom", text: "custom" } ];
+  egressTypeOptions = [ { value: "count", text: "number of data points (count)" },
+                        { value: "average", text: "average value (gauge)" },
+                        { value: "average_stddev", text: "standard deviation a.k.a. σ (stddev)" },
+                        { value: "derive", text: "rate of change (derive)" },
+                        { value: "derive_stddev", text: "rate of change σ (derive_stddev)" },
+                        { value: "counter", text: "rate of positive change (counter)" },
+                        { value: "counter_stddev", text: "rate of positive change σ (counter_stddev)" } ];
   caqlFindFunctions = {
                         count: "count",
                         average: "average",
@@ -50,17 +44,24 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     _.defaultsDeep(this.target, this.defaults);
     this.target.isCaql = this.target.isCaql || false;
-    this.target.egressoverride = this.target.egressoverride || "default";
-    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
+    this.target.egressoverride = this.target.egressoverride || "average";
+    this.target.metriclabel = this.target.metriclabel || "";
+    this.target.labeltype = this.target.labeltype || "default";
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
+    this.loadMetricLabel();
     this.loadSegments = false;
   }
 
+  toggleEditorMode() {
+    //console.log("toggleEditorMode()");
+    this.target.isCaql = !this.target.isCaql;
+    this.typeValueChanged();
+  }
+
   typeValueChanged() {
-    this.target.isCaql = (this.target.pointtype == "CAQL");
     if (this.target.isCaql) {
       var caqlQuery = this.segmentsToCaqlFind();
       this.target.query = caqlQuery;
@@ -68,11 +69,27 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     else {
       this.target.query = "";
-      this.target.egressoverride = "default";
+      this.target.egressoverride = "average";
+      this.target.labeltype = "default";
       this.emptySegments();
       this.parseTarget();
     }
     this.error = null;
+    this.panelCtrl.refresh();
+  }
+
+  labelTypeValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  loadMetricLabel() {
+    if (this.target.metriclabel === "" && this.target.labeltype !== "name") {
+      this.target.labeltype = "default";
+    }
+  }
+
+  metricLabelValueChanged() {
+    this.loadMetricLabel();
     this.panelCtrl.refresh();
   }
 
@@ -99,7 +116,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         .metricTagsQuery("and(__name:" + query + "*)", true)
         .then( results => {
           var metricnames = _.map(results.data, result => {
-            return tagless_name(result.metric_name);
+            return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
           //console.log(JSON.stringify(metricnames));
@@ -444,11 +461,26 @@ export class IrondbQueryCtrl extends QueryCtrl {
   queryFunctionToCaqlFind() {
     var findFunction = "find";
     var egressOverride = this.target.egressoverride;
-    if (egressOverride !== "default" ) {
+    if (egressOverride !== "average" ) {
       egressOverride = this.caqlFindFunctions[egressOverride];
       findFunction += ":" + egressOverride;
     }
     return findFunction;
+  }
+
+  buildCaqlLabel() {
+    var labeltype = this.target.labeltype;
+    var metriclabel = this.target.metriclabel;
+    if (labeltype !== "default") {
+      if (labeltype === "custom" && metriclabel !== "") {
+        metriclabel = metriclabel.replace(/"/g, "'");
+        return " | label(\"" + metriclabel + "\")";
+      }
+      else if (labeltype === "name") {
+        return " | label(\"%n\")";
+      }
+    }
+    return "";
   }
 
   segmentsToCaqlFind() {
@@ -461,7 +493,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
     if (tagless) {
-      query += ")";
+      query += ")" + this.buildCaqlLabel();
       return query;
     }
     var firstTag = true;
@@ -486,7 +518,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
         query += segment.value;
     }
-    query += "\")";
+    query += "\")" + this.buildCaqlLabel();
     return query;
   }
 

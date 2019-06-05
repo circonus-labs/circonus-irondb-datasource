@@ -1,11 +1,14 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
-System.register(['lodash'], function(exports_1) {
-    var lodash_1;
+System.register(['lodash', './irondb_query'], function(exports_1) {
+    var lodash_1, irondb_query_1;
     var IrondbDatasource;
     return {
         setters:[
             function (lodash_1_1) {
                 lodash_1 = lodash_1_1;
+            },
+            function (irondb_query_1_1) {
+                irondb_query_1 = irondb_query_1_1;
             }],
         execute: function() {
             IrondbDatasource = (function () {
@@ -229,6 +232,7 @@ System.register(['lodash'], function(exports_1) {
                             if (this.basicAuth) {
                                 options.headers.Authorization = this.basicAuth;
                             }
+                            options.metricLabel = irondbOptions['std']['names'][i]['leaf_data']['metriclabel'];
                             options.isCaql = false;
                             options.retry = 1;
                             queries.push(options);
@@ -396,15 +400,18 @@ System.register(['lodash'], function(exports_1) {
                                             egress_function: 'average',
                                             uuid: result[i]['uuid']
                                         };
-                                        if (target.egressoverride != "default") {
+                                        if (target.egressoverride !== "average") {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
                                         }
-                                        if ('hosted' == _this.irondbType) {
-                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
+                                        var leaf_name = result[i]['metric_name'];
+                                        if (target.labeltype !== "default") {
+                                            var metriclabel = target.metriclabel;
+                                            if (target.labeltype === "name") {
+                                                metriclabel = irondb_query_1.taglessName(leaf_name);
+                                            }
+                                            result[i]['leaf_data'].metriclabel = metriclabel;
                                         }
-                                        else {
-                                            cleanOptions['std']['names'].push({ leaf_name: result[i]['metric_name'], leaf_data: result[i]['leaf_data'] });
-                                        }
+                                        cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
                                     }
                                 }
                                 return cleanOptions;
@@ -434,8 +441,12 @@ System.register(['lodash'], function(exports_1) {
                         return { data: cleanData };
                     origDatapoint = data;
                     datapoint = [];
+                    var name = query.name;
+                    if (query.metricLabel !== undefined && query.metricLabel !== "") {
+                        name = query.metricLabel;
+                    }
                     cleanData.push({
-                        target: query.name,
+                        target: name,
                         datapoints: datapoint
                     });
                     for (var i = 0; i < origDatapoint.length; i++) {

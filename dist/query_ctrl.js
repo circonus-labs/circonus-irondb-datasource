@@ -7,13 +7,6 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
     };
     var lodash_1, irondb_query_1, irondb_query_2, sdk_1;
     var IrondbQueryCtrl;
-    function tagless_name(name) {
-        var tag_start = name.indexOf("ST[");
-        if (tag_start != -1) {
-            name = name.substring(0, tag_start - 1);
-        }
-        return name;
-    }
     function isEven(x) {
         return x % 2 == 0;
     }
@@ -44,15 +37,16 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.uiSegmentSrv = uiSegmentSrv;
                     this.templateSrv = templateSrv;
                     this.defaults = {};
-                    this.pointTypeOptions = [{ value: "Metric", text: "Metric" }, { value: "CAQL", text: "CAQL" }];
-                    this.egressTypeOptions = [{ value: "default", text: "default" },
-                        { value: "count", text: "count" },
-                        { value: "average", text: "average" },
-                        { value: "average_stddev", text: "average_stddev" },
-                        { value: "derive", text: "derive" },
-                        { value: "derive_stddev", text: "derive_stddev" },
-                        { value: "counter", text: "counter" },
-                        { value: "counter_stddev", text: "counter_stddev" }];
+                    this.labelTypeOptions = [{ value: "default", text: "name and tags" },
+                        { value: "name", text: "name only" },
+                        { value: "custom", text: "custom" }];
+                    this.egressTypeOptions = [{ value: "count", text: "number of data points (count)" },
+                        { value: "average", text: "average value (gauge)" },
+                        { value: "average_stddev", text: "standard deviation a.k.a. σ (stddev)" },
+                        { value: "derive", text: "rate of change (derive)" },
+                        { value: "derive_stddev", text: "rate of change σ (derive_stddev)" },
+                        { value: "counter", text: "rate of positive change (counter)" },
+                        { value: "counter_stddev", text: "rate of positive change σ (counter_stddev)" }];
                     this.caqlFindFunctions = {
                         count: "count",
                         average: "average",
@@ -63,27 +57,46 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         counter_stddev: "counter_stddev" };
                     lodash_1.default.defaultsDeep(this.target, this.defaults);
                     this.target.isCaql = this.target.isCaql || false;
-                    this.target.egressoverride = this.target.egressoverride || "default";
-                    this.target.pointtype = this.target.isCaql ? "CAQL" : "Metric";
+                    this.target.egressoverride = this.target.egressoverride || "average";
+                    this.target.metriclabel = this.target.metriclabel || "";
+                    this.target.labeltype = this.target.labeltype || "default";
                     this.target.query = this.target.query || '';
                     this.target.segments = this.target.segments || [];
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
                     this.buildSegments();
+                    this.loadMetricLabel();
                     this.loadSegments = false;
                 }
+                IrondbQueryCtrl.prototype.toggleEditorMode = function () {
+                    //console.log("toggleEditorMode()");
+                    this.target.isCaql = !this.target.isCaql;
+                    this.typeValueChanged();
+                };
                 IrondbQueryCtrl.prototype.typeValueChanged = function () {
-                    this.target.isCaql = (this.target.pointtype == "CAQL");
                     if (this.target.isCaql) {
                         var caqlQuery = this.segmentsToCaqlFind();
                         this.target.query = caqlQuery;
                     }
                     else {
                         this.target.query = "";
-                        this.target.egressoverride = "default";
+                        this.target.egressoverride = "average";
+                        this.target.labeltype = "default";
                         this.emptySegments();
                         this.parseTarget();
                     }
                     this.error = null;
+                    this.panelCtrl.refresh();
+                };
+                IrondbQueryCtrl.prototype.labelTypeValueChanged = function () {
+                    this.panelCtrl.refresh();
+                };
+                IrondbQueryCtrl.prototype.loadMetricLabel = function () {
+                    if (this.target.metriclabel === "" && this.target.labeltype !== "name") {
+                        this.target.labeltype = "default";
+                    }
+                };
+                IrondbQueryCtrl.prototype.metricLabelValueChanged = function () {
+                    this.loadMetricLabel();
                     this.panelCtrl.refresh();
                 };
                 IrondbQueryCtrl.prototype.egressValueChanged = function () {
@@ -106,7 +119,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             .metricTagsQuery("and(__name:" + query + "*)", true)
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
-                                return tagless_name(result.metric_name);
+                                return irondb_query_2.taglessName(result.metric_name);
                             });
                             metricnames = lodash_1.default.uniq(metricnames);
                             //console.log(JSON.stringify(metricnames));
@@ -417,11 +430,25 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                 IrondbQueryCtrl.prototype.queryFunctionToCaqlFind = function () {
                     var findFunction = "find";
                     var egressOverride = this.target.egressoverride;
-                    if (egressOverride !== "default") {
+                    if (egressOverride !== "average") {
                         egressOverride = this.caqlFindFunctions[egressOverride];
                         findFunction += ":" + egressOverride;
                     }
                     return findFunction;
+                };
+                IrondbQueryCtrl.prototype.buildCaqlLabel = function () {
+                    var labeltype = this.target.labeltype;
+                    var metriclabel = this.target.metriclabel;
+                    if (labeltype !== "default") {
+                        if (labeltype === "custom" && metriclabel !== "") {
+                            metriclabel = metriclabel.replace(/"/g, "'");
+                            return " | label(\"" + metriclabel + "\")";
+                        }
+                        else if (labeltype === "name") {
+                            return " | label(\"%n\")";
+                        }
+                    }
+                    return "";
                 };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();
@@ -433,7 +460,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     }
                     var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
                     if (tagless) {
-                        query += ")";
+                        query += ")" + this.buildCaqlLabel();
                         return query;
                     }
                     var firstTag = true;
@@ -459,7 +486,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                         query += segment.value;
                     }
-                    query += "\")";
+                    query += "\")" + this.buildCaqlLabel();
                     return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
