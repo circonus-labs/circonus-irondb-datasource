@@ -202,28 +202,39 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                     headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
                     if (irondbOptions['std']['names'].length) {
                         for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
+                            var paneltype = irondbOptions['std']['names'][i]['leaf_data']['paneltype'] || "Graph";
+                            var endpoint = paneltype === "Heatmap" ? "/histogram" : "/rollup";
                             options = {};
                             options.url = this.url;
-                            if ('hosted' == this.irondbType) {
+                            if ('hosted' === this.irondbType) {
                                 options.url = options.url + '/irondb';
-                                options.url = options.url + '/rollup';
+                                options.url = options.url + endpoint;
                             }
                             options.method = 'GET';
-                            if ('standalone' == this.irondbType) {
-                                options.url = options.url + '/rollup';
+                            if ('standalone' === this.irondbType) {
+                                options.url = options.url + endpoint;
                             }
                             var interval = irondbOptions['std']['interval'];
                             var start = irondbOptions['std']['start'];
                             var end = irondbOptions['std']['end'];
                             start = Math.floor(start - (start % interval));
                             end = Math.floor(end - (end % interval));
-                            interval *= 1000;
-                            options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
-                            options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
-                            options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
-                            options.url = options.url + '&end_ts=' + end + '.000';
-                            options.url = options.url + '&rollup_span=' + interval + 'ms';
-                            options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+                            if (paneltype === "Graph") {
+                                interval *= 1000;
+                                options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+                                options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
+                                options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
+                                options.url = options.url + '&end_ts=' + end + '.000';
+                                options.url = options.url + '&rollup_span=' + interval + 'ms';
+                                options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+                            }
+                            else if (paneltype === "Heatmap") {
+                                options.url = options.url + '/' + start + '/' + end;
+                                options.url = options.url + '/' + interval;
+                                options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+                                options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
+                            }
+                            //console.log(options.url);
                             options.name = irondbOptions['std']['names'][i]['leaf_name'];
                             options.headers = headers;
                             if (this.basicAuth || this.withCredentials) {
@@ -233,6 +244,7 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                 options.headers.Authorization = this.basicAuth;
                             }
                             options.metricLabel = irondbOptions['std']['names'][i]['leaf_data']['metriclabel'];
+                            options.paneltype = paneltype;
                             options.isCaql = false;
                             options.retry = 1;
                             queries.push(options);
@@ -328,8 +340,12 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                             break;
                         }
                     }
-                    if (period < 60)
+                    if (period < 60) {
                         period = 60;
+                    }
+                    else {
+                        period = period - (period % 60);
+                    }
                     cleanOptions['std'] = {};
                     cleanOptions['std']['start'] = start;
                     cleanOptions['std']['end'] = end;
@@ -385,7 +401,14 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                             var rawQuery = _this.templateSrv.replace(target['query']);
                             return _this.metricTagsQuery(rawQuery).then(function (result) {
                                 // Don't mix numeric results with histograms and text metrics
-                                result.data = lodash_1.default.filter(result.data, { type: "numeric" });
+                                var metricFilter = "numeric";
+                                if (target['paneltype'] === "Heatmap") {
+                                    metricFilter = "histogram";
+                                }
+                                result.data = lodash_1.default.filter(result.data, function (metric) {
+                                    var metricTypes = metric.type.split(",");
+                                    return lodash_1.default.includes(metricTypes, metricFilter);
+                                });
                                 for (var i = 0; i < result.data.length; i++) {
                                     result.data[i]['target'] = target;
                                 }
@@ -398,7 +421,8 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                     if (!target.isCaql) {
                                         result[i]['leaf_data'] = {
                                             egress_function: 'average',
-                                            uuid: result[i]['uuid']
+                                            uuid: result[i]['uuid'],
+                                            paneltype: result[i]['target']['paneltype']
                                         };
                                         if (target.egressoverride !== "average") {
                                             result[i]['leaf_data'].egress_function = target.egressoverride;
@@ -454,12 +478,39 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                         target: name,
                         datapoints: datapoint
                     });
+                    var lookaside = {};
                     for (var i = 0; i < origDatapoint.length; i++) {
                         timestamp = origDatapoint[i][0] * 1000;
-                        if (null == origDatapoint[i][1]) {
-                            continue;
+                        if (query.paneltype === "Heatmap") {
+                            if (lodash_1.default.isEmpty(origDatapoint[i][2])) {
+                                continue;
+                            }
+                            for (var vstr in origDatapoint[i][2]) {
+                                var cnt = origDatapoint[i][2][vstr];
+                                var v = parseFloat(vstr);
+                                var tsstr = timestamp.toString();
+                                if (lookaside[vstr] == null) {
+                                    lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
+                                    cleanData.push(lookaside[vstr]);
+                                }
+                                if (lookaside[vstr]._ts[tsstr] == null) {
+                                    lookaside[vstr]._ts[tsstr] = [cnt, timestamp];
+                                    lookaside[vstr].datapoints.push(lookaside[vstr]._ts[tsstr]);
+                                }
+                                else {
+                                    lookaside[vstr]._ts[tsstr][0] += cnt;
+                                }
+                            }
                         }
-                        datapoint.push([origDatapoint[i][1], timestamp]);
+                        else {
+                            if (null == origDatapoint[i][1]) {
+                                continue;
+                            }
+                            datapoint.push([origDatapoint[i][1], timestamp]);
+                        }
+                    }
+                    for (var i = 0; i < cleanData.length; i++) {
+                        delete (cleanData[i]._ts);
                     }
                     return { data: cleanData };
                 };

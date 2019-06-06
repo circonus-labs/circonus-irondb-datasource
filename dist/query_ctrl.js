@@ -29,6 +29,28 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
             },
             function (_1) {}],
         execute: function() {
+            /*const changePanelType = (dashboard, oldPanel, newPluginId: string) => {
+              const index = dashboard.panels.findIndex(panel => {
+                return panel.id === oldPanel.id;
+              });
+            
+              const deletedPanel = dashboard.panels.splice(index, 1);
+              dashboard.events.emit('panel-removed', deletedPanel);
+            
+              var newPanel = oldPanel.getSaveModel();
+              console.log(newPanel.type);
+              newPanel.type = newPluginId;
+              console.log(newPanel.type);
+              console.log(newPanel.events);
+              console.log(newPanel.id + " " + oldPanel.id);
+              newPanel = new oldPanel.constructor(newPanel);
+              console.log(newPanel.events);
+              console.log(newPanel.type);
+            
+              dashboard.panels.splice(index, 0, newPanel);
+              dashboard.sortPanelsByGridPos();
+              dashboard.events.emit('panel-added', newPanel);
+            };*/
             IrondbQueryCtrl = (function (_super) {
                 __extends(IrondbQueryCtrl, _super);
                 /** @ngInject **/
@@ -63,14 +85,27 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.target.labeltype = this.target.labeltype || "default";
                     this.target.query = this.target.query || '';
                     this.target.segments = this.target.segments || [];
+                    this.target.paneltype = this.panelCtrl.pluginName;
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
                     this.buildSegments();
                     this.updateMetricLabelValue(false);
+                    /*console.log("TYPE " + this.panelCtrl.pluginName + " " + this.panelCtrl.pluginId);
+                    console.log(this.panel.constructor);
+                    console.log(window["PanelModel"]);
+                    console.log(eval("new PanelModel()"));*/
                 }
                 IrondbQueryCtrl.prototype.toggleEditorMode = function () {
                     //console.log("toggleEditorMode()");
                     this.target.isCaql = !this.target.isCaql;
                     this.typeValueChanged();
+                    /*var newPanel = this.panel.getSaveModel();
+                    newPanel.type = "heatmap";
+                    this.isHistogram = !this.isHistogram;
+                    changePanelType(this.panelCtrl.dashboard, this.panel, this.isHistogram ? "heatmap" : "graph");
+                    this.panel.changeType(this.isHistogram ? "heatmap" : "graph");
+                    this.panel.initialized();
+                    this.panelCtrl.refresh();
+                    this.panel.render();*/
                 };
                 IrondbQueryCtrl.prototype.typeValueChanged = function () {
                     if (this.target.isCaql) {
@@ -443,6 +478,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     return query;
                 };
                 IrondbQueryCtrl.prototype.queryFunctionToCaqlFind = function () {
+                    if (this.target.paneltype === "Heatmap") {
+                        return "find:histogram";
+                    }
                     var findFunction = "find";
                     var egressOverride = this.target.egressoverride;
                     if (egressOverride !== "average") {
