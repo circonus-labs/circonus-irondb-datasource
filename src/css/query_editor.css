@@ -18,6 +18,9 @@
   right: 0.775rem
 }
 
+.ml-1 {
+    margin-left: 2px !important;
+}
 .join-r .gf-form-label {
     margin-right: 0;
 }
@@ -30,12 +33,6 @@
 }
 .mash-l .gf-form-label {
     padding-left: 0;
-}
-.mash-r.half .gf-form-label {
-    padding-right: 4px;
-}
-.mash-l.half .gf-form-label {
-    padding-left: 4px;
 }
 .irondb-tag-op .gf-form-label,
 .irondb-tag-end .gf-form-label {

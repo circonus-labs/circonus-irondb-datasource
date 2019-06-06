@@ -16,7 +16,7 @@
             <div ng-switch-when="TagEnd" class="irondb-tag-end join-r join-l">
                 <div class="gf-form-label"><b>{{segment.value}}</b></div>
             </div>
-            <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l half join-r join-l">
+            <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l join-r join-l">
                 <div class="gf-form-label"><b>{{segment.value}}</b></div>
             </div>
             <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':segment.value!='select tag'}">
@@ -28,16 +28,16 @@
             <div ng-switch-when="TagPlus" class="irondb-tag-plus join-r join-l">
                 <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
-            <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r">
+            <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r join-l">
                 <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
-            <div ng-switch-default>
+            <div ng-switch-default class="join-l">
               <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
           </div>
         </div>
       </div>
-      <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form--grow">
+      <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form--grow ml-1">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
