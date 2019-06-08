@@ -1,7 +1,7 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
-import {taglessName} from './irondb_query';
+import {metaInterpolateLabel} from './irondb_query';
 
 export default class IrondbDatasource {
   id: number;
@@ -417,8 +417,9 @@ export default class IrondbDatasource {
               if (target.labeltype !== "default") {
                 var metriclabel = target.metriclabel;
                 if(target.labeltype === "name") {
-                  metriclabel = taglessName(leaf_name);
+                  metriclabel = "%n";
                 }
+                metriclabel = metaInterpolateLabel(metriclabel, result, i);
                 result[i]['leaf_data'].metriclabel = metriclabel;
               }
               cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });

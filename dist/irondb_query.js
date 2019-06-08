@@ -1,14 +1,72 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
     var SegmentType, IrondbQuery;
-    function taglessName(name) {
-        var tag_start = name.indexOf("ST[");
-        if (tag_start != -1) {
-            name = name.substring(0, tag_start - 1);
+    function splitTags(tags) {
+        var outTags = {};
+        for (var _i = 0, _a = tags.split(/,/g); _i < _a.length; _i++) {
+            var tag = _a[_i];
+            var tagSep = tag.split(/:/g);
+            var tagCat = tagSep[0];
+            var tagVal = tagSep[1];
+            var tagVals = outTags[tagCat];
+            if (lodash_1.default.isUndefined(tagVals)) {
+                outTags[tagCat] = tagVals = [];
+            }
+            tagVals.push(tagVal);
         }
-        return name;
+        return outTags;
+    }
+    function taglessNameAndTags(name) {
+        var tags = "";
+        var tagStart = name.indexOf("ST[");
+        if (tagStart != -1) {
+            tags = name.substring(tagStart + 3, name.length - 1);
+            name = name.substring(0, tagStart - 1);
+        }
+        return [name, tags];
+    }
+    function taglessName(name) {
+        return taglessNameAndTags(name)[0];
     }
     exports_1("taglessName", taglessName);
+    function metaInterpolateLabel(fmt, meta_in, idx) {
+        var meta = meta_in[idx];
+        // case %d
+        var label = fmt.replace(/%d/g, (idx + 1).toString());
+        // case %n
+        label = label.replace(/%n/g, taglessName(meta.metric_name));
+        // case %cn
+        label = label.replace(/%cn/g, meta.metric_name);
+        // case %tv
+        label = label.replace(/%tv{(.*)}/g, function (x) {
+            var tag = x.substring(4, x.length - 1);
+            var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
+            var tagSet = splitTags(tags);
+            if (tag === "*") {
+                var tagVals = lodash_1.default.values(tagSet).map(function (n) { return n[0]; }).join(",");
+                return tagVals;
+            }
+            if (tagSet[tag] !== undefined) {
+                return tagSet[tag][0];
+            }
+            return "";
+        });
+        // case %t
+        label = label.replace(/%t{(.*)}/g, function (x) {
+            var tag = x.substring(3, x.length - 1);
+            var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
+            if (tag === "*") {
+                return tags;
+            }
+            var tagSet = splitTags(tags);
+            if (tagSet[tag] !== undefined) {
+                return tag + ":" + tagSet[tag][0];
+            }
+            return "";
+        });
+        return label;
+    }
+    exports_1("metaInterpolateLabel", metaInterpolateLabel);
     function wrapFunction(target, func) {
         return func.render(target);
     }
@@ -29,6 +87,7 @@ System.register(['lodash'], function(exports_1) {
                 SegmentType[SegmentType["TagPlus"] = 7] = "TagPlus";
             })(SegmentType || (SegmentType = {}));
             exports_1("SegmentType", SegmentType);
+            ;
             ;
             IrondbQuery = (function () {
                 /** @ngInject */

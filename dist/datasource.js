@@ -407,8 +407,9 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                         if (target.labeltype !== "default") {
                                             var metriclabel = target.metriclabel;
                                             if (target.labeltype === "name") {
-                                                metriclabel = irondb_query_1.taglessName(leaf_name);
+                                                metriclabel = "%n";
                                             }
+                                            metriclabel = irondb_query_1.metaInterpolateLabel(metriclabel, result, i);
                                             result[i]['leaf_data'].metriclabel = metriclabel;
                                         }
                                         cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
