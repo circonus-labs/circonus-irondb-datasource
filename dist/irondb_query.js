@@ -38,7 +38,7 @@ System.register(['lodash'], function(exports_1) {
         // case %cn
         label = label.replace(/%cn/g, meta.metric_name);
         // case %tv
-        label = label.replace(/%tv{(.*)}/g, function (x) {
+        label = label.replace(/%tv{([^}]*)}/g, function (x) {
             var tag = x.substring(4, x.length - 1);
             var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
             var tagSet = splitTags(tags);
@@ -52,7 +52,7 @@ System.register(['lodash'], function(exports_1) {
             return "";
         });
         // case %t
-        label = label.replace(/%t{(.*)}/g, function (x) {
+        label = label.replace(/%t{([^}]*)}/g, function (x) {
             var tag = x.substring(3, x.length - 1);
             var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
             if (tag === "*") {

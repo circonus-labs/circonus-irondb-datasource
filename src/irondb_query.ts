@@ -52,7 +52,7 @@ export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): 
   // case %cn
   label = label.replace(/%cn/g, meta.metric_name);
   // case %tv
-  label = label.replace(/%tv{(.*)}/g, function(x) {
+  label = label.replace(/%tv{([^}]*)}/g, function(x) {
     var tag = x.substring(4, x.length - 1);
     var [name, tags] = taglessNameAndTags(meta.metric_name);
     var tagSet = splitTags(tags);
@@ -66,7 +66,7 @@ export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): 
     return "";
   });
   // case %t
-  label = label.replace(/%t{(.*)}/g, function(x) {
+  label = label.replace(/%t{([^}]*)}/g, function(x) {
     var tag = x.substring(3, x.length - 1);
     var [name, tags] = taglessNameAndTags(meta.metric_name);
     if (tag === "*") {
