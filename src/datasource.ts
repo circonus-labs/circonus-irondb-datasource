@@ -420,6 +420,7 @@ export default class IrondbDatasource {
                   metriclabel = "%n";
                 }
                 metriclabel = metaInterpolateLabel(metriclabel, result, i);
+                metriclabel = this.templateSrv.replace(metriclabel);
                 result[i]['leaf_data'].metriclabel = metriclabel;
               }
               cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });

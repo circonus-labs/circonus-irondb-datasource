@@ -410,6 +410,7 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                                 metriclabel = "%n";
                                             }
                                             metriclabel = irondb_query_1.metaInterpolateLabel(metriclabel, result, i);
+                                            metriclabel = _this.templateSrv.replace(metriclabel);
                                             result[i]['leaf_data'].metriclabel = metriclabel;
                                         }
                                         cleanOptions['std']['names'].push({ leaf_name: leaf_name, leaf_data: result[i]['leaf_data'] });
