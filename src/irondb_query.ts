@@ -12,12 +12,73 @@ export enum SegmentType {
   TagPlus
 };
 
-export function taglessName(name: string) {
-  var tag_start = name.indexOf("ST[");
-  if (tag_start != -1) {
-    name = name.substring(0, tag_start - 1);
+interface TagSet { [tagCat: string] : string[] };
+
+function splitTags(tags: string): TagSet {
+  var outTags: TagSet = {};
+  for (var tag of tags.split(/,/g)) {
+    var tagSep = tag.split(/:/g);
+    var tagCat = tagSep[0];
+    var tagVal = tagSep[1];
+    var tagVals = outTags[tagCat];
+    if (_.isUndefined(tagVals)) {
+      outTags[tagCat] = tagVals = [];
+    }
+    tagVals.push(tagVal);
   }
-  return name;
+  return outTags;
+}
+
+function taglessNameAndTags(name: string): [string, string] {
+  var tags = "";
+  var tagStart = name.indexOf("ST[");
+  if (tagStart != -1) {
+    tags = name.substring(tagStart + 3, name.length - 1);
+    name = name.substring(0, tagStart - 1);
+  }
+  return [name, tags];
+}
+
+export function taglessName(name: string): string {
+  return taglessNameAndTags(name)[0];
+}
+
+export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): string {
+  var meta = meta_in[idx];
+  // case %d
+  var label = fmt.replace(/%d/g, (idx + 1).toString());
+  // case %n
+  label = label.replace(/%n/g, taglessName(meta.metric_name));
+  // case %cn
+  label = label.replace(/%cn/g, meta.metric_name);
+  // case %tv
+  label = label.replace(/%tv{([^}]*)}/g, function(x) {
+    var tag = x.substring(4, x.length - 1);
+    var [name, tags] = taglessNameAndTags(meta.metric_name);
+    var tagSet = splitTags(tags);
+    if (tag === "*") {
+      var tagVals = _.values(tagSet).map(n => n[0]).join(",");
+      return tagVals;
+    }
+    if (tagSet[tag] !== undefined) {
+      return tagSet[tag][0];
+    }
+    return "";
+  });
+  // case %t
+  label = label.replace(/%t{([^}]*)}/g, function(x) {
+    var tag = x.substring(3, x.length - 1);
+    var [name, tags] = taglessNameAndTags(meta.metric_name);
+    if (tag === "*") {
+      return tags;
+    }
+    var tagSet = splitTags(tags);
+    if (tagSet[tag] !== undefined) {
+      return tag + ":" + tagSet[tag][0];
+    }
+    return "";
+  });
+  return label
 }
 
 export default class IrondbQuery {

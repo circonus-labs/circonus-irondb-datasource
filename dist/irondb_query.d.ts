@@ -9,6 +9,7 @@ export declare enum SegmentType {
     TagPlus = 7,
 }
 export declare function taglessName(name: string): string;
+export declare function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): string;
 export default class IrondbQuery {
     datasource: any;
     target: any;
