@@ -19,6 +19,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   queryModel: IrondbQuery;
   labelTypeOptions = [ { value: "default", text: "name and tags" },
                        { value: "name", text: "name only" },
+                       { value: "cardinality", text: "high cardinality tags" },
                        { value: "custom", text: "custom" } ];
   egressTypeOptions = [ { value: "count", text: "number of data points (count)" },
                         { value: "average", text: "average value (gauge)" },
@@ -478,6 +479,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       else if (labeltype === "name") {
         return " | label(\"%n\")";
+      }
+      else if (labeltype === "cardinality") {
+        return " | label(\"%n|ST[%t-{*}]\")";
       }
     }
     return "";
