@@ -18,6 +18,10 @@
   right: 0.775rem
 }
 
+.gf-form-max {
+    flex-basis: 100%;
+}
+
 .ml-1 {
     margin-left: 2px !important;
 }

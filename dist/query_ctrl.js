@@ -65,7 +65,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.target.segments = this.target.segments || [];
                     this.queryModel = new irondb_query_1.default(this.datasource, this.target, templateSrv);
                     this.buildSegments();
-                    this.metricLabelValueChanged(false);
+                    this.updateMetricLabelValue(false);
                 }
                 IrondbQueryCtrl.prototype.toggleEditorMode = function () {
                     //console.log("toggleEditorMode()");
@@ -91,7 +91,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     if (this.target.labeltype === "custom") {
                         setTimeout(function () {
                             document.getElementById("metriclabel").focus();
-                        }, 0);
+                        }, 50);
                     }
                     this.panelCtrl.refresh();
                 };
@@ -101,11 +101,11 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     if (event.keyCode === 13) {
                         setTimeout(function () {
                             self.target.metriclabel = element.value;
-                            self.metricLabelValueChanged();
+                            self.updateMetricLabelValue();
                         }, 0);
                     }
                 };
-                IrondbQueryCtrl.prototype.metricLabelValueChanged = function (refresh) {
+                IrondbQueryCtrl.prototype.updateMetricLabelValue = function (refresh) {
                     if (refresh === void 0) { refresh = true; }
                     if (this.target.metriclabel === "" && this.target.labeltype === "custom") {
                         this.target.labeltype = "default";

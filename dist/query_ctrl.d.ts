@@ -32,7 +32,7 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
     typeValueChanged(): void;
     labelTypeValueChanged(): void;
     metricLabelKeyUp(event: any): void;
-    metricLabelValueChanged(refresh?: boolean): void;
+    updateMetricLabelValue(refresh?: boolean): void;
     egressValueChanged(): void;
     onChangeInternal(): void;
     getCollapsedText(): any;
