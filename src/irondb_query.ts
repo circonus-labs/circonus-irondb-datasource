@@ -43,6 +43,24 @@ export function taglessName(name: string): string {
   return taglessNameAndTags(name)[0];
 }
 
+// given an array of meta objects, return true if the tag cat
+// specified has variance in the array
+var _private_nil = {}; // just some truthy value different from every string
+function metaTagDiff(meta: any[], tag: string) {
+  var keycnt = 0;
+  var seen = new Map();
+  for (var i = 0; i < meta.length; i++) {
+    var [name, tags] = taglessNameAndTags(meta[i].metric_name);
+    var tagSet = splitTags(tags);
+    var mtag = tagSet[tag] !== undefined ? tagSet[tag][0] : _private_nil;
+    if (seen.get(mtag) === undefined) {
+      keycnt = keycnt + 1;
+    }
+    seen.set(mtag, true);
+  }
+  return keycnt > 1;
+}
+
 export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): string {
   var meta = meta_in[idx];
   // case %d
@@ -52,28 +70,47 @@ export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): 
   // case %cn
   label = label.replace(/%cn/g, meta.metric_name);
   // case %tv
-  label = label.replace(/%tv{([^}]*)}/g, function(x) {
-    var tag = x.substring(4, x.length - 1);
+  label = label.replace(/%tv-?{([^}]*)}/g, function(x) {
+    var elide = x.substring(3, 4);
+    var choose = elide === "-" ? metaTagDiff : () => true;
+    var tag = x.substring(elide === "-" ? 5 : 4, x.length - 1);
     var [name, tags] = taglessNameAndTags(meta.metric_name);
     var tagSet = splitTags(tags);
     if (tag === "*") {
-      var tagVals = _.values(tagSet).map(n => n[0]).join(",");
-      return tagVals;
+      var tagCats = [];
+      for (var k of _.keys(tagSet)) {
+        if (!k.startsWith("__") && choose(meta_in, k)) {
+          tagCats.push(k);
+        }
+      }
+      tagCats.sort();
+      var tagVals = _.map(tagCats, tagCat => tagSet[tagCat][0]);
+      return tagVals.join(",");
     }
-    if (tagSet[tag] !== undefined) {
+    if (tagSet[tag] !== undefined && choose(meta_in, tag)) {
       return tagSet[tag][0];
     }
     return "";
   });
   // case %t
-  label = label.replace(/%t{([^}]*)}/g, function(x) {
-    var tag = x.substring(3, x.length - 1);
+  label = label.replace(/%t-?{([^}]*)}/g, function(x) {
+    var elide = x.substring(2, 3);
+    var choose = elide === "-" ? metaTagDiff : () => true;
+    var tag = x.substring(elide === "-" ? 4 : 3, x.length - 1);
     var [name, tags] = taglessNameAndTags(meta.metric_name);
-    if (tag === "*") {
-      return tags;
-    }
     var tagSet = splitTags(tags);
-    if (tagSet[tag] !== undefined) {
+    if (tag === "*") {
+      var tagCats = [];
+      for (var k of _.keys(tagSet)) {
+        if (!k.startsWith("__") && choose(meta_in, k)) {
+          var v = tagSet[k][0];
+          tagCats.push(k + ":" + v);
+        }
+      }
+      tagCats.sort();
+      return tagCats.join(",");
+    }
+    if (tagSet[tag] !== undefined && choose(meta_in, tag)) {
       return tag + ":" + tagSet[tag][0];
     }
     return "";

@@ -409,6 +409,9 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                             if (target.labeltype === "name") {
                                                 metriclabel = "%n";
                                             }
+                                            else if (target.labeltype === "cardinality") {
+                                                metriclabel = "%n | %t-{*}";
+                                            }
                                             metriclabel = irondb_query_1.metaInterpolateLabel(metriclabel, result, i);
                                             metriclabel = _this.templateSrv.replace(metriclabel);
                                             result[i]['leaf_data'].metriclabel = metriclabel;

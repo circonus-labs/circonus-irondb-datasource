@@ -39,6 +39,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     this.defaults = {};
                     this.labelTypeOptions = [{ value: "default", text: "name and tags" },
                         { value: "name", text: "name only" },
+                        { value: "cardinality", text: "high cardinality tags" },
                         { value: "custom", text: "custom" }];
                     this.egressTypeOptions = [{ value: "count", text: "number of data points (count)" },
                         { value: "average", text: "average value (gauge)" },
@@ -446,6 +447,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                         else if (labeltype === "name") {
                             return " | label(\"%n\")";
+                        }
+                        else if (labeltype === "cardinality") {
+                            return " | label(\"%n | %t-{*}\")";
                         }
                     }
                     return "";

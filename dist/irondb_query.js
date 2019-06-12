@@ -1,6 +1,6 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
-    var SegmentType, IrondbQuery;
+    var SegmentType, _private_nil, IrondbQuery;
     function splitTags(tags) {
         var outTags = {};
         for (var _i = 0, _a = tags.split(/,/g); _i < _a.length; _i++) {
@@ -29,6 +29,20 @@ System.register(['lodash'], function(exports_1) {
         return taglessNameAndTags(name)[0];
     }
     exports_1("taglessName", taglessName);
+    function metaTagDiff(meta, tag) {
+        var keycnt = 0;
+        var seen = new Map();
+        for (var i = 0; i < meta.length; i++) {
+            var _a = taglessNameAndTags(meta[i].metric_name), name = _a[0], tags = _a[1];
+            var tagSet = splitTags(tags);
+            var mtag = tagSet[tag] !== undefined ? tagSet[tag][0] : _private_nil;
+            if (seen.get(mtag) === undefined) {
+                keycnt = keycnt + 1;
+            }
+            seen.set(mtag, true);
+        }
+        return keycnt > 1;
+    }
     function metaInterpolateLabel(fmt, meta_in, idx) {
         var meta = meta_in[idx];
         // case %d
@@ -38,28 +52,49 @@ System.register(['lodash'], function(exports_1) {
         // case %cn
         label = label.replace(/%cn/g, meta.metric_name);
         // case %tv
-        label = label.replace(/%tv{([^}]*)}/g, function (x) {
-            var tag = x.substring(4, x.length - 1);
+        label = label.replace(/%tv-?{([^}]*)}/g, function (x) {
+            var elide = x.substring(3, 4);
+            var choose = elide === "-" ? metaTagDiff : function () { return true; };
+            var tag = x.substring(elide === "-" ? 5 : 4, x.length - 1);
             var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
             var tagSet = splitTags(tags);
             if (tag === "*") {
-                var tagVals = lodash_1.default.values(tagSet).map(function (n) { return n[0]; }).join(",");
-                return tagVals;
+                var tagCats = [];
+                for (var _i = 0, _b = lodash_1.default.keys(tagSet); _i < _b.length; _i++) {
+                    var k = _b[_i];
+                    if (!k.startsWith("__") && choose(meta_in, k)) {
+                        tagCats.push(k);
+                    }
+                }
+                tagCats.sort();
+                var tagVals = lodash_1.default.map(tagCats, function (tagCat) { return tagSet[tagCat][0]; });
+                return tagVals.join(",");
             }
-            if (tagSet[tag] !== undefined) {
+            if (tagSet[tag] !== undefined && choose(meta_in, tag)) {
                 return tagSet[tag][0];
             }
             return "";
         });
         // case %t
-        label = label.replace(/%t{([^}]*)}/g, function (x) {
-            var tag = x.substring(3, x.length - 1);
+        label = label.replace(/%t-?{([^}]*)}/g, function (x) {
+            var elide = x.substring(2, 3);
+            var choose = elide === "-" ? metaTagDiff : function () { return true; };
+            var tag = x.substring(elide === "-" ? 4 : 3, x.length - 1);
             var _a = taglessNameAndTags(meta.metric_name), name = _a[0], tags = _a[1];
-            if (tag === "*") {
-                return tags;
-            }
             var tagSet = splitTags(tags);
-            if (tagSet[tag] !== undefined) {
+            if (tag === "*") {
+                var tagCats = [];
+                for (var _i = 0, _b = lodash_1.default.keys(tagSet); _i < _b.length; _i++) {
+                    var k = _b[_i];
+                    if (!k.startsWith("__") && choose(meta_in, k)) {
+                        var v = tagSet[k][0];
+                        tagCats.push(k + ":" + v);
+                    }
+                }
+                tagCats.sort();
+                return tagCats.join(",");
+            }
+            if (tagSet[tag] !== undefined && choose(meta_in, tag)) {
                 return tag + ":" + tagSet[tag][0];
             }
             return "";
@@ -89,6 +124,9 @@ System.register(['lodash'], function(exports_1) {
             exports_1("SegmentType", SegmentType);
             ;
             ;
+            // given an array of meta objects, return true if the tag cat
+            // specified has variance in the array
+            _private_nil = {}; // just some truthy value different from every string
             IrondbQuery = (function () {
                 /** @ngInject */
                 function IrondbQuery(datasource, target, templateSrv, scopedVars) {

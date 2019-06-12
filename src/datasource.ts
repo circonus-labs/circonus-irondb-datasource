@@ -416,8 +416,11 @@ export default class IrondbDatasource {
               var leaf_name = result[i]['metric_name'];
               if (target.labeltype !== "default") {
                 var metriclabel = target.metriclabel;
-                if(target.labeltype === "name") {
+                if (target.labeltype === "name") {
                   metriclabel = "%n";
+                }
+                else if (target.labeltype === "cardinality") {
+                  metriclabel = "%n | %t-{*}";
                 }
                 metriclabel = metaInterpolateLabel(metriclabel, result, i);
                 metriclabel = this.templateSrv.replace(metriclabel);
