@@ -449,7 +449,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return " | label(\"%n\")";
                         }
                         else if (labeltype === "cardinality") {
-                            return " | label(\"%n|ST[%t-{*}]\")";
+                            return " | label(\"%n | %t-{*}\")";
                         }
                     }
                     return "";

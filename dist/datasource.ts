@@ -420,7 +420,7 @@ export default class IrondbDatasource {
                   metriclabel = "%n";
                 }
                 else if (target.labeltype === "cardinality") {
-                  metriclabel = "%n|ST[%t-{*}]";
+                  metriclabel = "%n | %t-{*}";
                 }
                 metriclabel = metaInterpolateLabel(metriclabel, result, i);
                 metriclabel = this.templateSrv.replace(metriclabel);

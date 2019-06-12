@@ -410,7 +410,7 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                                                 metriclabel = "%n";
                                             }
                                             else if (target.labeltype === "cardinality") {
-                                                metriclabel = "%n|ST[%t-{*}]";
+                                                metriclabel = "%n | %t-{*}";
                                             }
                                             metriclabel = irondb_query_1.metaInterpolateLabel(metriclabel, result, i);
                                             metriclabel = _this.templateSrv.replace(metriclabel);

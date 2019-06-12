@@ -481,7 +481,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         return " | label(\"%n\")";
       }
       else if (labeltype === "cardinality") {
-        return " | label(\"%n|ST[%t-{*}]\")";
+        return " | label(\"%n | %t-{*}\")";
       }
     }
     return "";
