@@ -26,14 +26,13 @@ export declare class IrondbQueryCtrl extends QueryCtrl {
         counter_stddev: string;
     };
     segments: any[];
-    loadSegments: boolean;
     /** @ngInject **/
     constructor($scope: any, $injector: any, uiSegmentSrv: any, templateSrv: any);
     toggleEditorMode(): void;
     typeValueChanged(): void;
     labelTypeValueChanged(): void;
-    loadMetricLabel(): void;
-    metricLabelValueChanged(): void;
+    metricLabelKeyUp(event: any): void;
+    updateMetricLabelValue(refresh?: boolean): void;
     egressValueChanged(): void;
     onChangeInternal(): void;
     getCollapsedText(): any;

@@ -37,7 +37,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
                         counter: "counter",
                         counter_stddev: "counter_stddev" };
   segments: any[];
-  loadSegments: boolean;
 
   /** @ngInject **/
   constructor($scope, $injector, private uiSegmentSrv, private templateSrv) {
@@ -52,8 +51,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.segments = this.target.segments || [];
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
-    this.loadMetricLabel();
-    this.loadSegments = false;
+    this.updateMetricLabelValue(false);
   }
 
   toggleEditorMode() {
@@ -80,18 +78,32 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   labelTypeValueChanged() {
+    if (this.target.labeltype === "custom") {
+      setTimeout(function() {
+        document.getElementById("metriclabel").focus();
+      }, 50);
+    }
     this.panelCtrl.refresh();
   }
 
-  loadMetricLabel() {
-    if (this.target.metriclabel === "" && this.target.labeltype !== "name") {
-      this.target.labeltype = "default";
+  metricLabelKeyUp(event) {
+    var self = this;
+    var element = event.currentTarget;
+    if (event.keyCode === 13) {
+      setTimeout(function() {
+        self.target.metriclabel = element.value;
+        self.updateMetricLabelValue();
+      }, 0);
     }
   }
 
-  metricLabelValueChanged() {
-    this.loadMetricLabel();
-    this.panelCtrl.refresh();
+  updateMetricLabelValue(refresh: boolean = true) {
+    if (this.target.metriclabel === "" && this.target.labeltype === "custom") {
+      this.target.labeltype = "default";
+    }
+    if (refresh) {
+      this.panelCtrl.refresh();
+    }
   }
 
   egressValueChanged() {
