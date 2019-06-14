@@ -51,7 +51,7 @@
           lookup-text="true">
         </gf-form-dropdown>
       </div>
-      <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form gf-form--grow gf-form-max">
+      <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form gf-form--grow">
         <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-keyup="ctrl.metricLabelKeyUp($event)" ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
       </div>
       <div class="gf-form gf-form--grow">
