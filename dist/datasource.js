@@ -474,10 +474,12 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                     if (query.metricLabel !== undefined && query.metricLabel !== "") {
                         name = query.metricLabel;
                     }
-                    cleanData.push({
-                        target: name,
-                        datapoints: datapoint
-                    });
+                    if (query.paneltype !== "Heatmap") {
+                        cleanData.push({
+                            target: name,
+                            datapoints: datapoint
+                        });
+                    }
                     var lookaside = {};
                     for (var i = 0; i < origDatapoint.length; i++) {
                         timestamp = origDatapoint[i][0] * 1000;
@@ -488,6 +490,7 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                             for (var vstr in origDatapoint[i][2]) {
                                 var cnt = origDatapoint[i][2][vstr];
                                 var v = parseFloat(vstr);
+                                vstr = v.toString();
                                 var tsstr = timestamp.toString();
                                 if (lookaside[vstr] == null) {
                                     lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
@@ -530,7 +533,6 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                     for (var si = 0; si < data.length; si++) {
                         var dummy = name + " [" + (si + 1) + "]";
                         var lname = meta[si] ? meta[si].label : dummy;
-                        cleanData[si] = { target: lname, datapoints: [] };
                         for (var i = 0; i < data[si].length; i++) {
                             if (data[si][i] == null)
                                 continue;
@@ -538,12 +540,16 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                             if (ts < query.start * 1000)
                                 continue;
                             if (data[si][i].constructor === Number) {
+                                if (cleanData[si] === undefined) {
+                                    cleanData[si] = { target: lname, datapoints: [] };
+                                }
                                 cleanData[si].datapoints.push([data[si][i], ts]);
                             }
                             else if (data[si][i].constructor === Object) {
                                 for (var vstr in data[si][i]) {
                                     var cnt = data[si][i][vstr];
                                     var v = parseFloat(vstr);
+                                    vstr = v.toString();
                                     var tsstr = ts.toString();
                                     if (lookaside[vstr] == null) {
                                         lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
