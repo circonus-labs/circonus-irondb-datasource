@@ -205,58 +205,60 @@ export default class IrondbDatasource {
       headers['X-Circonus-Account'] = this.accountId;
     }
     headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : "none";
+    headers['Accept'] = 'application/json';
     if (irondbOptions['std']['names'].length) {
-      for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
-        var paneltype = irondbOptions['std']['names'][i]['leaf_data']['paneltype'] || "Graph";
-        var endpoint = paneltype === "Heatmap" ? "/histogram" : "/rollup";
-        options = {};
-        options.url = this.url;
-        if ('hosted' === this.irondbType) {
-          options.url = options.url + '/irondb';
-          options.url = options.url + endpoint;
-        }
-        options.method = 'GET';
-        if ('standalone' === this.irondbType) {
-          options.url = options.url + endpoint;
-        }
-        var interval = irondbOptions['std']['interval'];
-        var start = irondbOptions['std']['start'];
-        var end = irondbOptions['std']['end'];
-        start = Math.floor(start - (start % interval));
-        end = Math.floor(end - (end % interval));
-
-        if (paneltype === "Graph") {
-          interval *= 1000;
-
-          options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
-          options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
-          options.url = options.url + '?get_engine=dispatch&start_ts=' + start + '.000';
-          options.url = options.url + '&end_ts=' + end + '.000';
-          options.url = options.url + '&rollup_span=' + interval + 'ms';
-          options.url = options.url + '&type=' + irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
-        }
-        else if (paneltype === "Heatmap") {
-          options.url = options.url + '/' + start + '/' + end;
-          options.url = options.url + '/' + interval;
-          options.url = options.url + '/' + irondbOptions['std']['names'][i]['leaf_data']['uuid'];
-          options.url = options.url + '/' + encodeURIComponent(irondbOptions['std']['names'][i]['leaf_name']);
-        }
-        //console.log(options.url);
-        options.name = irondbOptions['std']['names'][i]['leaf_name'];
-
-        options.headers = headers;
-        if (this.basicAuth || this.withCredentials) {
-          options.withCredentials = true;
-        }
-        if (this.basicAuth) {
-          options.headers.Authorization = this.basicAuth;
-        }
-        options.metricLabel = irondbOptions['std']['names'][i]['leaf_data']['metriclabel'];
-        options.paneltype = paneltype;
-        options.isCaql = false;
-        options.retry = 1;
-        queries.push(options);
+      var paneltype = irondbOptions['std']['names'][0]['leaf_data']['paneltype'] || "Graph";
+      options = {};
+      options.url = this.url;
+      if ('hosted' === this.irondbType) {
+        options.url = options.url + '/irondb';
+        options.url = options.url + '/fetch';
       }
+      options.method = 'POST';
+      if ('standalone' === this.irondbType) {
+        options.url = options.url + '/fetch';
+      }
+      var metricLabels = [];
+      var interval = irondbOptions['std']['interval'];
+      var start = irondbOptions['std']['start'];
+      var end = irondbOptions['std']['end'];
+      start = Math.floor(start - (start % interval));
+      end = Math.floor(end - (end % interval));
+      var reduce = paneltype === "Heatmap" ? 'merge' : 'pass';
+      var streams = [];
+      var data = { 'streams': streams };
+      data['period'] = interval;
+      data['start'] = start;
+      data['count'] = Math.round((end - start) / interval);
+      data['reduce'] = [{ 'label': '', 'method': reduce }];
+      for (var i = 0; i < irondbOptions['std']['names'].length; i++) {
+        var metrictype = paneltype === "Heatmap" ? "histogram" : "numeric";
+        metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
+
+        var stream = {};
+        var transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+        transform = paneltype === "Heatmap" ? 'none' : transform;
+        stream['transform'] = transform;
+        stream['name'] = irondbOptions['std']['names'][i]['leaf_name'];
+        stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+        stream['kind'] = metrictype;
+        streams.push(stream);
+      }
+      //console.log(JSON.stringify(data));
+      options.data = data;
+      options.name = "fetch";
+      options.headers = headers;
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      options.metricLabels = metricLabels;
+      options.paneltype = paneltype;
+      options.isCaql = false;
+      options.retry = 1;
+      queries.push(options);
     }
     if (irondbOptions['caql']['names'].length) {
       for (var i = 0; i < irondbOptions['caql']['names'].length; i++) {
@@ -295,13 +297,8 @@ export default class IrondbDatasource {
     return Promise.all(queries.map(query =>
       this.backendSrv.datasourceRequest(query).then( result => {
         //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
-        var queryInterimResults;
-        if (query['isCaql']) {
-          queryInterimResults = this._convertIrondbCaqlDataToGrafana(result, query);
-        } else {
-          queryInterimResults = this._convertIrondbDataToGrafana(result, query);
-        }
-        return queryInterimResults;
+        //console.log(JSON.stringify(result));
+        return this._convertIrondbDf4DataToGrafana(result, query);
       }).then( result => {
         if (result['data'].constructor === Array) {
           for (var i = 0; i < result['data'].length; i++) {
@@ -477,63 +474,7 @@ export default class IrondbDatasource {
     });
   }
 
-  _convertIrondbDataToGrafana(result, query) {
-    var data = result.data
-    var cleanData = [];
-
-    var timestamp, origDatapoint, datapoint;
-
-    if (!data) return { data: cleanData };
-    origDatapoint = data;
-    datapoint = [];
-    var name = query.name;
-    if (query.metricLabel !== undefined && query.metricLabel !== "") {
-      name = query.metricLabel;
-    }
-    if (query.paneltype !== "Heatmap") {
-      cleanData.push({
-        target: name,
-        datapoints: datapoint
-      });
-    }
-    var lookaside = {};
-    for (var i = 0; i < origDatapoint.length; i++) {
-      timestamp = origDatapoint[i][0] * 1000;
-      if (query.paneltype === "Heatmap") {
-        if (_.isEmpty(origDatapoint[i][2])) {
-          continue;
-        }
-        for (var vstr in origDatapoint[i][2]) {
-          var cnt = origDatapoint[i][2][vstr];
-          var v = parseFloat(vstr);
-          vstr = v.toString();
-          var tsstr = timestamp.toString();
-          if (lookaside[vstr] == null) {
-            lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
-            cleanData.push(lookaside[vstr]);
-          }
-          if(lookaside[vstr]._ts[tsstr] == null) {
-            lookaside[vstr]._ts[tsstr] = [ cnt, timestamp ];
-            lookaside[vstr].datapoints.push(lookaside[vstr]._ts[tsstr]);
-          } else {
-            lookaside[vstr]._ts[tsstr][0] += cnt;
-          }
-        }
-      }
-      else {
-        if (null == origDatapoint[i][1]) {
-          continue;
-        }
-        datapoint.push([ origDatapoint[i][1], timestamp ]);
-      }
-    }
-    for (var i=0; i<cleanData.length; i++) {
-      delete(cleanData[i]._ts);
-    }
-    return { data: cleanData };
-  }
-
-  _convertIrondbCaqlDataToGrafana(result, query) {
+  _convertIrondbDf4DataToGrafana(result, query) {
     var name = query.name;
     var data = result.data.data;
     var meta = result.data.meta;
@@ -549,6 +490,10 @@ export default class IrondbDatasource {
     for (var si = 0; si < data.length; si++) {
       var dummy = name + " [" + (si+1) + "]";
       var lname = meta[si] ? meta[si].label : dummy;
+      var metricLabel = query.metricLabels[si];
+      if (_.isString(metricLabel)) {
+        lname = metricLabel;
+      }
       for (var i = 0; i < data[si].length; i++) {
         if (data[si][i] == null) continue;
         var ts = (st + (i*period)) * 1000;
