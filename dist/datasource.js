@@ -474,6 +474,9 @@ System.register(['lodash', './irondb_query'], function(exports_1) {
                     if (query.metricLabel !== undefined && query.metricLabel !== "") {
                         name = query.metricLabel;
                     }
+                    else {
+                        name = irondb_query_1.decodeNameAndTags(name);
+                    }
                     if (query.paneltype !== "Heatmap") {
                         cleanData.push({
                             target: name,

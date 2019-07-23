@@ -1,7 +1,7 @@
 ///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
-import {metaInterpolateLabel} from './irondb_query';
+import {metaInterpolateLabel,decodeNameAndTags} from './irondb_query';
 
 export default class IrondbDatasource {
   id: number;
@@ -489,6 +489,8 @@ export default class IrondbDatasource {
     var name = query.name;
     if (query.metricLabel !== undefined && query.metricLabel !== "") {
       name = query.metricLabel;
+    } else {
+      name = decodeNameAndTags(name);
     }
     if (query.paneltype !== "Heatmap") {
       cleanData.push({

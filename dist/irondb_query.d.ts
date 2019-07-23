@@ -12,6 +12,7 @@ export declare function taglessName(name: string): string;
 export declare function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): string;
 export declare function encodeTag(type: SegmentType, tag: string): string;
 export declare function decodeTag(tag: string): string;
+export declare function decodeNameAndTags(name: string): string;
 export default class IrondbQuery {
     datasource: any;
     target: any;

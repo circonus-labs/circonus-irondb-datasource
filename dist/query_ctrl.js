@@ -504,7 +504,8 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                             return " | label(\"%n | %t-{*}\")";
                         }
                     }
-                    return "";
+                    // Always use label() for tag decoding
+                    return " | label(\"%cn\")";
                 };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();

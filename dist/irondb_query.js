@@ -152,6 +152,17 @@ System.register(['lodash'], function(exports_1) {
         return tag;
     }
     exports_1("decodeTag", decodeTag);
+    function decodeNameAndTags(name) {
+        var tags = [];
+        var _a = taglessNameAndTags(name), metric = _a[0], rawTags = _a[1];
+        var tagSet = splitTags(rawTags);
+        for (var _i = 0, _b = lodash_1.default.keys(tagSet); _i < _b.length; _i++) {
+            var tagCat = _b[_i];
+            tags.push(tagCat + ':' + tagSet[tagCat][0]);
+        }
+        return metric + '|ST[' + tags.join(',') + ']';
+    }
+    exports_1("decodeNameAndTags", decodeNameAndTags);
     function wrapFunction(target, func) {
         return func.render(target);
     }

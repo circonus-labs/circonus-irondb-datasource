@@ -535,7 +535,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
         return " | label(\"%n | %t-{*}\")";
       }
     }
-    return "";
+    // Always use label() for tag decoding
+    return " | label(\"%cn\")";
   }
 
   segmentsToCaqlFind() {

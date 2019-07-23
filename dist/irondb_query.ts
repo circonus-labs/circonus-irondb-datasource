@@ -205,6 +205,16 @@ export function decodeTag(tag: string): string {
   return tag;
 }
 
+export function decodeNameAndTags(name: string): string {
+  var tags = [];
+  var [metric, rawTags] = taglessNameAndTags(name);
+  var tagSet = splitTags(rawTags);
+  for (var tagCat of _.keys(tagSet)) {
+    tags.push(tagCat + ':' + tagSet[tagCat][0]);
+  }
+  return metric + '|ST[' + tags.join(',') + ']';
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;
