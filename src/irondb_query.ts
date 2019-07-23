@@ -14,12 +14,16 @@ export enum SegmentType {
 
 interface TagSet { [tagCat: string] : string[] };
 
-function splitTags(tags: string): TagSet {
+function splitTags(tags: string, decode: boolean = true): TagSet {
   var outTags: TagSet = {};
   for (var tag of tags.split(/,/g)) {
     var tagSep = tag.split(/:/g);
     var tagCat = tagSep.shift();
     var tagVal = tagSep.join(':');
+    if (decode) {
+      tagCat = decodeTag(tagCat);
+      tagVal = decodeTag(tagVal);
+    }
     var tagVals = outTags[tagCat];
     if (_.isUndefined(tagVals)) {
       outTags[tagCat] = tagVals = [];
@@ -257,14 +261,14 @@ export default class IrondbQuery {
         this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
         tagCat = tagCat.slice(tagIndex);
       }
-      this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+      this.segments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
       this.segments.push({ type: SegmentType.TagPair });
       var end = 0;
       while (tagVal.endsWith(")")) {
         tagVal = tagVal.slice(0, -1);
         end++;
       }
-      this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      this.segments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
       for (var i = 0; i < end; i++) {
         this.segments.push({ type: SegmentType.TagPlus });
         this.segments.push({ type: SegmentType.TagEnd });

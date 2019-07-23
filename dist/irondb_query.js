@@ -1,13 +1,18 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
     var SegmentType, _private_nil, vTagMapKey, vTagMapValue, IrondbQuery;
-    function splitTags(tags) {
+    function splitTags(tags, decode) {
+        if (decode === void 0) { decode = true; }
         var outTags = {};
         for (var _i = 0, _a = tags.split(/,/g); _i < _a.length; _i++) {
             var tag = _a[_i];
             var tagSep = tag.split(/:/g);
             var tagCat = tagSep.shift();
             var tagVal = tagSep.join(':');
+            if (decode) {
+                tagCat = decodeTag(tagCat);
+                tagVal = decodeTag(tagVal);
+            }
             var tagVals = outTags[tagCat];
             if (lodash_1.default.isUndefined(tagVals)) {
                 outTags[tagCat] = tagVals = [];
@@ -245,14 +250,14 @@ System.register(['lodash'], function(exports_1) {
                             this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
                             tagCat = tagCat.slice(tagIndex);
                         }
-                        this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+                        this.segments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
                         this.segments.push({ type: SegmentType.TagPair });
                         var end = 0;
                         while (tagVal.endsWith(")")) {
                             tagVal = tagVal.slice(0, -1);
                             end++;
                         }
-                        this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+                        this.segments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
                         for (var i = 0; i < end; i++) {
                             this.segments.push({ type: SegmentType.TagPlus });
                             this.segments.push({ type: SegmentType.TagEnd });
