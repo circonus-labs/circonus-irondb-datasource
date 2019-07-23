@@ -118,6 +118,66 @@ export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): 
   return label
 }
 
+/*
+ * map for ascii tags
+  perl -e '$valid = qr/[`+A-Za-z0-9!@#\$%^&"'\/\?\._-]/;
+  foreach $i (0..7) {
+  foreach $j (0..31) { printf "%d,", chr($i*32+$j) =~ $valid; }
+  print "\n";
+  }'
+*/
+const vTagMapKey: number[] = [
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,1,1,1,1,1,1,1,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+];
+
+/* Same as above, but allow for ':' and '=' */
+const vTagMapValue: number[] = [
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+];
+
+function IsTaggableKeyChar(c: number): boolean {
+  return vTagMapKey[c] == 1;
+}
+
+function IsTaggableValueChar(c: number): boolean {
+  return vTagMapValue[c] == 1;
+}
+
+type TagPartFunction = (c: number) => boolean;
+
+function IsTaggablePart(tag: string, tagPartFunction: TagPartFunction): boolean {
+  var n = 0;
+  for (var i = 0; i < tag.length; i++) {
+    var c = tag.charCodeAt(i);
+    if (tagPartFunction(c)) {
+      n += 1;
+    }
+  }
+  return n === tag.length;
+}
+
+function IsTaggableKey(tag: string): boolean {
+  return IsTaggablePart(tag, IsTaggableKeyChar);
+}
+
+function IsTaggableValue(tag: string): boolean {
+  return IsTaggablePart(tag, IsTaggableValueChar);
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;

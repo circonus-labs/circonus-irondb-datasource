@@ -1,6 +1,6 @@
 System.register(['lodash'], function(exports_1) {
     var lodash_1;
-    var SegmentType, _private_nil, IrondbQuery;
+    var SegmentType, _private_nil, vTagMapKey, vTagMapValue, IrondbQuery;
     function splitTags(tags) {
         var outTags = {};
         for (var _i = 0, _a = tags.split(/,/g); _i < _a.length; _i++) {
@@ -102,6 +102,28 @@ System.register(['lodash'], function(exports_1) {
         return label;
     }
     exports_1("metaInterpolateLabel", metaInterpolateLabel);
+    function IsTaggableKeyChar(c) {
+        return vTagMapKey[c] == 1;
+    }
+    function IsTaggableValueChar(c) {
+        return vTagMapValue[c] == 1;
+    }
+    function IsTaggablePart(tag, tagPartFunction) {
+        var n = 0;
+        for (var i = 0; i < tag.length; i++) {
+            var c = tag.charCodeAt(i);
+            if (tagPartFunction(c)) {
+                n += 1;
+            }
+        }
+        return n === tag.length;
+    }
+    function IsTaggableKey(tag) {
+        return IsTaggablePart(tag, IsTaggableKeyChar);
+    }
+    function IsTaggableValue(tag) {
+        return IsTaggablePart(tag, IsTaggableValueChar);
+    }
     function wrapFunction(target, func) {
         return func.render(target);
     }
@@ -127,6 +149,35 @@ System.register(['lodash'], function(exports_1) {
             // given an array of meta objects, return true if the tag cat
             // specified has variance in the array
             _private_nil = {}; // just some truthy value different from every string
+            /*
+             * map for ascii tags
+              perl -e '$valid = qr/[`+A-Za-z0-9!@#\$%^&"'\/\?\._-]/;
+              foreach $i (0..7) {
+              foreach $j (0..31) { printf "%d,", chr($i*32+$j) =~ $valid; }
+              print "\n";
+              }'
+            */
+            vTagMapKey = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+            /* Same as above, but allow for ':' and '=' */
+            vTagMapValue = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
             IrondbQuery = (function () {
                 /** @ngInject */
                 function IrondbQuery(datasource, target, templateSrv, scopedVars) {
