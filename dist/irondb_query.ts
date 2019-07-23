@@ -18,8 +18,8 @@ function splitTags(tags: string): TagSet {
   var outTags: TagSet = {};
   for (var tag of tags.split(/,/g)) {
     var tagSep = tag.split(/:/g);
-    var tagCat = tagSep[0];
-    var tagVal = tagSep[1];
+    var tagCat = tagSep.shift();
+    var tagVal = tagSep.join(':');
     var tagVals = outTags[tagCat];
     if (_.isUndefined(tagVals)) {
       outTags[tagCat] = tagVals = [];
@@ -243,8 +243,8 @@ export default class IrondbQuery {
         this.segments.push({ type: SegmentType.TagSep });
       }
       tag = tag.split(':');
-      var tagCat = tag[0];
-      var tagVal = tag[1];
+      var tagCat = tag.shift();
+      var tagVal = tag.join(':');
       var tagOp = false, tagIndex = 4;
       if (tagCat.startsWith("and(") || tagCat.startsWith("not(")) {
         tagOp = true;

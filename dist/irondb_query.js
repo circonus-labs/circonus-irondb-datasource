@@ -6,8 +6,8 @@ System.register(['lodash'], function(exports_1) {
         for (var _i = 0, _a = tags.split(/,/g); _i < _a.length; _i++) {
             var tag = _a[_i];
             var tagSep = tag.split(/:/g);
-            var tagCat = tagSep[0];
-            var tagVal = tagSep[1];
+            var tagCat = tagSep.shift();
+            var tagVal = tagSep.join(':');
             var tagVals = outTags[tagCat];
             if (lodash_1.default.isUndefined(tagVals)) {
                 outTags[tagCat] = tagVals = [];
@@ -231,8 +231,8 @@ System.register(['lodash'], function(exports_1) {
                             this.segments.push({ type: SegmentType.TagSep });
                         }
                         tag = tag.split(':');
-                        var tagCat = tag[0];
-                        var tagVal = tag[1];
+                        var tagCat = tag.shift();
+                        var tagVal = tag.join(':');
                         var tagOp = false, tagIndex = 4;
                         if (tagCat.startsWith("and(") || tagCat.startsWith("not(")) {
                             tagOp = true;
