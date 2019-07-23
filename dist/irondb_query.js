@@ -124,6 +124,29 @@ System.register(['lodash'], function(exports_1) {
     function IsTaggableValue(tag) {
         return IsTaggablePart(tag, IsTaggableValueChar);
     }
+    function encodeTag(type, tag) {
+        var needsBase64 = false;
+        if (type === SegmentType.TagCat && !IsTaggableKey(tag)) {
+            needsBase64 = true;
+        }
+        else if (type === SegmentType.TagVal && !IsTaggableValue(tag)) {
+            if (!(tag.length === 1 && tag.charAt(0) === '*')) {
+                needsBase64 = true;
+            }
+        }
+        if (needsBase64) {
+            tag = 'b"' + btoa(tag) + '"';
+        }
+        return tag;
+    }
+    exports_1("encodeTag", encodeTag);
+    function decodeTag(tag) {
+        if (tag.startsWith('b"') && tag.endsWith('"')) {
+            tag = atob(tag.slice(2, tag.length - 1));
+        }
+        return tag;
+    }
+    exports_1("decodeTag", decodeTag);
     function wrapFunction(target, func) {
         return func.render(target);
     }

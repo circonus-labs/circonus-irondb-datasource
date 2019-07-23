@@ -178,6 +178,29 @@ function IsTaggableValue(tag: string): boolean {
   return IsTaggablePart(tag, IsTaggableValueChar);
 }
 
+export function encodeTag(type: SegmentType, tag: string): string {
+  var needsBase64 = false;
+  if (type === SegmentType.TagCat && !IsTaggableKey(tag)) {
+    needsBase64 = true;
+  }
+  else if (type === SegmentType.TagVal && !IsTaggableValue(tag)) {
+    if (!(tag.length === 1 && tag.charAt(0) === '*')) {
+      needsBase64 = true;
+    }
+  }
+  if (needsBase64) {
+    tag = 'b"' + btoa(tag) + '"';
+  }
+  return tag;
+}
+
+export function decodeTag(tag: string): string {
+  if (tag.startsWith('b"') && tag.endsWith('"')) {
+    tag = atob(tag.slice(2, tag.length - 1));
+  }
+  return tag;
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;
