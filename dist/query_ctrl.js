@@ -455,7 +455,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segments = this.segments.slice();
                     // First element is always metric name
                     var metricName = segments.shift().value;
-                    var query = "and(__name:" + metricName;
+                    var query = "and(__name:" + irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, metricName);
                     var noComma = false; // because last was a tag:pair
                     for (var _i = 0; _i < segments.length; _i++) {
                         var segment = segments[_i];
@@ -472,7 +472,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         else {
                             noComma = false;
                         }
-                        query += segment.value;
+                        query += irondb_query_2.encodeTag(type, segment.value);
                     }
                     query += ")";
                     return query;
@@ -541,7 +541,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         else {
                             noComma = false;
                         }
-                        query += segment.value;
+                        query += irondb_query_2.encodeTag(type, segment.value);
                     }
                     query += "')" + this.buildCaqlLabel();
                     return query;

@@ -2,7 +2,7 @@
 
 import _ from 'lodash';
 import IrondbQuery from './irondb_query';
-import {SegmentType,taglessName} from './irondb_query';
+import {SegmentType,taglessName,decodeTag,encodeTag} from './irondb_query';
 import {QueryCtrl} from 'app/plugins/sdk';
 import './css/query_editor.css!';
 
@@ -485,7 +485,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     var segments = this.segments.slice();
     // First element is always metric name
     var metricName = segments.shift().value;
-    var query = "and(__name:" + metricName;
+    var query = "and(__name:" + encodeTag(SegmentType.TagVal, metricName);
     var noComma = false; // because last was a tag:pair
     for ( let segment of segments ) {
         let type = segment._type;
@@ -501,7 +501,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             noComma = false; 
         }
 
-        query += segment.value;
+        query += encodeTag(type, segment.value);
     }
     query += ")";
     return query;
@@ -572,7 +572,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             noComma = false;
         }
 
-        query += segment.value;
+        query += encodeTag(type, segment.value);
     }
     query += "')" + this.buildCaqlLabel();
     return query;
