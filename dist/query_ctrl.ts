@@ -525,18 +525,18 @@ export class IrondbQueryCtrl extends QueryCtrl {
     var metriclabel = this.target.metriclabel;
     if (labeltype !== "default") {
       if (labeltype === "custom" && metriclabel !== "") {
-        metriclabel = metriclabel.replace(/"/g, "'");
-        return " | label(\"" + metriclabel + "\")";
+        metriclabel = metriclabel.replace(/'/g, "\"");
+        return " | label('" + metriclabel + "')";
       }
       else if (labeltype === "name") {
-        return " | label(\"%n\")";
+        return " | label('%n')";
       }
       else if (labeltype === "cardinality") {
-        return " | label(\"%n | %t-{*}\")";
+        return " | label('%n | %t-{*}')";
       }
     }
     // Always use label() for tag decoding
-    return " | label(\"%cn\")";
+    return " | label('%cn')";
   }
 
   segmentsToCaqlFind() {
@@ -547,7 +547,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (metricName === "*" && tagless) {
       return "";
     }
-    var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
+    var query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
     if (tagless) {
       query += ")" + this.buildCaqlLabel();
       return query;
@@ -562,7 +562,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if( !noComma && type !== SegmentType.TagEnd && type !==SegmentType.TagSep ) {
             query += ","
             if (firstTag) {
-              query += " \"";
+              query += " '";
               firstTag = false;
             }
         }
@@ -574,7 +574,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
         query += segment.value;
     }
-    query += "\")" + this.buildCaqlLabel();
+    query += "')" + this.buildCaqlLabel();
     return query;
   }
 

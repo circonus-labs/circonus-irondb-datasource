@@ -494,18 +494,18 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var metriclabel = this.target.metriclabel;
                     if (labeltype !== "default") {
                         if (labeltype === "custom" && metriclabel !== "") {
-                            metriclabel = metriclabel.replace(/"/g, "'");
-                            return " | label(\"" + metriclabel + "\")";
+                            metriclabel = metriclabel.replace(/'/g, "\"");
+                            return " | label('" + metriclabel + "')";
                         }
                         else if (labeltype === "name") {
-                            return " | label(\"%n\")";
+                            return " | label('%n')";
                         }
                         else if (labeltype === "cardinality") {
-                            return " | label(\"%n | %t-{*}\")";
+                            return " | label('%n | %t-{*}')";
                         }
                     }
                     // Always use label() for tag decoding
-                    return " | label(\"%cn\")";
+                    return " | label('%cn')";
                 };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();
@@ -515,7 +515,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     if (metricName === "*" && tagless) {
                         return "";
                     }
-                    var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
+                    var query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
                     if (tagless) {
                         query += ")" + this.buildCaqlLabel();
                         return query;
@@ -531,7 +531,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         if (!noComma && type !== irondb_query_2.SegmentType.TagEnd && type !== irondb_query_2.SegmentType.TagSep) {
                             query += ",";
                             if (firstTag) {
-                                query += " \"";
+                                query += " '";
                                 firstTag = false;
                             }
                         }
@@ -543,7 +543,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         }
                         query += segment.value;
                     }
-                    query += "\")" + this.buildCaqlLabel();
+                    query += "')" + this.buildCaqlLabel();
                     return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
