@@ -199,7 +199,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         });
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagCat || segmentType === irondb_query_2.SegmentType.TagPlus) {
-                        var metricName = this.segments[0].value;
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, this.segments[0].value);
                         //console.log("getSegments() tags for " + metricName);
                         return this.datasource
                             .metricTagCatsQuery(metricName)
@@ -210,7 +210,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 for (var _i = 0; _i < tagCats.length; _i++) {
                                     var tagCat = tagCats[_i];
                                     tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagCat, {
-                                        value: tagCat,
+                                        value: irondb_query_2.decodeTag(tagCat),
                                         expandable: true
                                     }));
                                 }
@@ -238,14 +238,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         return Promise.resolve(tagSegments);
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagVal) {
-                        var metricName = this.segments[0].value;
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, this.segments[0].value);
                         var tagCat = this.segments[index - 2].value;
                         if (tagCat === "select tag") {
                             return Promise.resolve([]);
                         }
                         //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
-                            .metricTagValsQuery(metricName, tagCat)
+                            .metricTagValsQuery(metricName, irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagCat, tagCat))
                             .then(function (segments) {
                             if (segments.data && segments.data.length > 0) {
                                 var tagVals = segments.data;
@@ -264,7 +264,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 for (var _i = 0; _i < tagVals.length; _i++) {
                                     var tagVal = tagVals[_i];
                                     tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagVal, {
-                                        value: tagVal,
+                                        value: irondb_query_2.decodeTag(tagVal),
                                         expandable: true
                                     }));
                                 }

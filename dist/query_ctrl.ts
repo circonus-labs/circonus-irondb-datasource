@@ -200,7 +200,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         });
     }
     else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
-      var metricName = this.segments[0].value;
+      var metricName = encodeTag(SegmentType.TagVal, this.segments[0].value);
       //console.log("getSegments() tags for " + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
@@ -210,7 +210,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             var tagSegments = [];
             for(var tagCat of tagCats) {
               tagSegments.push(this.newSegment(SegmentType.TagCat, {
-                value: tagCat,
+                value: decodeTag(tagCat),
                 expandable: true
               }));
             }
@@ -238,14 +238,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
         return Promise.resolve(tagSegments);
     }
     else if (segmentType === SegmentType.TagVal) {
-      var metricName = this.segments[0].value;
+      var metricName = encodeTag(SegmentType.TagVal, this.segments[0].value);
       var tagCat = this.segments[index - 2].value;
       if (tagCat === "select tag") {
         return Promise.resolve([]);
       }
       //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
       return this.datasource
-        .metricTagValsQuery(metricName, tagCat)
+        .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat))
         .then(segments => {
           if (segments.data && segments.data.length > 0) {
             var tagVals = segments.data;
@@ -263,7 +263,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             });
             for(var tagVal of tagVals) {
               tagSegments.push(this.newSegment(SegmentType.TagVal, {
-                value: tagVal,
+                value: decodeTag(tagVal),
                 expandable: true
               }));
             }
