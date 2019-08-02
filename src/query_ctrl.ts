@@ -161,8 +161,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     var segmentType = this.segments[index]._type;
     //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
+      if (encodeTag(SegmentType.MetricName, query) !== query) {
+        query = 'b/' + btoa(this.escapeRegExp(query)) + '/';
+      }
+      else {
+        query += '*';
+      }
       return this.datasource
-        .metricTagsQuery("and(__name:" + query + "*)", true)
+        .metricTagsQuery("and(__name:" + query + ")", true)
         .then( results => {
           var metricnames = _.map(results.data, result => {
             return taglessName(result.metric_name);
@@ -604,25 +610,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   escapeRegExp(regexp) {
-    var specialChars = "[]{}()*?.,";
-    var fixedRegExp = [];
-    for (var i = 0; i < regexp.length; ++i) {
-      var c = regexp.charAt(i);
-      switch (c) {
-        case '?':
-          fixedRegExp.push(".");
-          break;
-        case '*':
-          fixedRegExp.push(".*?");
-          break;
-        default:
-          if (specialChars.indexOf(c) >= 0) {
-            fixedRegExp.push("\\");
-          }
-          fixedRegExp.push(c);
-      }
-    }
-    return fixedRegExp.join('');
+    return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
   }
 }
 

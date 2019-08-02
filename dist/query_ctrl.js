@@ -165,8 +165,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segmentType = this.segments[index]._type;
                     //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
                     if (segmentType === irondb_query_2.SegmentType.MetricName) {
+                        if (irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, query) !== query) {
+                            query = 'b/' + btoa(this.escapeRegExp(query)) + '/';
+                        }
+                        else {
+                            query += '*';
+                        }
                         return this.datasource
-                            .metricTagsQuery("and(__name:" + query + "*)", true)
+                            .metricTagsQuery("and(__name:" + query + ")", true)
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
                                 return irondb_query_2.taglessName(result.metric_name);
@@ -567,25 +573,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     return index !== this.segments.length - 1;
                 };
                 IrondbQueryCtrl.prototype.escapeRegExp = function (regexp) {
-                    var specialChars = "[]{}()*?.,";
-                    var fixedRegExp = [];
-                    for (var i = 0; i < regexp.length; ++i) {
-                        var c = regexp.charAt(i);
-                        switch (c) {
-                            case '?':
-                                fixedRegExp.push(".");
-                                break;
-                            case '*':
-                                fixedRegExp.push(".*?");
-                                break;
-                            default:
-                                if (specialChars.indexOf(c) >= 0) {
-                                    fixedRegExp.push("\\");
-                                }
-                                fixedRegExp.push(c);
-                        }
-                    }
-                    return fixedRegExp.join('');
+                    return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
                 };
                 IrondbQueryCtrl.templateUrl = 'partials/query.editor.html';
                 return IrondbQueryCtrl;
