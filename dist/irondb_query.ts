@@ -182,7 +182,10 @@ function IsTaggableValue(tag: string): boolean {
   return IsTaggablePart(tag, IsTaggableValueChar);
 }
 
-export function encodeTag(type: SegmentType, tag: string): string {
+export function encodeTag(type: SegmentType, tag: string, exactMatch: boolean = true): string {
+  if (type === SegmentType.MetricName) {
+    type = SegmentType.TagVal;
+  }
   var needsBase64 = false;
   if (type === SegmentType.TagCat && !IsTaggableKey(tag)) {
     needsBase64 = true;
@@ -193,13 +196,18 @@ export function encodeTag(type: SegmentType, tag: string): string {
     }
   }
   if (needsBase64) {
-    tag = 'b"' + btoa(tag) + '"';
+    var base64Char = '"';
+    if (exactMatch) {
+      base64Char = '!';
+    }
+    tag = ['b', base64Char, btoa(tag), base64Char].join('');
   }
   return tag;
 }
 
 export function decodeTag(tag: string): string {
-  if (tag.startsWith('b"') && tag.endsWith('"')) {
+  if ((tag.startsWith('b"') && tag.endsWith('"')) ||
+      (tag.startsWith('b!') && tag.endsWith('!'))) {
     tag = atob(tag.slice(2, tag.length - 1));
   }
   return tag;
@@ -246,7 +254,7 @@ export default class IrondbQuery {
     metricName = metricName.slice(11, -1) || '*';
     var tags = metricName.split(',');
     metricName = tags.shift();
-    this.segments.push({ type: SegmentType.MetricName, value: metricName });
+    this.segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
 
     var first = true;
     for(var tag of tags) {

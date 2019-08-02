@@ -199,7 +199,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         });
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagCat || segmentType === irondb_query_2.SegmentType.TagPlus) {
-                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, this.segments[0].value);
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, this.segments[0].value);
                         //console.log("getSegments() tags for " + metricName);
                         return this.datasource
                             .metricTagCatsQuery(metricName)
@@ -238,14 +238,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         return Promise.resolve(tagSegments);
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagVal) {
-                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, this.segments[0].value);
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, this.segments[0].value);
                         var tagCat = this.segments[index - 2].value;
                         if (tagCat === "select tag") {
                             return Promise.resolve([]);
                         }
                         //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
-                            .metricTagValsQuery(metricName, irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagCat, tagCat))
+                            .metricTagValsQuery(metricName, irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagCat, tagCat, false))
                             .then(function (segments) {
                             if (segments.data && segments.data.length > 0) {
                                 var tagVals = segments.data;
@@ -455,7 +455,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segments = this.segments.slice();
                     // First element is always metric name
                     var metricName = segments.shift().value;
-                    var query = "and(__name:" + irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagVal, metricName);
+                    var query = "and(__name:" + irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, metricName);
                     var noComma = false; // because last was a tag:pair
                     for (var _i = 0; _i < segments.length; _i++) {
                         var segment = segments[_i];

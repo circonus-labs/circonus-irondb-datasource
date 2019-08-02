@@ -129,7 +129,11 @@ System.register(['lodash'], function(exports_1) {
     function IsTaggableValue(tag) {
         return IsTaggablePart(tag, IsTaggableValueChar);
     }
-    function encodeTag(type, tag) {
+    function encodeTag(type, tag, exactMatch) {
+        if (exactMatch === void 0) { exactMatch = true; }
+        if (type === SegmentType.MetricName) {
+            type = SegmentType.TagVal;
+        }
         var needsBase64 = false;
         if (type === SegmentType.TagCat && !IsTaggableKey(tag)) {
             needsBase64 = true;
@@ -140,13 +144,18 @@ System.register(['lodash'], function(exports_1) {
             }
         }
         if (needsBase64) {
-            tag = 'b"' + btoa(tag) + '"';
+            var base64Char = '"';
+            if (exactMatch) {
+                base64Char = '!';
+            }
+            tag = ['b', base64Char, btoa(tag), base64Char].join('');
         }
         return tag;
     }
     exports_1("encodeTag", encodeTag);
     function decodeTag(tag) {
-        if (tag.startsWith('b"') && tag.endsWith('"')) {
+        if ((tag.startsWith('b"') && tag.endsWith('"')) ||
+            (tag.startsWith('b!') && tag.endsWith('!'))) {
             tag = atob(tag.slice(2, tag.length - 1));
         }
         return tag;
@@ -236,7 +245,7 @@ System.register(['lodash'], function(exports_1) {
                     metricName = metricName.slice(11, -1) || '*';
                     var tags = metricName.split(',');
                     metricName = tags.shift();
-                    this.segments.push({ type: SegmentType.MetricName, value: metricName });
+                    this.segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
                     var first = true;
                     for (var _i = 0; _i < tags.length; _i++) {
                         var tag = tags[_i];
