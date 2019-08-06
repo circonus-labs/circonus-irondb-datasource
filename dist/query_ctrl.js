@@ -165,8 +165,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segmentType = this.segments[index]._type;
                     //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
                     if (segmentType === irondb_query_2.SegmentType.MetricName) {
+                        if (irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, query) !== query) {
+                            query = 'b/' + btoa(this.escapeRegExp(query)) + '/';
+                        }
+                        else {
+                            query += '*';
+                        }
                         return this.datasource
-                            .metricTagsQuery("and(__name:" + query + "*)", true)
+                            .metricTagsQuery("and(__name:" + query + ")", true)
                             .then(function (results) {
                             var metricnames = lodash_1.default.map(results.data, function (result) {
                                 return irondb_query_2.taglessName(result.metric_name);
@@ -199,7 +205,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         });
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagCat || segmentType === irondb_query_2.SegmentType.TagPlus) {
-                        var metricName = this.segments[0].value;
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, this.segments[0].value);
                         //console.log("getSegments() tags for " + metricName);
                         return this.datasource
                             .metricTagCatsQuery(metricName)
@@ -210,7 +216,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 for (var _i = 0; _i < tagCats.length; _i++) {
                                     var tagCat = tagCats[_i];
                                     tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagCat, {
-                                        value: tagCat,
+                                        value: irondb_query_2.decodeTag(tagCat),
                                         expandable: true
                                     }));
                                 }
@@ -238,14 +244,14 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         return Promise.resolve(tagSegments);
                     }
                     else if (segmentType === irondb_query_2.SegmentType.TagVal) {
-                        var metricName = this.segments[0].value;
+                        var metricName = irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, this.segments[0].value);
                         var tagCat = this.segments[index - 2].value;
                         if (tagCat === "select tag") {
                             return Promise.resolve([]);
                         }
                         //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
                         return this.datasource
-                            .metricTagValsQuery(metricName, tagCat)
+                            .metricTagValsQuery(metricName, irondb_query_2.encodeTag(irondb_query_2.SegmentType.TagCat, tagCat, false))
                             .then(function (segments) {
                             if (segments.data && segments.data.length > 0) {
                                 var tagVals = segments.data;
@@ -264,7 +270,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                                 for (var _i = 0; _i < tagVals.length; _i++) {
                                     var tagVal = tagVals[_i];
                                     tagSegments.push(_this.newSegment(irondb_query_2.SegmentType.TagVal, {
-                                        value: tagVal,
+                                        value: irondb_query_2.decodeTag(tagVal),
                                         expandable: true
                                     }));
                                 }
@@ -455,7 +461,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var segments = this.segments.slice();
                     // First element is always metric name
                     var metricName = segments.shift().value;
-                    var query = "and(__name:" + metricName;
+                    var query = "and(__name:" + irondb_query_2.encodeTag(irondb_query_2.SegmentType.MetricName, metricName);
                     var noComma = false; // because last was a tag:pair
                     for (var _i = 0; _i < segments.length; _i++) {
                         var segment = segments[_i];
@@ -472,7 +478,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         else {
                             noComma = false;
                         }
-                        query += segment.value;
+                        query += irondb_query_2.encodeTag(type, segment.value);
                     }
                     query += ")";
                     return query;
@@ -494,17 +500,18 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     var metriclabel = this.target.metriclabel;
                     if (labeltype !== "default") {
                         if (labeltype === "custom" && metriclabel !== "") {
-                            metriclabel = metriclabel.replace(/"/g, "'");
-                            return " | label(\"" + metriclabel + "\")";
+                            metriclabel = metriclabel.replace(/'/g, "\"");
+                            return " | label('" + metriclabel + "')";
                         }
                         else if (labeltype === "name") {
-                            return " | label(\"%n\")";
+                            return " | label('%n')";
                         }
                         else if (labeltype === "cardinality") {
-                            return " | label(\"%n | %t-{*}\")";
+                            return " | label('%n | %t-{*}')";
                         }
                     }
-                    return "";
+                    // Always use label() for tag decoding
+                    return " | label('%cn')";
                 };
                 IrondbQueryCtrl.prototype.segmentsToCaqlFind = function () {
                     var segments = this.segments.slice();
@@ -514,7 +521,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     if (metricName === "*" && tagless) {
                         return "";
                     }
-                    var query = this.queryFunctionToCaqlFind() + "(\"" + metricName + "\"";
+                    var query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
                     if (tagless) {
                         query += ")" + this.buildCaqlLabel();
                         return query;
@@ -530,7 +537,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         if (!noComma && type !== irondb_query_2.SegmentType.TagEnd && type !== irondb_query_2.SegmentType.TagSep) {
                             query += ",";
                             if (firstTag) {
-                                query += " \"";
+                                query += " '";
                                 firstTag = false;
                             }
                         }
@@ -540,9 +547,9 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                         else {
                             noComma = false;
                         }
-                        query += segment.value;
+                        query += irondb_query_2.encodeTag(type, segment.value);
                     }
-                    query += "\")" + this.buildCaqlLabel();
+                    query += "')" + this.buildCaqlLabel();
                     return query;
                 };
                 IrondbQueryCtrl.prototype.updateModelTarget = function () {
@@ -566,25 +573,7 @@ System.register(['lodash', './irondb_query', 'app/plugins/sdk', './css/query_edi
                     return index !== this.segments.length - 1;
                 };
                 IrondbQueryCtrl.prototype.escapeRegExp = function (regexp) {
-                    var specialChars = "[]{}()*?.,";
-                    var fixedRegExp = [];
-                    for (var i = 0; i < regexp.length; ++i) {
-                        var c = regexp.charAt(i);
-                        switch (c) {
-                            case '?':
-                                fixedRegExp.push(".");
-                                break;
-                            case '*':
-                                fixedRegExp.push(".*?");
-                                break;
-                            default:
-                                if (specialChars.indexOf(c) >= 0) {
-                                    fixedRegExp.push("\\");
-                                }
-                                fixedRegExp.push(c);
-                        }
-                    }
-                    return fixedRegExp.join('');
+                    return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
                 };
                 IrondbQueryCtrl.templateUrl = 'partials/query.editor.html';
                 return IrondbQueryCtrl;

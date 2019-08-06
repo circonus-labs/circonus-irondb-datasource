@@ -14,12 +14,16 @@ export enum SegmentType {
 
 interface TagSet { [tagCat: string] : string[] };
 
-function splitTags(tags: string): TagSet {
+function splitTags(tags: string, decode: boolean = true): TagSet {
   var outTags: TagSet = {};
   for (var tag of tags.split(/,/g)) {
     var tagSep = tag.split(/:/g);
-    var tagCat = tagSep[0];
-    var tagVal = tagSep[1];
+    var tagCat = tagSep.shift();
+    var tagVal = tagSep.join(':');
+    if (decode) {
+      tagCat = decodeTag(tagCat);
+      tagVal = decodeTag(tagVal);
+    }
     var tagVals = outTags[tagCat];
     if (_.isUndefined(tagVals)) {
       outTags[tagCat] = tagVals = [];
@@ -118,6 +122,107 @@ export function metaInterpolateLabel(fmt: string, meta_in: any[], idx: number): 
   return label
 }
 
+/*
+ * map for ascii tags
+  perl -e '$valid = qr/[`+A-Za-z0-9!@#\$%^&"'\/\?\._-]/;
+  foreach $i (0..7) {
+  foreach $j (0..31) { printf "%d,", chr($i*32+$j) =~ $valid; }
+  print "\n";
+  }'
+*/
+const vTagMapKey: number[] = [
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,1,1,1,1,1,1,1,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+];
+
+/* Same as above, but allow for ':' and '=' */
+const vTagMapValue: number[] = [
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+];
+
+function IsTaggableKeyChar(c: number): boolean {
+  return vTagMapKey[c] == 1;
+}
+
+function IsTaggableValueChar(c: number): boolean {
+  return vTagMapValue[c] == 1;
+}
+
+type TagPartFunction = (c: number) => boolean;
+
+function IsTaggablePart(tag: string, tagPartFunction: TagPartFunction): boolean {
+  var n = 0;
+  for (var i = 0; i < tag.length; i++) {
+    var c = tag.charCodeAt(i);
+    if (tagPartFunction(c)) {
+      n += 1;
+    }
+  }
+  return n === tag.length;
+}
+
+function IsTaggableKey(tag: string): boolean {
+  return IsTaggablePart(tag, IsTaggableKeyChar);
+}
+
+function IsTaggableValue(tag: string): boolean {
+  return IsTaggablePart(tag, IsTaggableValueChar);
+}
+
+export function encodeTag(type: SegmentType, tag: string, exactMatch: boolean = true): string {
+  if (type === SegmentType.MetricName) {
+    type = SegmentType.TagVal;
+  }
+  var needsBase64 = false;
+  if (type === SegmentType.TagCat && !IsTaggableKey(tag)) {
+    needsBase64 = true;
+  }
+  else if (type === SegmentType.TagVal && !IsTaggableValue(tag)) {
+    if (!(tag.length === 1 && tag.charAt(0) === '*')) {
+      needsBase64 = true;
+    }
+  }
+  if (needsBase64) {
+    var base64Char = '"';
+    if (exactMatch) {
+      base64Char = '!';
+    }
+    tag = ['b', base64Char, btoa(tag), base64Char].join('');
+  }
+  return tag;
+}
+
+export function decodeTag(tag: string): string {
+  if ((tag.startsWith('b"') && tag.endsWith('"')) ||
+      (tag.startsWith('b!') && tag.endsWith('!'))) {
+    tag = atob(tag.slice(2, tag.length - 1));
+  }
+  return tag;
+}
+
+export function decodeNameAndTags(name: string): string {
+  var tags = [];
+  var [metric, rawTags] = taglessNameAndTags(name);
+  var tagSet = splitTags(rawTags);
+  for (var tagCat of _.keys(tagSet)) {
+    tags.push(tagCat + ':' + tagSet[tagCat][0]);
+  }
+  return metric + '|ST[' + tags.join(',') + ']';
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;
@@ -149,7 +254,7 @@ export default class IrondbQuery {
     metricName = metricName.slice(11, -1) || '*';
     var tags = metricName.split(',');
     metricName = tags.shift();
-    this.segments.push({ type: SegmentType.MetricName, value: metricName });
+    this.segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
 
     var first = true;
     for(var tag of tags) {
@@ -160,8 +265,8 @@ export default class IrondbQuery {
         this.segments.push({ type: SegmentType.TagSep });
       }
       tag = tag.split(':');
-      var tagCat = tag[0];
-      var tagVal = tag[1];
+      var tagCat = tag.shift();
+      var tagVal = tag.join(':');
       var tagOp = false, tagIndex = 4;
       if (tagCat.startsWith("and(") || tagCat.startsWith("not(")) {
         tagOp = true;
@@ -174,14 +279,14 @@ export default class IrondbQuery {
         this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
         tagCat = tagCat.slice(tagIndex);
       }
-      this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+      this.segments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
       this.segments.push({ type: SegmentType.TagPair });
       var end = 0;
       while (tagVal.endsWith(")")) {
         tagVal = tagVal.slice(0, -1);
         end++;
       }
-      this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      this.segments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
       for (var i = 0; i < end; i++) {
         this.segments.push({ type: SegmentType.TagPlus });
         this.segments.push({ type: SegmentType.TagEnd });
