@@ -1,4 +1,3 @@
-///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
 import {metaInterpolateLabel,decodeNameAndTags} from './irondb_query';
@@ -339,9 +338,9 @@ export default class IrondbDatasource {
     // The period is in the right realm now, force align to something
     // that will make it pretty.
     var align = [86400,3600,1800,1200,900,300,60,30,15,10,5,1];
-    for (var i in align) {
-      if(period > 1000*align[i]) {
-        period = Math.floor(period / (1000*align[i])) * (1000*align[i]);
+    for (var j in align) {
+      if(period > 1000*align[j]) {
+        period = Math.floor(period / (1000*align[j])) * (1000*align[j]);
         break;
       }
     }

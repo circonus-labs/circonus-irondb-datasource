@@ -1,10 +1,9 @@
-///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 import _ from 'lodash';
 import IrondbQuery from './irondb_query';
 import {SegmentType,taglessName,decodeTag,encodeTag} from './irondb_query';
-import {QueryCtrl} from 'app/plugins/sdk';
-import './css/query_editor.css!';
+import {QueryCtrl} from 'grafana/app/plugins/sdk';
+import './css/query_editor.css';
 
 
 function isEven(x) {

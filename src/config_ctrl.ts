@@ -1,4 +1,3 @@
-///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
 
 export class IrondbConfigCtrl {
   static templateUrl = 'partials/config.html';
