@@ -11,11 +11,13 @@
   "author": "Circonus",
   "license": "BSD-3-clause",
   "dependencies": {
+    "memoizee": "^0.4.14"
   },
   "devDependencies": {
     "@grafana/data": "latest",
     "@grafana/ui": "latest",
     "@grafana/toolkit": "next",
-    "@types/grafana": "github:CorpGlory/types-grafana.git"
+    "@types/grafana": "github:CorpGlory/types-grafana.git",
+    "@types/memoizee": "^0.4.2"
   }
 }
