@@ -1,5 +1,6 @@
 
 import _ from 'lodash';
+import memoize from 'memoizee';
 import {metaInterpolateLabel,decodeNameAndTags} from './irondb_query';
 
 export default class IrondbDatasource {
@@ -16,6 +17,46 @@ export default class IrondbDatasource {
   supportMetrics: boolean;
   basicAuth: any;
   withCredentials: any;
+  datasourceRequest: (options: any) => any;
+
+  static readonly DEFAULT_CACHE_ENTRIES = 128;
+  static readonly DEFAULT_CACHE_TIME_MS = 60000;
+
+  static requestCacheKey(requestOptions) {
+    var httpMethod = requestOptions.method;
+    if (httpMethod === "GET") {
+      return requestOptions.url;
+    }
+    else if (httpMethod === "POST") {
+      return JSON.stringify(requestOptions.data);
+    }
+    throw new Error("Unsupported HTTP method type: " + (httpMethod || "?"));
+  }
+
+  static setupCache(instanceSettings, backendSrv) {
+    var doRequest = function(options) {
+      //console.log("cache miss " + IrondbDatasource.requestCacheKey(options));
+      return backendSrv.datasourceRequest(options);
+    }
+    var useCaching = (instanceSettings.jsonData || {}).useCaching;
+    if (!useCaching) {
+      //console.log("caching disabled " + useCaching);
+      return doRequest;
+    }
+    var cacheOpts = {
+      max: IrondbDatasource.DEFAULT_CACHE_ENTRIES,
+      maxAge: IrondbDatasource.DEFAULT_CACHE_TIME_MS,
+      promise: true,
+      normalizer: function(args) {
+        var requestOptions = args[0];
+        var cacheKey = IrondbDatasource.requestCacheKey(requestOptions);
+        //console.log("cache lookup " + cacheKey);
+        return cacheKey;
+      }
+    };
+    //console.log("caching enabled");
+    return memoize(doRequest, cacheOpts);
+  }
 
   /** @ngInject */
   constructor(instanceSettings, private $q, private backendSrv, private templateSrv) {
@@ -30,6 +71,7 @@ export default class IrondbDatasource {
     this.supportAnnotations = false;
     this.supportMetrics = true;
     this.appName = 'Grafana';
+    this.datasourceRequest = IrondbDatasource.setupCache(instanceSettings, backendSrv);
   }
 
   query(options) {
@@ -186,7 +228,7 @@ export default class IrondbDatasource {
     };
 
     //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
-    return this.backendSrv.datasourceRequest(options);
+    return this.datasourceRequest(options);
   }
 
   _irondbRequest(irondbOptions, isCaql = false, isLimited = true) {
@@ -294,7 +336,7 @@ export default class IrondbDatasource {
     //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
 
     return Promise.all(queries.map(query =>
-      this.backendSrv.datasourceRequest(query).then( result => {
+      this.datasourceRequest(query).then( result => {
         //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
         //console.log(JSON.stringify(result));
         return this._convertIrondbDf4DataToGrafana(result, query);
