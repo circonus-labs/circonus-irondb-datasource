@@ -38,8 +38,12 @@
         <p>Setting it to -1 or "none" removes the limit.</p>
       </info-popover>
     </div>
-    <div class="gf-form">
-      <gf-form-switch class="gf-form" label="Client-Side Caching" label-class="width-9" checked="ctrl.current.jsonData.useCaching" switch-class="max-width-6"></gf-form-switch>
-    </div>
+  </div>
+  <div class="gf-form-inline">
+    <gf-form-switch class="gf-form"
+      label-class="width-9" switch-class="width-30"
+      label="Cache Results" checked="ctrl.current.jsonData.useCaching"
+      tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
+    </gf-form-switch>
   </div>
 </div>

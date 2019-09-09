@@ -38,7 +38,7 @@ export default class IrondbDatasource {
       //console.log("cache miss " + IrondbDatasource.requestCacheKey(options));
       return backendSrv.datasourceRequest(options);
     }
-    var useCaching = (instanceSettings.jsonData || {}).useCaching;
+    var useCaching = (instanceSettings.jsonData || {}).useCaching || true;
     if (!useCaching) {
       //console.log("caching disabled " + useCaching);
       return doRequest;
