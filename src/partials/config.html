@@ -16,14 +16,14 @@
         </info-popover>
       </div>
     </div>
-    <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType == 'standalone'">
+    <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'standalone'">
       <span class="gf-form-label width-9">Account ID</span>
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.accountId' placeholder="enter account id"></input>
       <info-popover mode="right-absolute">
           <p>The Account ID associated with the account to pull metrics from. This can be found on your user profile page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "My Accounts" section.</p>
       </info-popover>
     </div>
-    <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType == 'hosted'">
+    <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'hosted'">
       <span class="gf-form-label width-9">API Token</span>
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.apiToken' placeholder="enter API token"></input>
       <info-popover mode="right-absolute">

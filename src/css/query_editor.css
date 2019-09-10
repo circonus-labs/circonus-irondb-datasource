@@ -15,38 +15,38 @@
 }
 
 .gf-form-select-wrapper--caret-indent.gf-form-select-wrapper::after {
-  right: 0.775rem
+  right: 0.775rem;
 }
 
 .ml-1 {
-    margin-left: 2px !important;
+  margin-left: 2px !important;
 }
 .join-r .gf-form-label {
-    margin-right: 0;
+  margin-right: 0;
 }
 .join-l .gf-form-label {
-    border-left-width: 0;
-    border-radius: 0;
+  border-left-width: 0;
+  border-radius: 0;
 }
 .mash-r .gf-form-label {
-    padding-right: 0;
+  padding-right: 0;
 }
 .mash-l .gf-form-label {
-    padding-left: 0;
+  padding-left: 0;
 }
 .irondb-tag-op .gf-form-label,
 .irondb-tag-end .gf-form-label {
-    color: #eb7b18;
+  color: #eb7b18;
 }
 .irondb-tag-cat .gf-form-label {
-    color: #598;
+  color: #598;
 }
 .irondb-tag-val .gf-form-label {
-    color: #5ca;
+  color: #5ca;
 }
 .irondb-tag-pair .gf-form-label,
 .irondb-tag-sep .gf-form-label {
-    color: #888;
+  color: #888;
 }
 .irondb-tag-op .gf-form-label:focus,
 .irondb-tag-op .gf-form-label:hover,
@@ -56,40 +56,40 @@
 .irondb-tag-val .gf-form-label:hover,
 .gf-form-label:focus .template-variable,
 .gf-form-label:hover .template-variable {
-    color: #fff;
+  color: #fff;
 }
 
 /* menu item color changes */
 
-.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a {
-    color: #bb002c !important;
+.irondb-tag-op .typeahead.dropdown-menu [data-value='REMOVE'] a {
+  color: #bb002c !important;
 }
-.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a {
-    color: #33b5e5 !important;
+.irondb-tag-val .typeahead.dropdown-menu [data-value^='$'] a {
+  color: #33b5e5 !important;
 }
-.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a {
-    color: #eb7b18 !important;
+.irondb-tag-op .typeahead.dropdown-menu [data-value='or('] a,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='not('] a,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='and('] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='or('] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='not('] a,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='and('] a {
+  color: #eb7b18 !important;
 }
-.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a:focus,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="REMOVE"] a:hover,
-.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a:focus,
-.irondb-tag-val .typeahead.dropdown-menu [data-value^="$"] a:hover,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a:focus,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="or("] a:hover,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a:focus,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="not("] a:hover,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a:focus,
-.irondb-tag-op .typeahead.dropdown-menu [data-value="and("] a:hover,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a:focus,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="or("] a:hover,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a:focus,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="not("] a:hover,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a:focus,
-.irondb-tag-plus .typeahead.dropdown-menu [data-value="and("] a:hover {
-    color: #fff !important;
+.irondb-tag-op .typeahead.dropdown-menu [data-value='REMOVE'] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='REMOVE'] a:hover,
+.irondb-tag-val .typeahead.dropdown-menu [data-value^='$'] a:focus,
+.irondb-tag-val .typeahead.dropdown-menu [data-value^='$'] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='or('] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='or('] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='not('] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='not('] a:hover,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='and('] a:focus,
+.irondb-tag-op .typeahead.dropdown-menu [data-value='and('] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='or('] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='or('] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='not('] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='not('] a:hover,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='and('] a:focus,
+.irondb-tag-plus .typeahead.dropdown-menu [data-value='and('] a:hover {
+  color: #fff !important;
 }

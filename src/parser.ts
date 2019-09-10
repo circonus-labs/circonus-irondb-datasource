@@ -26,7 +26,7 @@ Parser.prototype = {
 
   curlyBraceSegment: function() {
     if (this.match('identifier', '{') || this.match('{')) {
-      var curlySegment = '';
+      let curlySegment = '';
 
       while (!this.match('') && !this.match('}')) {
         curlySegment += this.consumeToken().value;
@@ -54,14 +54,14 @@ Parser.prototype = {
   },
 
   metricSegment: function() {
-    var curly = this.curlyBraceSegment();
+    const curly = this.curlyBraceSegment();
     if (curly) {
       return curly;
     }
 
     if (this.match('identifier') || this.match('number')) {
       // hack to handle float numbers in metric segments
-      var parts = this.consumeToken().value.split('.');
+      const parts = this.consumeToken().value.split('.');
       if (parts.length === 2) {
         this.tokens.splice(this.index, 0, { type: '.' });
         this.tokens.splice(this.index + 1, 0, {
@@ -86,7 +86,7 @@ Parser.prototype = {
       this.errorMark('Expected identifier after templateStart');
     }
 
-    var node = {
+    const node = {
       type: 'template',
       value: this.consumeToken().value,
     };
@@ -104,7 +104,7 @@ Parser.prototype = {
       return null;
     }
 
-    var node = {
+    const node = {
       type: 'metric',
       segments: [],
     };
@@ -114,7 +114,7 @@ Parser.prototype = {
     while (this.match('.')) {
       this.consumeToken();
 
-      var segment = this.metricSegment();
+      const segment = this.metricSegment();
       if (!segment) {
         this.errorMark('Expected metric identifier');
       }
@@ -130,7 +130,7 @@ Parser.prototype = {
       return null;
     }
 
-    var node: any = {
+    const node: any = {
       type: 'function',
       name: this.consumeToken().value,
     };
@@ -165,12 +165,7 @@ Parser.prototype = {
       return [];
     }
 
-    var param =
-      this.functionCall() ||
-      this.numericLiteral() ||
-      this.boolExpression() ||
-      this.metricExpression() ||
-      this.stringLiteral();
+    const param = this.functionCall() || this.numericLiteral() || this.boolExpression() || this.metricExpression() || this.stringLiteral();
 
     if (!this.match(',')) {
       return [param];
@@ -196,7 +191,7 @@ Parser.prototype = {
       return null;
     }
 
-    var token = this.consumeToken();
+    const token = this.consumeToken();
     if (token.isUnclosed) {
       throw { message: 'Unclosed string parameter', pos: token.pos };
     }
@@ -208,8 +203,8 @@ Parser.prototype = {
   },
 
   errorMark: function(text) {
-    var currentToken = this.tokens[this.index];
-    var type = currentToken ? currentToken.type : 'end of string';
+    const currentToken = this.tokens[this.index];
+    const type = currentToken ? currentToken.type : 'end of string';
     throw {
       message: text + ' instead found ' + type,
       pos: currentToken ? currentToken.pos : this.lexer.char,
@@ -223,7 +218,7 @@ Parser.prototype = {
   },
 
   matchToken: function(type, index) {
-    var token = this.tokens[this.index + index];
+    const token = this.tokens[this.index + index];
     return (token === undefined && type === '') || (token && token.type === type);
   },
 

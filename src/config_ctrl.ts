@@ -1,4 +1,3 @@
-
 export class IrondbConfigCtrl {
   static templateUrl = 'partials/config.html';
   current: any;
