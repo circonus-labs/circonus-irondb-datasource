@@ -309,48 +309,4 @@ export default class IrondbQuery {
   addSelectMetricSegment() {
     this.segments.push({ value: 'select metric' });
   }
-
-  updateModelTarget(targets) {
-    //console.log("IrondbQuery.updateModelTarget() " + JSON.stringify(targets));
-    // render query
-    //this.target.query = this.getSegmentPathUpTo(this.segments.length).replace(/\.select metric.$/, '');
-    //this.target.query = this.target.query.replace(/\.$/, '');
-
-    this.updateRenderedTarget(this.target, targets);
-
-    // loop through other queries and update targetFull as needed
-    for (const target of targets || []) {
-      if (target.refId !== this.target.refId) {
-        this.updateRenderedTarget(target, targets);
-      }
-    }
-  }
-
-  updateRenderedTarget(target, targets) {
-    // render nested query
-    const targetsByRefId = _.keyBy(targets, 'refId');
-
-    // no references to self
-    delete targetsByRefId[target.refId];
-
-    const targetWithNestedQueries = target.query;
-
-    // Use ref count to track circular references
-    function countTargetRefs(targetsByRefId, refId) {
-      const refCount = 0;
-      _.each(targetsByRefId, (t, id) => {
-        if (id !== refId) {
-        }
-      });
-      targetsByRefId[refId].refCount = refCount;
-    }
-    _.each(targetsByRefId, (t, id) => {
-      countTargetRefs(targetsByRefId, id);
-    });
-
-    delete target.targetFull;
-    if (target.query !== targetWithNestedQueries) {
-      target.targetFull = targetWithNestedQueries;
-    }
-  }
 }

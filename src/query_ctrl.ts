@@ -147,16 +147,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
               expandable: true,
             });
           });
-
-          // add query references
-          if (index === 0) {
-            _.eachRight(this.panelCtrl.panel.targets, target => {
-              if (target.refId === this.queryModel.target.refId) {
-                return;
-              }
-            });
-          }
-
           return allSegments;
         })
         .catch(err => {
@@ -543,7 +533,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   updateModelTarget() {
     const streamTags = this.segmentsToStreamTags();
     //console.log("updateModelTarget() " + streamTags);
-    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
     this.queryModel.target.query = streamTags;
   }
 
