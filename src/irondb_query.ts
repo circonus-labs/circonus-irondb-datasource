@@ -1,4 +1,7 @@
 import _ from 'lodash';
+import Log from './log';
+
+const log = Log('IrondbQuery');
 
 export enum SegmentType {
   MetricName,
@@ -248,7 +251,7 @@ export default class IrondbQuery {
       return;
     }
 
-    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(this.target));
+    log(() => 'parseTarget() target = ' + JSON.stringify(this.target));
     let metricName = this.target.query;
     // Strip 'and(__name:)' from metric name
     metricName = metricName.slice(11, -1) || '*';
@@ -295,12 +298,12 @@ export default class IrondbQuery {
       this.segments.push({ type: SegmentType.TagPlus });
     }
 
-    //console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
+    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, s => SegmentType[s.type])));
   }
 
   updateSegmentValue(segment, index) {
-    //console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
-    //console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
+    log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
+    log(() => 'updateSegmentValue() length = ' + this.segments.length);
     if (this.segments[index] !== undefined) {
       this.segments[index].value = segment.value;
     }

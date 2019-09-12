@@ -1,8 +1,11 @@
 import _ from 'lodash';
+import Log from './log';
 import IrondbQuery from './irondb_query';
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import './css/query_editor.css';
+
+const log = Log('IrondbQueryCtrl');
 
 function escapeRegExp(regexp) {
   return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -54,11 +57,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
-    //console.log('TYPE ' + this.panelCtrl.pluginName + ' ' + this.panelCtrl.pluginId);
   }
 
   toggleEditorMode() {
-    //console.log("toggleEditorMode()");
+    log(() => 'toggleEditorMode()');
     this.target.isCaql = !this.target.isCaql;
     this.typeValueChanged();
   }
@@ -67,13 +69,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (this.target.isCaql) {
       const caqlQuery = this.segmentsToCaqlFind();
       this.target.query = caqlQuery;
-      //console.log("typeValueChanged() CAQL " + caqlQuery);
+      log(() => 'typeValueChanged() caqlQuery = ' + caqlQuery);
     } else {
       this.target.query = '';
       this.target.egressoverride = 'average';
       this.target.labeltype = 'default';
       this.emptySegments();
       this.parseTarget();
+      log(() => 'typeValueChanged() target reset');
     }
     this.error = null;
     this.panelCtrl.refresh();
@@ -121,11 +124,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getSegments(index, prefix) {
-    //console.log("getSegments() " + index + " " + prefix);
+    log(() => 'getSegments() ' + index + ' prefix = ' + prefix);
     let query = prefix && prefix.length > 0 ? prefix : '';
 
     const segmentType = this.segments[index]._type;
-    //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
+    log(() => 'getSegments() ' + index + ' SegmentType = ' + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       if (encodeTag(SegmentType.MetricName, query) !== query) {
         query = 'b/' + btoa(escapeRegExp(query)) + '/';
@@ -139,7 +142,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
-          //console.log(JSON.stringify(metricnames));
+          log(() => 'getSegments() metricnames = ' + JSON.stringify(metricnames));
 
           const allSegments = _.map(metricnames, segment => {
             return this.newSegment(SegmentType.MetricName, {
@@ -150,12 +153,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
           return allSegments;
         })
         .catch(err => {
-          //console.log("getSegments() " + err.toString());
+          log(() => 'getSegments() err = ' + err.toString());
           return [];
         });
     } else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
       const metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
-      //console.log("getSegments() tags for " + metricName);
+      log(() => 'getSegments() tags for ' + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
         .then(segments => {
@@ -180,7 +183,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch(err => {
-          //console.log(err);
+          log(() => 'getSegments() err = ' + err);
           return [];
         });
     } else if (segmentType === SegmentType.TagOp) {
@@ -197,7 +200,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       if (tagCat === 'select tag') {
         return Promise.resolve([]);
       }
-      //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
+      log(() => 'getSegments() tag vals for ' + metricName + ', ' + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
         .then(segments => {
@@ -231,7 +234,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch(err => {
-          //console.log(err);
+          log(() => 'getSegments() err = ' + err);
           return [];
         });
     }
@@ -274,6 +277,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   buildSegments() {
     this.segments = _.map(this.queryModel.segments, s => this.mapSegment(s));
+    log(() => 'buildSegments()');
 
     const checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
     this.checkOtherSegments(checkOtherSegmentsIndex);
@@ -305,7 +309,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   checkOtherSegments(fromIndex) {
     if (fromIndex === this.segments.length) {
       const segmentType = this.segments[fromIndex - 1]._type;
-      //console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
+      log(() => 'checkOtherSegments() ' + (fromIndex - 1) + ' SegmentType = ' + SegmentType[segmentType]);
       if (segmentType === SegmentType.MetricName) {
         this.addSelectTagPlusSegment();
       }
@@ -320,7 +324,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentValueChanged(segment, segmentIndex) {
-    //console.log("segmentValueChanged()");
+    log(() => 'segmentValueChanged()');
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
@@ -532,12 +536,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   updateModelTarget() {
     const streamTags = this.segmentsToStreamTags();
-    //console.log("updateModelTarget() " + streamTags);
+    log(() => 'updateModelTarget() streamTags = ' + streamTags);
     this.queryModel.target.query = streamTags;
   }
 
   targetChanged() {
-    //console.log("targetChanged()");
+    log(() => 'targetChanged()');
     if (this.queryModel.error) {
       return;
     }

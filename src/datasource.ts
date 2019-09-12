@@ -1,6 +1,9 @@
 import _ from 'lodash';
+import Log from './log';
 import memoize from 'memoizee';
 import { metaInterpolateLabel } from './irondb_query';
+
+const log = Log('IrondbDatasource');
 
 export default class IrondbDatasource {
   id: number;
@@ -33,12 +36,12 @@ export default class IrondbDatasource {
 
   static setupCache(instanceSettings, backendSrv) {
     const doRequest = options => {
-      //console.log("cache miss " + IrondbDatasource.requestCacheKey(options));
+      log(() => 'doRequest() cache miss key = ' + IrondbDatasource.requestCacheKey(options));
       return backendSrv.datasourceRequest(options);
     };
     const useCaching = (instanceSettings.jsonData || {}).useCaching || true;
     if (!useCaching) {
-      //console.log("caching disabled " + useCaching);
+      log(() => 'setupCache() caching disabled');
       return doRequest;
     }
     const cacheOpts = {
@@ -48,11 +51,11 @@ export default class IrondbDatasource {
       normalizer: args => {
         const requestOptions = args[0];
         const cacheKey = IrondbDatasource.requestCacheKey(requestOptions);
-        //console.log("cache lookup " + cacheKey);
+        log(() => 'normalizer() cache lookup key = ' + cacheKey);
         return cacheKey;
       },
     };
-    //console.log("caching enabled");
+    log(() => 'setupCache() caching enabled');
     return memoize(doRequest, cacheOpts);
   }
 
@@ -73,7 +76,7 @@ export default class IrondbDatasource {
   }
 
   query(options) {
-    //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
+    log(() => 'query() options = ' + JSON.stringify(options));
 
     if (_.isEmpty(options['targets'][0])) {
       return this.$q.when({ data: [] });
@@ -92,7 +95,7 @@ export default class IrondbDatasource {
             return a['target'].localeCompare(b['target']);
           });
         }
-        //console.log(`queryResults (query): ${JSON.stringify(queryResults, null, 2)}`);
+        log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
       })
       .catch(err => {
@@ -132,21 +135,21 @@ export default class IrondbDatasource {
     }
     let queryUrl = '/find' + this.getAccountId() + '/tags?query=';
     queryUrl = queryUrl + query;
-    //console.log(queryUrl);
+    log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagCatsQuery(query: string) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
-    //console.log(queryUrl);
+    log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   metricTagValsQuery(query: string, cat: string) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
-    //console.log(queryUrl);
+    log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
@@ -181,7 +184,7 @@ export default class IrondbDatasource {
   }
 
   _throwerr(err) {
-    //console.log(err);
+    log(() => '_throwerr() err = ' + err);
     if (err.data && err.data.error) {
       throw new Error('Circonus IRONdb Error: ' + err.data.error);
     } else if (err.data && err.data.user_error) {
@@ -231,12 +234,12 @@ export default class IrondbDatasource {
       retry: 1,
     };
 
-    //console.log(`simple query (_irondbSimpleRequest): ${JSON.stringify(options, null, 2)}`);
+    log(() => '_irondbSimpleRequest() options = ' + JSON.stringify(options));
     return this.datasourceRequest(options);
   }
 
   _irondbRequest(irondbOptions, isLimited = true) {
-    //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
+    log(() => '_irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
     const headers = { 'Content-Type': 'application/json' };
     let options: any = {};
     const queries = [];
@@ -289,7 +292,7 @@ export default class IrondbDatasource {
         stream['kind'] = metrictype;
         streams.push(stream);
       }
-      //console.log(JSON.stringify(data));
+      log(() => '_irondbRequest() data = ' + JSON.stringify(data));
       options.data = data;
       options.name = 'fetch';
       options.headers = headers;
@@ -337,14 +340,14 @@ export default class IrondbDatasource {
         queries.push(options);
       }
     }
-    //console.log(`queries (_irondbRequest): ${JSON.stringify(queries, null, 2)}`);
+    log(() => '_irondbRequest() queries = ' + JSON.stringify(queries));
 
     return Promise.all(
       queries.map(query =>
         this.datasourceRequest(query)
           .then(result => {
-            //console.log(`query (_irondbRequest): ${JSON.stringify(query, null, 2)}`);
-            //console.log(JSON.stringify(result));
+            log(() => '_irondbRequest() query = ' + JSON.stringify(query));
+            log(() => '_irondbRequest() result = ' + JSON.stringify(result));
             return this._convertIrondbDf4DataToGrafana(result, query);
           })
           .then(result => {
@@ -439,7 +442,6 @@ export default class IrondbDatasource {
       return cleanOptions;
     } else {
       const promises = options.targets.map(target => {
-        //console.log("_buildIrondbParamsAsync() target " + JSON.stringify(target));
         const rawQuery = this.templateSrv.replace(target['query']);
         return this.metricTagsQuery(rawQuery)
           .then(result => {
@@ -495,7 +497,7 @@ export default class IrondbDatasource {
           return cleanOptions;
         })
         .catch(err => {
-          //console.log(`err (_buildIrondbParams): ${JSON.stringify(err, null, 2)}`);
+          log(() => '_buildIrondbParams() err = ' + JSON.stringify(err));
           if (err.status !== 0 || err.status >= 300) {
           }
         });
@@ -564,7 +566,7 @@ export default class IrondbDatasource {
     }
     for (let i = 0; i < cleanData.length; i++) {
       if (_.isUndefined(cleanData[i])) {
-        //console.log('No data received for ' + meta[i].kind + ' "' + meta[i].label + '"');
+        log(() => '_convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"');
         continue;
       }
       delete cleanData[i]._ts;
