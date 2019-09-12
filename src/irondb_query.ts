@@ -1,5 +1,4 @@
 import _ from 'lodash';
-import { Parser } from './parser';
 
 export enum SegmentType {
   MetricName,
@@ -299,30 +298,6 @@ export default class IrondbQuery {
     //console.log("IrondbQuery.parseTarget() " + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
-  getSegmentPathUpTo(index) {
-    const arr = this.segments.slice(0, index);
-
-    return _.reduce(
-      arr,
-      (result, segment) => {
-        return result ? result + segment.value + '.' : segment.value + '.';
-      },
-      ''
-    );
-  }
-
-  parseTargetRecursive(astNode, func) {
-    if (astNode === null) {
-      return null;
-    }
-
-    switch (astNode.type) {
-      case 'metric':
-        this.segments = astNode.segments;
-        break;
-    }
-  }
-
   updateSegmentValue(segment, index) {
     //console.log("IrondbQuery.updateSegmentValue() " + index + " " + JSON.stringify(segment));
     //console.log("IrondbQuery.updateSegmentValue() len " + this.segments.length);
@@ -378,8 +353,4 @@ export default class IrondbQuery {
       target.targetFull = targetWithNestedQueries;
     }
   }
-}
-
-function wrapFunction(target, func) {
-  return func.render(target);
 }

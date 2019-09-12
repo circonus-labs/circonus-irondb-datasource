@@ -4,32 +4,9 @@ import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import './css/query_editor.css';
 
-function isEven(x) {
-  return x % 2 === 0;
+function escapeRegExp(regexp) {
+  return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
 }
-
-/*const changePanelType = (dashboard, oldPanel, newPluginId: string) => {
-  const index = dashboard.panels.findIndex(panel => {
-    return panel.id === oldPanel.id;
-  });
-
-  const deletedPanel = dashboard.panels.splice(index, 1);
-  dashboard.events.emit('panel-removed', deletedPanel);
-
-  var newPanel = oldPanel.getSaveModel();
-  console.log(newPanel.type);
-  newPanel.type = newPluginId;
-  console.log(newPanel.type);
-  console.log(newPanel.events);
-  console.log(newPanel.id + " " + oldPanel.id);
-  newPanel = new oldPanel.constructor(newPanel);
-  console.log(newPanel.events);
-  console.log(newPanel.type);
-
-  dashboard.panels.splice(index, 0, newPanel);
-  dashboard.sortPanelsByGridPos();
-  dashboard.events.emit('panel-added', newPanel);
-};*/
 
 export class IrondbQueryCtrl extends QueryCtrl {
   static templateUrl = 'partials/query.editor.html';
@@ -77,24 +54,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
-    /*console.log("TYPE " + this.panelCtrl.pluginName + " " + this.panelCtrl.pluginId);
-    console.log(this.panel.constructor);
-    console.log(window["PanelModel"]);
-    console.log(eval("new PanelModel()"));*/
+    //console.log('TYPE ' + this.panelCtrl.pluginName + ' ' + this.panelCtrl.pluginId);
   }
 
   toggleEditorMode() {
     //console.log("toggleEditorMode()");
     this.target.isCaql = !this.target.isCaql;
     this.typeValueChanged();
-    /*var newPanel = this.panel.getSaveModel();
-    newPanel.type = "heatmap";
-    this.isHistogram = !this.isHistogram;
-    changePanelType(this.panelCtrl.dashboard, this.panel, this.isHistogram ? "heatmap" : "graph");
-    this.panel.changeType(this.isHistogram ? "heatmap" : "graph");
-    this.panel.initialized();
-    this.panelCtrl.refresh();
-    this.panel.render();*/
   }
 
   typeValueChanged() {
@@ -162,7 +128,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       if (encodeTag(SegmentType.MetricName, query) !== query) {
-        query = 'b/' + btoa(this.escapeRegExp(query)) + '/';
+        query = 'b/' + btoa(escapeRegExp(query)) + '/';
       } else {
         query += '*';
       }
@@ -176,17 +142,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
           //console.log(JSON.stringify(metricnames));
 
           const allSegments = _.map(metricnames, segment => {
-            //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-
             return this.newSegment(SegmentType.MetricName, {
-              value: segment, //.replace(queryRegExp,''),
-              expandable: true, //!segment.leaf,
+              value: segment,
+              expandable: true,
             });
           });
-
-          /*if (index > 0 && allSegments.length === 0) {
-            return allSegments;
-          }*/
 
           // add query references
           if (index === 0) {
@@ -337,7 +297,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   buildSelectTagPlusSegment() {
-    //this.queryModel.addSelectMetricSegment();
     const tagCatSegment = this.uiSegmentSrv.newPlusButton();
     this.setSegmentType(tagCatSegment, SegmentType.TagPlus);
     return tagCatSegment;
@@ -601,18 +560,4 @@ export class IrondbQueryCtrl extends QueryCtrl {
       this.panelCtrl.refresh();
     }
   }
-
-  showDelimiter(index) {
-    return index !== this.segments.length - 1;
-  }
-
-  escapeRegExp(regexp) {
-    return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
-  }
-}
-
-function mapToDropdownOptions(results) {
-  return _.map(results, value => {
-    return { text: value, value: value };
-  });
 }

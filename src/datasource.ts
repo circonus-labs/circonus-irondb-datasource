@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import memoize from 'memoizee';
-import { metaInterpolateLabel, decodeNameAndTags } from './irondb_query';
+import { metaInterpolateLabel } from './irondb_query';
 
 export default class IrondbDatasource {
   id: number;
@@ -74,7 +74,6 @@ export default class IrondbDatasource {
 
   query(options) {
     //console.log(`options (query): ${JSON.stringify(options, null, 2)}`);
-    const scopedVars = options.scopedVars;
 
     if (_.isEmpty(options['targets'][0])) {
       return this.$q.when({ data: [] });
@@ -236,7 +235,7 @@ export default class IrondbDatasource {
     return this.datasourceRequest(options);
   }
 
-  _irondbRequest(irondbOptions, isCaql = false, isLimited = true) {
+  _irondbRequest(irondbOptions, isLimited = true) {
     //console.log(`irondbOptions (_irondbRequest): ${JSON.stringify(irondbOptions, null, 2)}`);
     const headers = { 'Content-Type': 'application/json' };
     let options: any = {};
@@ -373,12 +372,10 @@ export default class IrondbDatasource {
 
   _buildIrondbParamsAsync(options) {
     const cleanOptions = {};
-    const intervalRegex = /'(\d+)m'/gi;
     let i, target;
     let hasTargets = false;
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
-    let hasWildcards = false;
 
     // Pick a reasonable period for CAQL
     // We assume will use something close the request interval
@@ -422,21 +419,6 @@ export default class IrondbDatasource {
         continue;
       }
       hasTargets = true;
-      if (
-        !target['isCaql'] &&
-        target['query'] &&
-        (target['query'].includes('*') ||
-          target['query'].includes('?') ||
-          target['query'].includes('[') ||
-          target['query'].includes(']') ||
-          target['query'].includes('(') ||
-          target['query'].includes(')') ||
-          target['query'].includes('{') ||
-          target['query'].includes('}') ||
-          target['query'].includes(';'))
-      ) {
-        hasWildcards = true;
-      }
     }
 
     if (!hasTargets) {
@@ -454,20 +436,6 @@ export default class IrondbDatasource {
     }
 
     if (target.isCaql) {
-      /*for (i = 0; i < options.targets.length; i++) {
-        target = options.targets[i];
-        if (target.hide || !target['query'] || target['query'].length === 0) {
-          continue;
-        }
-        if (!target.isCaql) {
-          //console.log(`target['query'] (_buildIrondbParamsAsync): ${JSON.stringify(target['query'], null, 2)}`);
-          if ('hosted' === this.irondbType) {
-            cleanOptions['std']['names'].push(this.queryPrefix + target['query']);
-          } else {
-            cleanOptions['std']['names'].push(target['query']);
-          }
-        }
-      }*/
       return cleanOptions;
     } else {
       const promises = options.targets.map(target => {
@@ -531,7 +499,6 @@ export default class IrondbDatasource {
           if (err.status !== 0 || err.status >= 300) {
           }
         });
-      return cleanOptions;
     }
   }
 
@@ -548,7 +515,6 @@ export default class IrondbDatasource {
     const meta = result.data.meta;
     const cleanData = [];
     const st = result.data.head.start;
-    const cnt = result.data.head.count;
     const period = result.data.head.period;
 
     if (!data || data.length === 0) {
