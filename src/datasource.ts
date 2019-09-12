@@ -12,6 +12,8 @@ export default class IrondbDatasource {
   accountId: number;
   irondbType: string;
   resultsLimit: string;
+  useCaching: boolean;
+  activityTracking: boolean;
   url: any;
   apiToken: string;
   appName: string;
@@ -34,12 +36,10 @@ export default class IrondbDatasource {
     throw new Error('Unsupported HTTP method type: ' + (httpMethod || '?'));
   }
 
-  static setupCache(instanceSettings, backendSrv) {
+  static setupCache(useCaching, backendSrv) {
     const doRequest = options => {
-      log(() => 'doRequest() cache miss key = ' + IrondbDatasource.requestCacheKey(options));
       return backendSrv.datasourceRequest(options);
     };
-    const useCaching = (instanceSettings.jsonData || {}).useCaching || true;
     if (!useCaching) {
       log(() => 'setupCache() caching disabled');
       return doRequest;
@@ -56,7 +56,10 @@ export default class IrondbDatasource {
       },
     };
     log(() => 'setupCache() caching enabled');
-    return memoize(doRequest, cacheOpts);
+    return memoize(options => {
+      log(() => 'doRequest() cache miss key = ' + IrondbDatasource.requestCacheKey(options));
+      return doRequest(options);
+    }, cacheOpts);
   }
 
   /** @ngInject */
@@ -68,11 +71,13 @@ export default class IrondbDatasource {
     this.irondbType = (instanceSettings.jsonData || {}).irondbType;
     this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
     this.apiToken = (instanceSettings.jsonData || {}).apiToken;
+    this.useCaching = (instanceSettings.jsonData || {}).useCaching;
+    this.activityTracking = (instanceSettings.jsonData || {}).activityTracking;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
     this.supportMetrics = true;
     this.appName = 'Grafana';
-    this.datasourceRequest = IrondbDatasource.setupCache(instanceSettings, backendSrv);
+    this.datasourceRequest = IrondbDatasource.setupCache(this.useCaching, backendSrv);
   }
 
   query(options) {
@@ -129,12 +134,17 @@ export default class IrondbDatasource {
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricTagsQuery(query: string, allowEmptyWildcard = false) {
+  metricTagsQuery(query: string, allowEmptyWildcard = false, activityWindow: [number, number] = null) {
     if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
     let queryUrl = '/find' + this.getAccountId() + '/tags?query=';
     queryUrl = queryUrl + query;
+    if (this.activityTracking && !_.isEmpty(activityWindow)) {
+      log(() => 'metricTagsQuery() activityWindow = ' + JSON.stringify(activityWindow));
+      queryUrl += '&activity_start_secs=' + _.toInteger(activityWindow[0]);
+      queryUrl += '&activity_end_secs=' + _.toInteger(activityWindow[1]);
+    }
     log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
     return this._irondbSimpleRequest('GET', queryUrl, false, true);
   }
@@ -443,7 +453,7 @@ export default class IrondbDatasource {
     } else {
       const promises = options.targets.map(target => {
         const rawQuery = this.templateSrv.replace(target['query']);
-        return this.metricTagsQuery(rawQuery)
+        return this.metricTagsQuery(rawQuery, false, [start, end])
           .then(result => {
             // Don't mix numeric results with histograms and text metrics
             let metricFilter = 'numeric';

@@ -6,5 +6,6 @@ export class IrondbConfigCtrl {
     this.current.jsonData.irondbType = this.current.jsonData.irondbType || 'standalone';
     this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
     this.current.jsonData.useCaching = this.current.jsonData.useCaching || true;
+    this.current.jsonData.activityTracking = this.current.jsonData.activityTracking || true;
   }
 }
