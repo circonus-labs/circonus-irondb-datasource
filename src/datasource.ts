@@ -563,8 +563,12 @@ export default class IrondbDatasource {
       }
     }
     for (let i = 0; i < cleanData.length; i++) {
+      if (_.isUndefined(cleanData[i])) {
+        //console.log('No data received for ' + meta[i].kind + ' "' + meta[i].label + '"');
+        continue;
+      }
       delete cleanData[i]._ts;
     }
-    return { data: cleanData };
+    return { data: _.compact(cleanData) };
   }
 }
