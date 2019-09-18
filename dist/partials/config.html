@@ -6,49 +6,65 @@
 <div class="gf-form-group">
   <div class="gf-form-inline">
     <div class="gf-form">
-      <span class="gf-form-label width-9">IRONdb Type</span>
-      <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
-        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType'></select>
-        <info-popover mode="right-absolute">
+      <span class="gf-form-label width-10">IRONdb Type
+        <info-popover mode="right-normal">
           <p>This option determines whether a standalone or hosted IRONdb instance is the target of this datasource.</p>
           <p>Standalone = An IRONdb cluster accessible directly.</p>
           <p>Hosted = An IRONdb instance hosted by Circonus, requires entry of API tokens.</p>
-        </info-popover>
+        </info-popover></span>
+      <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
+        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType'></select>
       </div>
     </div>
+  </div>
+  <div class="gf-form-inline">
     <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'standalone'">
-      <span class="gf-form-label width-9">Account ID</span>
+      <span class="gf-form-label width-10">Account ID
+        <info-popover mode="right-normal">
+            <p>The Account ID associated with the account to pull metrics from. This can be found on your user profile page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "My Accounts" section.</p>
+        </info-popover></span>
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.accountId' placeholder="enter account id"></input>
-      <info-popover mode="right-absolute">
-          <p>The Account ID associated with the account to pull metrics from. This can be found on your user profile page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "My Accounts" section.</p>
-      </info-popover>
     </div>
     <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'hosted'">
-      <span class="gf-form-label width-9">API Token</span>
+      <span class="gf-form-label width-10">API Token
+        <info-popover mode="right-normal">
+            <p>The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "User Profile" section.</p>
+        </info-popover></span>
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.apiToken' placeholder="enter API token"></input>
-      <info-popover mode="right-absolute">
-          <p>The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "User Profile" section.</p>
-      </info-popover>
     </div>
+  </div>
+  <div class="gf-form-inline">
     <div class="gf-form">
-      <span class="gf-form-label width-9">Results Limit</span>
+      <span class="gf-form-label width-10">Results Limit
+        <info-popover mode="right-normal">
+          <p>Limit number of search results items fetched.</p>
+          <p>Setting it to -1 or "none" removes the limit.</p>
+        </info-popover></span>
       <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
-      <info-popover mode="right-absolute">
-        <p>Limit number of search results items fetched.</p>
-        <p>Setting it to -1 or "none" removes the limit.</p>
-      </info-popover>
     </div>
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
-      label-class="width-9" switch-class="width-30"
+      label-class="width-10" switch-class="width-5"
       label="Cache Results" checked="ctrl.current.jsonData.useCaching"
       tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
     </gf-form-switch>
+    <!--<gf-form-checkbox class="gf-form" label-class="width-10" switch-class="width-5" checked="ctrl.current.jsonData.useCaching" label="Cache Results" tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
+      <label for="check-11" class="gf-form-switch-container">
+        <div class="gf-form-label width-10" ng-show="ctrl.label">
+          Cache Results
+          <info-popover mode="right-normal" ng-if="ctrl.tooltip" position="top center" class="gf-form-help-icon gf-form-help-icon--right-normal drop-help drop-hide-out-of-bounds drop-target"><i class="fa fa-info-circle"></i></info-popover>
+        </div>
+        <div class="gf-form-checkbox width-5" ng-if="ctrl.show">
+          <input id="check-11" type="checkbox" ng-model="ctrl.checked" ng-change="ctrl.internalOnChange()" class="ng-pristine ng-untouched ng-valid ng-not-empty" />
+          <span class="gf-form-switch__checkbox"></span>
+        </div>
+      </label>
+    </gf-form-checkbox>-->
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
-      label-class="width-9" switch-class="width-30"
+      label-class="width-10" switch-class="width-5" ng-model="ctrl.current.jsonData.activityTracking"
       label="Activity Tracking" checked="ctrl.current.jsonData.activityTracking"
       tooltip="IRONdb supports tracking of metric activity without the expense of reading all known time series data to find active ranges.">
     </gf-form-switch>
