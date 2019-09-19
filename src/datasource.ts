@@ -26,10 +26,18 @@ export default class IrondbDatasource {
   static readonly DEFAULT_CACHE_ENTRIES = 128;
   static readonly DEFAULT_CACHE_TIME_MS = 60000;
 
+  static stripActivityWindow(url) {
+    return _.split(url, '&')
+      .map(p => p.split('='))
+      .filter(p => !p[0].startsWith('activity_'))
+      .map(p => p.join('='))
+      .join('&');
+  }
+
   static requestCacheKey(requestOptions) {
     const httpMethod = requestOptions.method;
     if (httpMethod === 'GET') {
-      return requestOptions.url;
+      return IrondbDatasource.stripActivityWindow(requestOptions.url);
     } else if (httpMethod === 'POST') {
       return JSON.stringify(requestOptions.data);
     }
