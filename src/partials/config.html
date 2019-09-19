@@ -49,22 +49,10 @@
       label="Cache Results" checked="ctrl.current.jsonData.useCaching"
       tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
     </gf-form-switch>
-    <!--<gf-form-checkbox class="gf-form" label-class="width-10" switch-class="width-5" checked="ctrl.current.jsonData.useCaching" label="Cache Results" tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
-      <label for="check-11" class="gf-form-switch-container">
-        <div class="gf-form-label width-10" ng-show="ctrl.label">
-          Cache Results
-          <info-popover mode="right-normal" ng-if="ctrl.tooltip" position="top center" class="gf-form-help-icon gf-form-help-icon--right-normal drop-help drop-hide-out-of-bounds drop-target"><i class="fa fa-info-circle"></i></info-popover>
-        </div>
-        <div class="gf-form-checkbox width-5" ng-if="ctrl.show">
-          <input id="check-11" type="checkbox" ng-model="ctrl.checked" ng-change="ctrl.internalOnChange()" class="ng-pristine ng-untouched ng-valid ng-not-empty" />
-          <span class="gf-form-switch__checkbox"></span>
-        </div>
-      </label>
-    </gf-form-checkbox>-->
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
-      label-class="width-10" switch-class="width-5" ng-model="ctrl.current.jsonData.activityTracking"
+      label-class="width-10" switch-class="width-5"
       label="Activity Tracking" checked="ctrl.current.jsonData.activityTracking"
       tooltip="IRONdb supports tracking of metric activity without the expense of reading all known time series data to find active ranges.">
     </gf-form-switch>
