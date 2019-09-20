@@ -393,8 +393,6 @@ export default class IrondbDatasource {
 
   _buildIrondbParamsAsync(options) {
     const cleanOptions = {};
-    let i, target;
-    let hasTargets = false;
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
 
@@ -434,30 +432,17 @@ export default class IrondbDatasource {
     cleanOptions['caql']['names'] = [];
     cleanOptions['caql']['interval'] = period;
 
-    for (i = 0; i < options.targets.length; i++) {
-      target = options.targets[i];
-      if (target.hide) {
-        continue;
-      }
-      hasTargets = true;
-    }
+    const targets = _.reject(options.targets, target => {
+      return target.hide || !target['query'] || target['query'].length === 0;
+    });
 
-    if (!hasTargets) {
+    if (!targets.length) {
       return {};
     }
 
-    for (i = 0; i < options.targets.length; i++) {
-      target = options.targets[i];
-      if (target.hide || !target['query'] || target['query'].length === 0) {
-        continue;
-      }
+    const promises = targets.map(target => {
       if (target.isCaql) {
         cleanOptions['caql']['names'].push(target['query']);
-      }
-    }
-
-    const promises = options.targets.map(target => {
-      if (target.isCaql) {
         return Promise.resolve(cleanOptions);
       } else {
         const rawQuery = this.templateSrv.replace(target['query']);
@@ -479,9 +464,6 @@ export default class IrondbDatasource {
           })
           .then(result => {
             for (let i = 0; i < result.length; i++) {
-              if (result[i]['target'].hide) {
-                continue;
-              }
               result[i]['leaf_data'] = {
                 egress_function: 'average',
                 uuid: result[i]['uuid'],
