@@ -456,10 +456,10 @@ export default class IrondbDatasource {
       }
     }
 
-    if (target.isCaql) {
-      return cleanOptions;
-    } else {
-      const promises = options.targets.map(target => {
+    const promises = options.targets.map(target => {
+      if (target.isCaql) {
+        return Promise.resolve(cleanOptions);
+      } else {
         const rawQuery = this.templateSrv.replace(target['query']);
         return this.metricTagsQuery(rawQuery, false, [start, end])
           .then(result => {
@@ -482,44 +482,42 @@ export default class IrondbDatasource {
               if (result[i]['target'].hide) {
                 continue;
               }
-              if (!target.isCaql) {
-                result[i]['leaf_data'] = {
-                  egress_function: 'average',
-                  uuid: result[i]['uuid'],
-                  paneltype: result[i]['target']['paneltype'],
-                };
-                if (target.egressoverride !== 'average') {
-                  result[i]['leaf_data'].egress_function = target.egressoverride;
-                }
-                const leafName = result[i]['metric_name'];
-                if (target.labeltype !== 'default') {
-                  let metriclabel = target.metriclabel;
-                  if (target.labeltype === 'name') {
-                    metriclabel = '%n';
-                  } else if (target.labeltype === 'cardinality') {
-                    metriclabel = '%n | %t-{*}';
-                  }
-                  metriclabel = metaInterpolateLabel(metriclabel, result, i);
-                  metriclabel = this.templateSrv.replace(metriclabel);
-                  result[i]['leaf_data'].metriclabel = metriclabel;
-                }
-                cleanOptions['std']['names'].push({ leaf_name: leafName, leaf_data: result[i]['leaf_data'] });
+              result[i]['leaf_data'] = {
+                egress_function: 'average',
+                uuid: result[i]['uuid'],
+                paneltype: result[i]['target']['paneltype'],
+              };
+              if (target.egressoverride !== 'average') {
+                result[i]['leaf_data'].egress_function = target.egressoverride;
               }
+              const leafName = result[i]['metric_name'];
+              if (target.labeltype !== 'default') {
+                let metriclabel = target.metriclabel;
+                if (target.labeltype === 'name') {
+                  metriclabel = '%n';
+                } else if (target.labeltype === 'cardinality') {
+                  metriclabel = '%n | %t-{*}';
+                }
+                metriclabel = metaInterpolateLabel(metriclabel, result, i);
+                metriclabel = this.templateSrv.replace(metriclabel);
+                result[i]['leaf_data'].metriclabel = metriclabel;
+              }
+              cleanOptions['std']['names'].push({ leaf_name: leafName, leaf_data: result[i]['leaf_data'] });
             }
             return cleanOptions;
           });
-      });
+      }
+    });
 
-      return Promise.all(promises)
-        .then(result => {
-          return cleanOptions;
-        })
-        .catch(err => {
-          log(() => '_buildIrondbParams() err = ' + JSON.stringify(err));
-          if (err.status !== 0 || err.status >= 300) {
-          }
-        });
-    }
+    return Promise.all(promises)
+      .then(result => {
+        return cleanOptions;
+      })
+      .catch(err => {
+        log(() => '_buildIrondbParams() err = ' + JSON.stringify(err));
+        if (err.status !== 0 || err.status >= 300) {
+        }
+      });
   }
 
   _buildIrondbParams(options) {
@@ -531,6 +529,7 @@ export default class IrondbDatasource {
 
   _convertIrondbDf4DataToGrafana(result, query) {
     const name = query.name;
+    const metricLabels = query.metricLabels || {};
     const data = result.data.data;
     const meta = result.data.meta;
     const cleanData = [];
@@ -545,7 +544,7 @@ export default class IrondbDatasource {
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       let lname = meta[si] ? meta[si].label : dummy;
-      const metricLabel = query.metricLabels[si];
+      const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;
       }
