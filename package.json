@@ -14,9 +14,9 @@
     "memoizee": "^0.4.14"
   },
   "devDependencies": {
-    "@grafana/data": "latest",
-    "@grafana/ui": "latest",
-    "@grafana/toolkit": "next",
+    "@grafana/data": "^6.4.0-beta.1",
+    "@grafana/ui": "^6.4.0-beta.1",
+    "@grafana/toolkit": "^6.4.0-beta.1",
     "@types/grafana": "github:CorpGlory/types-grafana.git",
     "@types/memoizee": "^0.4.2"
   }
