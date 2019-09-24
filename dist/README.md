@@ -1,6 +1,6 @@
 # IRONdb Datasource
 
-This is the plugin for IRONdb 0.11.9 and newer. It is evolving and we continue to track its API.
+This is the plugin for IRONdb 0.17.1 and newer. It is evolving and we continue to track its API.
 
 Read more about IRONdb here:
 
