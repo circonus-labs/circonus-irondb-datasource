@@ -95,12 +95,12 @@ export default class IrondbDatasource {
       return this.$q.when({ data: [] });
     }
 
-    return Promise.all([this._buildIrondbParams(options)])
+    return Promise.all([this.buildIrondbParams(options)])
       .then(irondbOptions => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        return this._irondbRequest(irondbOptions[0]);
+        return this.irondbRequest(irondbOptions[0]);
       })
       .then(queryResults => {
         if (queryResults['data'].constructor === Array) {
@@ -113,7 +113,7 @@ export default class IrondbDatasource {
       })
       .catch(err => {
         if (err.status !== 0 || err.status >= 300) {
-          this._throwerr(err);
+          this.throwerr(err);
         }
       });
   }
@@ -154,21 +154,21 @@ export default class IrondbDatasource {
       queryUrl += '&activity_end_secs=' + _.toInteger(activityWindow[1]);
     }
     log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
-    return this._irondbSimpleRequest('GET', queryUrl, false, true);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
   metricTagCatsQuery(query: string) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
-    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   metricTagValsQuery(query: string, cat: string) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + 'and(__name:' + query + ')';
     log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
-    return this._irondbSimpleRequest('GET', queryUrl, false, true, false);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   testDatasource() {
@@ -201,8 +201,8 @@ export default class IrondbDatasource {
       });
   }
 
-  _throwerr(err) {
-    log(() => '_throwerr() err = ' + err);
+  throwerr(err) {
+    log(() => 'throwerr() err = ' + err);
     if (err.data && err.data.error) {
       throw new Error('Circonus IRONdb Error: ' + err.data.error);
     } else if (err.data && err.data.user_error) {
@@ -220,7 +220,8 @@ export default class IrondbDatasource {
       throw new Error('Error: ' + (err ? err.toString() : 'unknown'));
     }
   }
-  _irondbSimpleRequest(method, url, isCaql = false, isFind = false, isLimited = true) {
+
+  irondbSimpleRequest(method, url, isCaql = false, isFind = false, isLimited = true) {
     let baseUrl = this.url;
     const headers = { 'Content-Type': 'application/json' };
 
@@ -252,12 +253,12 @@ export default class IrondbDatasource {
       retry: 1,
     };
 
-    log(() => '_irondbSimpleRequest() options = ' + JSON.stringify(options));
+    log(() => 'irondbSimpleRequest() options = ' + JSON.stringify(options));
     return this.datasourceRequest(options);
   }
 
-  _irondbRequest(irondbOptions, isLimited = true) {
-    log(() => '_irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
+  irondbRequest(irondbOptions, isLimited = true) {
+    log(() => 'irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
     const headers = { 'Content-Type': 'application/json' };
     let options: any = {};
     const queries = [];
@@ -310,7 +311,7 @@ export default class IrondbDatasource {
         stream['kind'] = metrictype;
         streams.push(stream);
       }
-      log(() => '_irondbRequest() data = ' + JSON.stringify(data));
+      log(() => 'irondbRequest() data = ' + JSON.stringify(data));
       options.data = data;
       options.name = 'fetch';
       options.headers = headers;
@@ -358,15 +359,15 @@ export default class IrondbDatasource {
         queries.push(options);
       }
     }
-    log(() => '_irondbRequest() queries = ' + JSON.stringify(queries));
+    log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
     return Promise.all(
       queries.map(query =>
         this.datasourceRequest(query)
           .then(result => {
-            log(() => '_irondbRequest() query = ' + JSON.stringify(query));
-            log(() => '_irondbRequest() result = ' + JSON.stringify(result));
-            return this._convertIrondbDf4DataToGrafana(result, query);
+            log(() => 'irondbRequest() query = ' + JSON.stringify(query));
+            log(() => 'irondbRequest() result = ' + JSON.stringify(result));
+            return this.convertIrondbDf4DataToGrafana(result, query);
           })
           .then(result => {
             if (result['data'].constructor === Array) {
@@ -386,16 +387,12 @@ export default class IrondbDatasource {
       })
       .catch(err => {
         if (err.status !== 0 || err.status >= 300) {
-          this._throwerr(err);
+          this.throwerr(err);
         }
       });
   }
 
-  _buildIrondbParamsAsync(options) {
-    const cleanOptions = {};
-    const start = new Date(options.range.from).getTime() / 1000;
-    const end = new Date(options.range.to).getTime() / 1000;
-
+  getRollupSpan(options, start, end) {
     // Pick a reasonable period for CAQL
     // We assume will use something close the request interval
     // unless it would produce more than maxDataPoints / 8
@@ -420,6 +417,60 @@ export default class IrondbDatasource {
     } else {
       period = period - (period % 60);
     }
+    return period;
+  }
+
+  buildFetchParamsAsync(cleanOptions, target, start, end) {
+    const rawQuery = this.templateSrv.replace(target['query']);
+    return this.metricTagsQuery(rawQuery, false, [start, end])
+      .then(result => {
+        // Don't mix numeric results with histograms and text metrics
+        let metricFilter = 'numeric';
+        if (target['paneltype'] === 'Heatmap') {
+          metricFilter = 'histogram';
+        }
+        result.data = _.filter(result.data, metric => {
+          const metricTypes = metric.type.split(',');
+          return _.includes(metricTypes, metricFilter);
+        });
+        for (let i = 0; i < result.data.length; i++) {
+          result.data[i]['target'] = target;
+        }
+        return result.data;
+      })
+      .then(result => {
+        for (let i = 0; i < result.length; i++) {
+          result[i]['leaf_data'] = {
+            egress_function: 'average',
+            uuid: result[i]['uuid'],
+            paneltype: result[i]['target']['paneltype'],
+          };
+          if (target.egressoverride !== 'average') {
+            result[i]['leaf_data'].egress_function = target.egressoverride;
+          }
+          const leafName = result[i]['metric_name'];
+          if (target.labeltype !== 'default') {
+            let metriclabel = target.metriclabel;
+            if (target.labeltype === 'name') {
+              metriclabel = '%n';
+            } else if (target.labeltype === 'cardinality') {
+              metriclabel = '%n | %t-{*}';
+            }
+            metriclabel = metaInterpolateLabel(metriclabel, result, i);
+            metriclabel = this.templateSrv.replace(metriclabel);
+            result[i]['leaf_data'].metriclabel = metriclabel;
+          }
+          cleanOptions['std']['names'].push({ leaf_name: leafName, leaf_data: result[i]['leaf_data'] });
+        }
+        return cleanOptions;
+      });
+  }
+
+  buildIrondbParamsAsync(options) {
+    const cleanOptions = {};
+    const start = new Date(options.range.from).getTime() / 1000;
+    const end = new Date(options.range.to).getTime() / 1000;
+    const period = this.getRollupSpan(options, start, end);
 
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
@@ -445,49 +496,7 @@ export default class IrondbDatasource {
         cleanOptions['caql']['names'].push(target['query']);
         return Promise.resolve(cleanOptions);
       } else {
-        const rawQuery = this.templateSrv.replace(target['query']);
-        return this.metricTagsQuery(rawQuery, false, [start, end])
-          .then(result => {
-            // Don't mix numeric results with histograms and text metrics
-            let metricFilter = 'numeric';
-            if (target['paneltype'] === 'Heatmap') {
-              metricFilter = 'histogram';
-            }
-            result.data = _.filter(result.data, metric => {
-              const metricTypes = metric.type.split(',');
-              return _.includes(metricTypes, metricFilter);
-            });
-            for (let i = 0; i < result.data.length; i++) {
-              result.data[i]['target'] = target;
-            }
-            return result.data;
-          })
-          .then(result => {
-            for (let i = 0; i < result.length; i++) {
-              result[i]['leaf_data'] = {
-                egress_function: 'average',
-                uuid: result[i]['uuid'],
-                paneltype: result[i]['target']['paneltype'],
-              };
-              if (target.egressoverride !== 'average') {
-                result[i]['leaf_data'].egress_function = target.egressoverride;
-              }
-              const leafName = result[i]['metric_name'];
-              if (target.labeltype !== 'default') {
-                let metriclabel = target.metriclabel;
-                if (target.labeltype === 'name') {
-                  metriclabel = '%n';
-                } else if (target.labeltype === 'cardinality') {
-                  metriclabel = '%n | %t-{*}';
-                }
-                metriclabel = metaInterpolateLabel(metriclabel, result, i);
-                metriclabel = this.templateSrv.replace(metriclabel);
-                result[i]['leaf_data'].metriclabel = metriclabel;
-              }
-              cleanOptions['std']['names'].push({ leaf_name: leafName, leaf_data: result[i]['leaf_data'] });
-            }
-            return cleanOptions;
-          });
+        return this.buildFetchParamsAsync(cleanOptions, target, start, end);
       }
     });
 
@@ -496,20 +505,20 @@ export default class IrondbDatasource {
         return cleanOptions;
       })
       .catch(err => {
-        log(() => '_buildIrondbParams() err = ' + JSON.stringify(err));
+        log(() => 'buildIrondbParams() err = ' + JSON.stringify(err));
         if (err.status !== 0 || err.status >= 300) {
         }
       });
   }
 
-  _buildIrondbParams(options) {
+  buildIrondbParams(options) {
     const self = this;
     return new Promise((resolve, reject) => {
-      resolve(self._buildIrondbParamsAsync(options));
+      resolve(self.buildIrondbParamsAsync(options));
     });
   }
 
-  _convertIrondbDf4DataToGrafana(result, query) {
+  convertIrondbDf4DataToGrafana(result, query) {
     const name = query.name;
     const metricLabels = query.metricLabels || {};
     const data = result.data.data;
@@ -565,7 +574,7 @@ export default class IrondbDatasource {
     }
     for (let i = 0; i < cleanData.length; i++) {
       if (_.isUndefined(cleanData[i])) {
-        log(() => '_convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"');
+        log(() => 'convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"');
         continue;
       }
       delete cleanData[i]._ts;
