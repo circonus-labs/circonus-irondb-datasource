@@ -120,7 +120,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getCollapsedText() {
-    return this.target.query;
+    if (this.target.isCaql) {
+      return this.target.query;
+    } else {
+      return this.segmentsToCaqlFind();
+    }
   }
 
   getSegments(index, prefix) {
