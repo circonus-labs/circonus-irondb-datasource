@@ -420,19 +420,47 @@ export default class IrondbDatasource {
     return period;
   }
 
+  filterMetricsByType(target, data) {
+    // Don't mix numeric results with histograms and text metrics
+    let metricFilter = 'numeric';
+    if (target['paneltype'] === 'Heatmap') {
+      metricFilter = 'histogram';
+    }
+    return _.filter(data, metric => {
+      const metricTypes = metric.type.split(',');
+      return _.includes(metricTypes, metricFilter);
+    });
+  }
+
+  buildFetchStream(target, result, i) {
+    result[i]['leaf_data'] = {
+      egress_function: 'average',
+      uuid: result[i]['uuid'],
+      paneltype: result[i]['target']['paneltype'],
+    };
+    if (target.egressoverride !== 'average') {
+      result[i]['leaf_data'].egress_function = target.egressoverride;
+    }
+    const leafName = result[i]['metric_name'];
+    if (target.labeltype !== 'default') {
+      let metriclabel = target.metriclabel;
+      if (target.labeltype === 'name') {
+        metriclabel = '%n';
+      } else if (target.labeltype === 'cardinality') {
+        metriclabel = '%n | %t-{*}';
+      }
+      metriclabel = metaInterpolateLabel(metriclabel, result, i);
+      metriclabel = this.templateSrv.replace(metriclabel);
+      result[i]['leaf_data'].metriclabel = metriclabel;
+    }
+    return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
+  }
+
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query']);
     return this.metricTagsQuery(rawQuery, false, [start, end])
       .then(result => {
-        // Don't mix numeric results with histograms and text metrics
-        let metricFilter = 'numeric';
-        if (target['paneltype'] === 'Heatmap') {
-          metricFilter = 'histogram';
-        }
-        result.data = _.filter(result.data, metric => {
-          const metricTypes = metric.type.split(',');
-          return _.includes(metricTypes, metricFilter);
-        });
+        result.data = this.filterMetricsByType(target, result.data);
         for (let i = 0; i < result.data.length; i++) {
           result.data[i]['target'] = target;
         }
@@ -440,27 +468,7 @@ export default class IrondbDatasource {
       })
       .then(result => {
         for (let i = 0; i < result.length; i++) {
-          result[i]['leaf_data'] = {
-            egress_function: 'average',
-            uuid: result[i]['uuid'],
-            paneltype: result[i]['target']['paneltype'],
-          };
-          if (target.egressoverride !== 'average') {
-            result[i]['leaf_data'].egress_function = target.egressoverride;
-          }
-          const leafName = result[i]['metric_name'];
-          if (target.labeltype !== 'default') {
-            let metriclabel = target.metriclabel;
-            if (target.labeltype === 'name') {
-              metriclabel = '%n';
-            } else if (target.labeltype === 'cardinality') {
-              metriclabel = '%n | %t-{*}';
-            }
-            metriclabel = metaInterpolateLabel(metriclabel, result, i);
-            metriclabel = this.templateSrv.replace(metriclabel);
-            result[i]['leaf_data'].metriclabel = metriclabel;
-          }
-          cleanOptions['std']['names'].push({ leaf_name: leafName, leaf_data: result[i]['leaf_data'] });
+          cleanOptions['std']['names'].push(this.buildFetchStream(target, result, i));
         }
         return cleanOptions;
       });
