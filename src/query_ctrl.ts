@@ -3,6 +3,7 @@ import Log from './log';
 import IrondbQuery from './irondb_query';
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
+import appEvents from 'grafana/app/core/app_events';
 import './css/query_editor.css';
 
 const log = Log('IrondbQueryCtrl');
@@ -59,27 +60,41 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.updateMetricLabelValue(false);
   }
 
-  toggleEditorMode() {
-    log(() => 'toggleEditorMode()');
-    this.target.isCaql = !this.target.isCaql;
-    this.typeValueChanged();
+  resetQueryTarget() {
+    log(() => 'resetQueryTarget()');
+    this.target.isCaql = false;
+    this.target.query = '';
+    this.target.egressoverride = 'average';
+    this.target.labeltype = 'default';
+    this.emptySegments();
+    this.parseTarget();
+    this.panelCtrl.refresh();
   }
 
-  typeValueChanged() {
+  toggleEditorMode() {
+    log(() => 'toggleEditorMode()');
     if (this.target.isCaql) {
-      const caqlQuery = this.segmentsToCaqlFind();
-      this.target.query = caqlQuery;
-      log(() => 'typeValueChanged() caqlQuery = ' + caqlQuery);
+      const onConfirm = () => {
+        this.resetQueryTarget();
+      };
+      if (this.target.query === '') {
+        setTimeout(onConfirm, 0);
+      } else {
+        appEvents.emit('confirm-modal', {
+          title: 'Warning',
+          text2: 'Switching to query builder may overwrite your raw CAQL.',
+          icon: 'fa-exclamation',
+          yesText: 'Switch',
+          onConfirm: onConfirm,
+        });
+      }
     } else {
-      this.target.query = '';
-      this.target.egressoverride = 'average';
-      this.target.labeltype = 'default';
-      this.emptySegments();
-      this.parseTarget();
-      log(() => 'typeValueChanged() target reset');
+      this.target.isCaql = true;
+      const caqlQuery = this.segmentsToCaqlFind();
+      log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
+      this.target.query = caqlQuery;
+      this.panelCtrl.refresh();
     }
-    this.error = null;
-    this.panelCtrl.refresh();
   }
 
   labelTypeValueChanged() {
