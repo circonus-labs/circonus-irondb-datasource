@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import memoize from 'memoizee';
+import { Memoized } from 'memoizee';
 import { metaInterpolateLabel } from './irondb_query';
 
 const log = Log('IrondbDatasource');
@@ -22,6 +23,7 @@ export default class IrondbDatasource {
   basicAuth: any;
   withCredentials: any;
   datasourceRequest: (options: any) => any;
+  queryRange: any;
 
   static readonly DEFAULT_CACHE_ENTRIES = 128;
   static readonly DEFAULT_CACHE_TIME_MS = 60000;
@@ -90,6 +92,16 @@ export default class IrondbDatasource {
 
   query(options) {
     log(() => 'query() options = ' + JSON.stringify(options));
+
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(options.rangeRaw, this.queryRange)) {
+      log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.rangeRaw));
+      if (this.useCaching) {
+        log(() => 'query() clearing cache');
+        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        requestCache.clear();
+      }
+    }
+    this.queryRange = options.rangeRaw;
 
     if (_.isEmpty(options['targets'][0])) {
       return this.$q.when({ data: [] });
