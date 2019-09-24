@@ -566,11 +566,11 @@ export default class IrondbDatasource {
             const v = parseFloat(vstr);
             vstr = v.toString();
             const tsstr = ts.toString();
-            if (lookaside[vstr] === null) {
+            if (_.isUndefined(lookaside[vstr])) {
               lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
               cleanData.push(lookaside[vstr]);
             }
-            if (lookaside[vstr]._ts[tsstr] === null) {
+            if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
               lookaside[vstr]._ts[tsstr] = [cnt, ts];
               lookaside[vstr].datapoints.push(lookaside[vstr]._ts[tsstr]);
             } else {
