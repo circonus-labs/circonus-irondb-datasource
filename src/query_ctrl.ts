@@ -1,141 +1,125 @@
-///<reference path="../node_modules/grafana-sdk-mocks/app/headers/common.d.ts" />
-
 import _ from 'lodash';
+import Log from './log';
 import IrondbQuery from './irondb_query';
-import {SegmentType,taglessName,decodeTag,encodeTag} from './irondb_query';
-import {QueryCtrl} from 'app/plugins/sdk';
-import './css/query_editor.css!';
+import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
+import { QueryCtrl } from 'grafana/app/plugins/sdk';
+import appEvents from 'grafana/app/core/app_events';
+import './css/query_editor.css';
 
+const log = Log('IrondbQueryCtrl');
 
-function isEven(x) {
-  return x % 2 == 0;
+function escapeRegExp(regexp) {
+  return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
 }
-
-/*const changePanelType = (dashboard, oldPanel, newPluginId: string) => {
-  const index = dashboard.panels.findIndex(panel => {
-    return panel.id === oldPanel.id;
-  });
-
-  const deletedPanel = dashboard.panels.splice(index, 1);
-  dashboard.events.emit('panel-removed', deletedPanel);
-
-  var newPanel = oldPanel.getSaveModel();
-  console.log(newPanel.type);
-  newPanel.type = newPluginId;
-  console.log(newPanel.type);
-  console.log(newPanel.events);
-  console.log(newPanel.id + " " + oldPanel.id);
-  newPanel = new oldPanel.constructor(newPanel);
-  console.log(newPanel.events);
-  console.log(newPanel.type);
-
-  dashboard.panels.splice(index, 0, newPanel);
-  dashboard.sortPanelsByGridPos();
-  dashboard.events.emit('panel-added', newPanel);
-};*/
 
 export class IrondbQueryCtrl extends QueryCtrl {
   static templateUrl = 'partials/query.editor.html';
 
-  defaults = {
-  };
+  defaults = {};
   queryModel: IrondbQuery;
-  labelTypeOptions = [ { value: "default", text: "name and tags" },
-                       { value: "name", text: "name only" },
-                       { value: "cardinality", text: "high cardinality tags" },
-                       { value: "custom", text: "custom" } ];
-  egressTypeOptions = [ { value: "count", text: "number of data points (count)" },
-                        { value: "average", text: "average value (gauge)" },
-                        { value: "average_stddev", text: "standard deviation a.k.a. σ (stddev)" },
-                        { value: "derive", text: "rate of change (derive)" },
-                        { value: "derive_stddev", text: "rate of change σ (derive_stddev)" },
-                        { value: "counter", text: "rate of positive change (counter)" },
-                        { value: "counter_stddev", text: "rate of positive change σ (counter_stddev)" } ];
+  labelTypeOptions = [
+    { value: 'default', text: 'name and tags' },
+    { value: 'name', text: 'name only' },
+    { value: 'cardinality', text: 'high cardinality tags' },
+    { value: 'custom', text: 'custom' },
+  ];
+  egressTypeOptions = [
+    { value: 'count', text: 'number of data points (count)' },
+    { value: 'average', text: 'average value (gauge)' },
+    { value: 'average_stddev', text: 'standard deviation a.k.a. σ (stddev)' },
+    { value: 'derive', text: 'rate of change (derive)' },
+    { value: 'derive_stddev', text: 'rate of change σ (derive_stddev)' },
+    { value: 'counter', text: 'rate of positive change (counter)' },
+    { value: 'counter_stddev', text: 'rate of positive change σ (counter_stddev)' },
+  ];
   caqlFindFunctions = {
-                        count: "count",
-                        average: "average",
-                        average_stddev: "stddev",
-                        derive: "derivative",
-                        derive_stddev: "derivative_stddev",
-                        counter: "counter",
-                        counter_stddev: "counter_stddev" };
+    count: 'count',
+    average: 'average',
+    average_stddev: 'stddev',
+    derive: 'derivative',
+    derive_stddev: 'derivative_stddev',
+    counter: 'counter',
+    counter_stddev: 'counter_stddev',
+  };
   segments: any[];
 
-  /** @ngInject **/
+  /** @ngInject */
   constructor($scope, $injector, private uiSegmentSrv, private templateSrv) {
     super($scope, $injector);
 
     _.defaultsDeep(this.target, this.defaults);
     this.target.isCaql = this.target.isCaql || false;
-    this.target.egressoverride = this.target.egressoverride || "average";
-    this.target.metriclabel = this.target.metriclabel || "";
-    this.target.labeltype = this.target.labeltype || "default";
+    this.target.egressoverride = this.target.egressoverride || 'average';
+    this.target.metriclabel = this.target.metriclabel || '';
+    this.target.labeltype = this.target.labeltype || 'default';
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.paneltype = this.panelCtrl.pluginName;
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
-    /*console.log("TYPE " + this.panelCtrl.pluginName + " " + this.panelCtrl.pluginId);
-    console.log(this.panel.constructor);
-    console.log(window["PanelModel"]);
-    console.log(eval("new PanelModel()"));*/
+  }
+
+  resetQueryTarget() {
+    log(() => 'resetQueryTarget()');
+    this.target.isCaql = false;
+    this.target.query = '';
+    this.target.egressoverride = 'average';
+    this.target.labeltype = 'default';
+    this.emptySegments();
+    this.parseTarget();
+    this.panelCtrl.refresh();
   }
 
   toggleEditorMode() {
-    //console.log("toggleEditorMode()");
-    this.target.isCaql = !this.target.isCaql;
-    this.typeValueChanged();
-    /*var newPanel = this.panel.getSaveModel();
-    newPanel.type = "heatmap";
-    this.isHistogram = !this.isHistogram;
-    changePanelType(this.panelCtrl.dashboard, this.panel, this.isHistogram ? "heatmap" : "graph");
-    this.panel.changeType(this.isHistogram ? "heatmap" : "graph");
-    this.panel.initialized();
-    this.panelCtrl.refresh();
-    this.panel.render();*/
-  }
-
-  typeValueChanged() {
+    log(() => 'toggleEditorMode()');
     if (this.target.isCaql) {
-      var caqlQuery = this.segmentsToCaqlFind();
+      const onConfirm = () => {
+        this.resetQueryTarget();
+      };
+      if (this.target.query === '') {
+        setTimeout(onConfirm, 0);
+      } else {
+        appEvents.emit('confirm-modal', {
+          title: 'Warning',
+          text2: 'Switching to query builder may overwrite your raw CAQL.',
+          icon: 'fa-exclamation',
+          yesText: 'Switch',
+          onConfirm: onConfirm,
+        });
+      }
+    } else {
+      this.target.isCaql = true;
+      const caqlQuery = this.segmentsToCaqlFind();
+      log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
       this.target.query = caqlQuery;
-      //console.log("typeValueChanged() CAQL " + caqlQuery);
+      this.panelCtrl.refresh();
     }
-    else {
-      this.target.query = "";
-      this.target.egressoverride = "average";
-      this.target.labeltype = "default";
-      this.emptySegments();
-      this.parseTarget();
-    }
-    this.error = null;
-    this.panelCtrl.refresh();
   }
 
   labelTypeValueChanged() {
-    if (this.target.labeltype === "custom") {
-      setTimeout(function() {
-        document.getElementById("metriclabel").focus();
+    if (this.target.labeltype === 'custom') {
+      setTimeout(() => {
+        document.getElementById('metriclabel').focus();
       }, 50);
     }
     this.panelCtrl.refresh();
   }
 
   metricLabelKeyUp(event) {
-    var self = this;
-    var element = event.currentTarget;
+    const self = this;
+    const element = event.currentTarget;
     if (event.keyCode === 13) {
-      setTimeout(function() {
+      setTimeout(() => {
         self.target.metriclabel = element.value;
         self.updateMetricLabelValue();
       }, 0);
     }
   }
 
-  updateMetricLabelValue(refresh: boolean = true) {
-    if (this.target.metriclabel === "" && this.target.labeltype === "custom") {
-      this.target.labeltype = "default";
+  updateMetricLabelValue(refresh = true) {
+    if (this.target.metriclabel === '' && this.target.labeltype === 'custom') {
+      this.target.labeltype = 'default';
     }
     if (refresh) {
       this.panelCtrl.refresh();
@@ -151,133 +135,125 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getCollapsedText() {
-    return this.target.query;
+    if (this.target.isCaql) {
+      return this.target.query;
+    } else {
+      return this.segmentsToCaqlFind();
+    }
   }
 
   getSegments(index, prefix) {
-    //console.log("getSegments() " + index + " " + prefix);
-    var query = prefix && prefix.length > 0 ? prefix : '';
+    log(() => 'getSegments() ' + index + ' prefix = ' + prefix);
+    let query = prefix && prefix.length > 0 ? prefix : '';
 
-    var segmentType = this.segments[index]._type;
-    //console.log("getSegments() " + index + " " + SegmentType[segmentType]);
+    const segmentType = this.segments[index]._type;
+    log(() => 'getSegments() ' + index + ' SegmentType = ' + SegmentType[segmentType]);
     if (segmentType === SegmentType.MetricName) {
       if (encodeTag(SegmentType.MetricName, query) !== query) {
-        query = 'b/' + btoa(this.escapeRegExp(query)) + '/';
-      }
-      else {
+        query = 'b/' + btoa(escapeRegExp(query)) + '/';
+      } else {
         query += '*';
       }
       return this.datasource
-        .metricTagsQuery("and(__name:" + query + ")", true)
-        .then( results => {
-          var metricnames = _.map(results.data, result => {
+        .metricTagsQuery('and(__name:' + query + ')', true)
+        .then(results => {
+          let metricnames = _.map(results.data, result => {
             return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
-          //console.log(JSON.stringify(metricnames));
+          log(() => 'getSegments() metricnames = ' + JSON.stringify(metricnames));
 
-          var allSegments = _.map(metricnames, segment => {
-            //var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-
+          const allSegments = _.map(metricnames, segment => {
             return this.newSegment(SegmentType.MetricName, {
-              value: segment, //.replace(queryRegExp,''),
-              expandable: true//!segment.leaf,
+              value: segment,
+              expandable: true,
             });
           });
-
-          /*if (index > 0 && allSegments.length === 0) {
-            return allSegments;
-          }*/
-
-          // add query references
-          if (index === 0) {
-            _.eachRight(this.panelCtrl.panel.targets, target => {
-              if (target.refId === this.queryModel.target.refId) {
-                return;
-              }
-            });
-          }
-
           return allSegments;
         })
         .catch(err => {
-          //console.log("getSegments() " + err.toString());
+          log(() => 'getSegments() err = ' + err.toString());
           return [];
         });
-    }
-    else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
-      var metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
-      //console.log("getSegments() tags for " + metricName);
+    } else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
+      const metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
+      log(() => 'getSegments() tags for ' + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
         .then(segments => {
           if (segments.data && segments.data.length > 0) {
-            var tagCats = segments.data;
-            var tagSegments = [];
-            for(var tagCat of tagCats) {
-              tagSegments.push(this.newSegment(SegmentType.TagCat, {
-                value: decodeTag(tagCat),
-                expandable: true
-              }));
+            const tagCats = segments.data;
+            const tagSegments = [];
+            for (const tagCat of tagCats) {
+              tagSegments.push(
+                this.newSegment(SegmentType.TagCat, {
+                  value: decodeTag(tagCat),
+                  expandable: true,
+                })
+              );
             }
-            if( segmentType === SegmentType.TagPlus ) {
-                // For Plus, we want to allow new operators, so put those on the front
-                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "and(" }) );
-                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "not(" }) );
-                tagSegments.unshift( this.newSegment(SegmentType.TagOp, { value: "or("  }) );
+            if (segmentType === SegmentType.TagPlus) {
+              // For Plus, we want to allow new operators, so put those on the front
+              tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'and(' }));
+              tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'not(' }));
+              tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'or(' }));
             }
             return tagSegments;
           }
         })
         .catch(err => {
-          //console.log(err);
+          log(() => 'getSegments() err = ' + err);
           return [];
         });
-    }
-    else if (segmentType === SegmentType.TagOp) {
-        var tagSegments = [
-            this.newSegment(SegmentType.TagOp, { value: "REMOVE" }),
-            this.newSegment(SegmentType.TagOp, { value: "and(" }),
-            this.newSegment(SegmentType.TagOp, { value: "not(" }),
-            this.newSegment(SegmentType.TagOp, { value: "or("  })
-        ];
-        return Promise.resolve(tagSegments);
-    }
-    else if (segmentType === SegmentType.TagVal) {
-      var metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
-      var tagCat = this.segments[index - 2].value;
-      if (tagCat === "select tag") {
+    } else if (segmentType === SegmentType.TagOp) {
+      const tagSegments = [
+        this.newSegment(SegmentType.TagOp, { value: 'REMOVE' }),
+        this.newSegment(SegmentType.TagOp, { value: 'and(' }),
+        this.newSegment(SegmentType.TagOp, { value: 'not(' }),
+        this.newSegment(SegmentType.TagOp, { value: 'or(' }),
+      ];
+      return Promise.resolve(tagSegments);
+    } else if (segmentType === SegmentType.TagVal) {
+      const metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
+      const tagCat = this.segments[index - 2].value;
+      if (tagCat === 'select tag') {
         return Promise.resolve([]);
       }
-      //console.log("getSegments() tag vals for " + metricName + ", " + tagCat);
+      log(() => 'getSegments() tag vals for ' + metricName + ', ' + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
         .then(segments => {
           if (segments.data && segments.data.length > 0) {
-            var tagVals = segments.data;
-            var tagSegments = [];
-            tagSegments.push(this.newSegment(SegmentType.TagVal, {
-              value: '*',
-              expandable: true
-            }));
+            const tagVals = segments.data;
+            const tagSegments = [];
+            tagSegments.push(
+              this.newSegment(SegmentType.TagVal, {
+                value: '*',
+                expandable: true,
+              })
+            );
             _.eachRight(this.templateSrv.variables, variable => {
-                tagSegments.push(this.newSegment(SegmentType.TagVal, {
+              tagSegments.push(
+                this.newSegment(SegmentType.TagVal, {
                   type: 'template',
                   value: '$' + variable.name,
                   expandable: true,
-                }));
+                })
+              );
             });
-            for(var tagVal of tagVals) {
-              tagSegments.push(this.newSegment(SegmentType.TagVal, {
-                value: decodeTag(tagVal),
-                expandable: true
-              }));
+            for (const tagVal of tagVals) {
+              tagSegments.push(
+                this.newSegment(SegmentType.TagVal, {
+                  value: decodeTag(tagVal),
+                  expandable: true,
+                })
+              );
             }
             return tagSegments;
           }
         })
         .catch(err => {
-          //console.log(err);
+          log(() => 'getSegments() err = ' + err);
           return [];
         });
     }
@@ -296,50 +272,45 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   newSegment(type: SegmentType, options: any) {
-    var segment = this.uiSegmentSrv.newSegment(options);
+    const segment = this.uiSegmentSrv.newSegment(options);
     return this.setSegmentType(segment, type);
   }
 
   mapSegment(segment) {
-    var uiSegment;
+    let uiSegment;
     if (segment.type === SegmentType.TagOp) {
       uiSegment = this.uiSegmentSrv.newOperator(segment.value);
-    }
-    else if (segment.type === SegmentType.TagEnd) {
-      uiSegment = this.uiSegmentSrv.newOperator(")");
-    }
-    else if (segment.type === SegmentType.TagPair) {
-      uiSegment = this.uiSegmentSrv.newCondition(":");
-    }
-    else if (segment.type === SegmentType.TagSep) {
-      uiSegment = this.uiSegmentSrv.newCondition(",");
-    }
-    else if (segment.type === SegmentType.TagPlus) {
+    } else if (segment.type === SegmentType.TagEnd) {
+      uiSegment = this.uiSegmentSrv.newOperator(')');
+    } else if (segment.type === SegmentType.TagPair) {
+      uiSegment = this.uiSegmentSrv.newCondition(':');
+    } else if (segment.type === SegmentType.TagSep) {
+      uiSegment = this.uiSegmentSrv.newCondition(',');
+    } else if (segment.type === SegmentType.TagPlus) {
       uiSegment = this.buildSelectTagPlusSegment();
-    }
-    else {
+    } else {
       uiSegment = this.uiSegmentSrv.newSegment(segment);
     }
     return this.setSegmentType(uiSegment, segment.type);
   }
 
   buildSegments() {
-    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
+    this.segments = _.map(this.queryModel.segments, s => this.mapSegment(s));
+    log(() => 'buildSegments()');
 
-    let checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
+    const checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
     this.checkOtherSegments(checkOtherSegmentsIndex);
   }
 
   addSelectMetricSegment() {
     this.queryModel.addSelectMetricSegment();
-    var segment = this.uiSegmentSrv.newSelectMetric();
+    const segment = this.uiSegmentSrv.newSelectMetric();
     this.setSegmentType(segment, SegmentType.MetricName);
     this.segments.push(segment);
   }
 
   buildSelectTagPlusSegment() {
-    //this.queryModel.addSelectMetricSegment();
-    var tagCatSegment = this.uiSegmentSrv.newPlusButton();
+    const tagCatSegment = this.uiSegmentSrv.newPlusButton();
     this.setSegmentType(tagCatSegment, SegmentType.TagPlus);
     return tagCatSegment;
   }
@@ -349,15 +320,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   newSelectTagValSegment() {
-    var tagValSegment = this.uiSegmentSrv.newKeyValue("*");
+    const tagValSegment = this.uiSegmentSrv.newKeyValue('*');
     this.setSegmentType(tagValSegment, SegmentType.TagVal);
     return tagValSegment;
   }
 
   checkOtherSegments(fromIndex) {
     if (fromIndex === this.segments.length) {
-      var segmentType = this.segments[fromIndex - 1]._type;
-      //console.log("checkOtherSegments() " + (fromIndex - 1) + " " + SegmentType[segmentType]);
+      const segmentType = this.segments[fromIndex - 1]._type;
+      log(() => 'checkOtherSegments() ' + (fromIndex - 1) + ' SegmentType = ' + SegmentType[segmentType]);
       if (segmentType === SegmentType.MetricName) {
         this.addSelectTagPlusSegment();
       }
@@ -372,98 +343,98 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentValueChanged(segment, segmentIndex) {
-    //console.log("segmentValueChanged()");
+    log(() => 'segmentValueChanged()');
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
-    if( segment._type === SegmentType.TagOp ) {
-        if( segment.value === "REMOVE" ) {
-            // We need to remove ourself, as well as every other segment until our TagEnd
-            // For every TagOp we hit, we need to get one more TagEnd to remove any sub-ops
-            var endIndex = segmentIndex + 1;
-            var endsNeeded = 1;
-            var lastIndex = this.segments.length;
-            while( endsNeeded > 0 && endIndex < lastIndex) {
-                var type = this.segments[endIndex]._type;
-                if( type === SegmentType.TagOp ) {
-                    endsNeeded++;
-                } else if( type === SegmentType.TagEnd ) {
-                    endsNeeded--;
-                    if( endsNeeded == 0 ) {
-                        break; // don't increment endIndex
-                    } 
-                }
-                endIndex++; // keep going
+    if (segment._type === SegmentType.TagOp) {
+      if (segment.value === 'REMOVE') {
+        // We need to remove ourself, as well as every other segment until our TagEnd
+        // For every TagOp we hit, we need to get one more TagEnd to remove any sub-ops
+        let endIndex = segmentIndex + 1;
+        let endsNeeded = 1;
+        const lastIndex = this.segments.length;
+        while (endsNeeded > 0 && endIndex < lastIndex) {
+          const type = this.segments[endIndex]._type;
+          if (type === SegmentType.TagOp) {
+            endsNeeded++;
+          } else if (type === SegmentType.TagEnd) {
+            endsNeeded--;
+            if (endsNeeded === 0) {
+              break; // don't increment endIndex
             }
-            let deleteStart = segmentIndex;
-            let countDelete = endIndex - segmentIndex + 1;
-            if( segmentIndex > 2 ) {
-                // If I'm not the very first operator, then i have a comma in front of me that needs killing
-                deleteStart--;
-                countDelete++;
-            }
-            this.segments.splice( deleteStart, countDelete );
-            if( lastIndex === endIndex + 1 ) { 
-                // If these match, we removed the outermost operator, so we need a new + button
-                this.segments.push( this.buildSelectTagPlusSegment() );
-            }
+          }
+          endIndex++; // keep going
         }
-        // else Changing an Operator doesn't need to affect any other segments
-        this.targetChanged();
+        let deleteStart = segmentIndex;
+        let countDelete = endIndex - segmentIndex + 1;
+        if (segmentIndex > 2) {
+          // If I'm not the very first operator, then i have a comma in front of me that needs killing
+          deleteStart--;
+          countDelete++;
+        }
+        this.segments.splice(deleteStart, countDelete);
+        if (lastIndex === endIndex + 1) {
+          // If these match, we removed the outermost operator, so we need a new + button
+          this.segments.push(this.buildSelectTagPlusSegment());
+        }
+      }
+      // else Changing an Operator doesn't need to affect any other segments
+      this.targetChanged();
+      return;
+    } else if (segment._type === SegmentType.TagPlus) {
+      if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
+        // Remove myself
+        this.segments.splice(segmentIndex, 1);
+        if (segmentIndex > 2) {
+          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
+        }
+        // and replace it with a TagOp + friends
+        this.segments.splice(
+          segmentIndex + 1,
+          0,
+          this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
+          this.mapSegment({ type: SegmentType.TagCat, value: 'select tag', fake: true }),
+          this.mapSegment({ type: SegmentType.TagPair }),
+          this.newSelectTagValSegment(),
+          this.buildSelectTagPlusSegment(),
+          this.mapSegment({ type: SegmentType.TagEnd })
+        );
+        if (segmentIndex > 2) {
+          this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
+        }
+        // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
+        this.setSegmentFocus(segmentIndex + 3);
         return;
-    }
-    else if( segment._type === SegmentType.TagPlus ) {
-        if( segment.value === "and(" ||
-            segment.value === "not(" ||
-            segment.value === "or(" )
-        {
-            // Remove myself
-            this.segments.splice(segmentIndex, 1);
-            if( segmentIndex > 2 ) {
-                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
-            }
-            // and replace it with a TagOp + friends
-            this.segments.splice(segmentIndex + 1, 0,
-                this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-                this.mapSegment({ type: SegmentType.TagCat, value: "select tag", fake: true }),
-                this.mapSegment({ type: SegmentType.TagPair }),
-                this.newSelectTagValSegment(),
-                this.buildSelectTagPlusSegment(),
-                this.mapSegment({ type: SegmentType.TagEnd })
-             );
-             if( segmentIndex > 2 ) {
-                 this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment() );
-             }
-             // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
-             this.setSegmentFocus(segmentIndex + 3);
-             return;
-        } else {
-            // Remove myself
-            this.segments.splice(segmentIndex, 1);
-            if( segmentIndex > 2 ) {
-                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
-            }
-            // and replace it with a TagOp + friends
-            this.segments.splice(segmentIndex + 1, 0,
-                this.mapSegment({ type: SegmentType.TagCat, value: segment.value }),
-                this.mapSegment({ type: SegmentType.TagPair }),
-                this.newSelectTagValSegment(),
-                this.buildSelectTagPlusSegment()
-            );
-
-            if( segmentIndex == 1 ) {
-                // if index is 1 (immediatley after metric name), it's the first add and we're a tagCat 
-                // so that means we need to add in the implicit and() in the front
-                this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagOp, value: "and(" }));
-                this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
-            }
-            // Fall through so targetChanged gets called
+      } else {
+        // Remove myself
+        this.segments.splice(segmentIndex, 1);
+        if (segmentIndex > 2) {
+          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
         }
+        // and replace it with a TagOp + friends
+        this.segments.splice(
+          segmentIndex + 1,
+          0,
+          this.mapSegment({ type: SegmentType.TagCat, value: segment.value }),
+          this.mapSegment({ type: SegmentType.TagPair }),
+          this.newSelectTagValSegment(),
+          this.buildSelectTagPlusSegment()
+        );
+
+        if (segmentIndex === 1) {
+          // if index is 1 (immediatley after metric name), it's the first add and we're a tagCat
+          // so that means we need to add in the implicit and() in the front
+          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagOp, value: 'and(' }));
+          this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
+        }
+        // Fall through so targetChanged gets called
+      }
     }
 
-    if( segmentIndex == 0 ) {
-        // If we changed the start metric, all the filters are invalid
-        this.spliceSegments(segmentIndex + 1);
+    if (segmentIndex === 0) {
+      // If we changed the start metric, all the filters are invalid
+      this.spliceSegments(segmentIndex + 1);
     }
 
     if (segment.expandable) {
@@ -471,7 +442,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.setSegmentFocus(segmentIndex + 1);
         this.targetChanged();
       });
-    } 
+    }
 
     this.setSegmentFocus(segmentIndex + 1);
     this.targetChanged();
@@ -488,56 +459,54 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentsToStreamTags() {
-    var segments = this.segments.slice();
+    const segments = this.segments.slice();
     // First element is always metric name
-    var metricName = segments.shift().value;
-    var query = "and(__name:" + encodeTag(SegmentType.MetricName, metricName);
-    var noComma = false; // because last was a tag:pair
-    for ( let segment of segments ) {
-        let type = segment._type;
-        if( type === SegmentType.TagPlus ) {
-            continue;
-        }
-        if( !noComma && type !== SegmentType.TagEnd && type !==SegmentType.TagSep ) {
-            query += ","
-        }
-        if( type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep ) { 
-            noComma = true; 
-        } else { 
-            noComma = false; 
-        }
+    const metricName = segments.shift().value;
+    let query = 'and(__name:' + encodeTag(SegmentType.MetricName, metricName);
+    let noComma = false; // because last was a tag:pair
+    for (const segment of segments) {
+      const type = segment._type;
+      if (type === SegmentType.TagPlus) {
+        continue;
+      }
+      if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
+        query += ',';
+      }
+      if (type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep) {
+        noComma = true;
+      } else {
+        noComma = false;
+      }
 
-        query += encodeTag(type, segment.value);
+      query += encodeTag(type, segment.value);
     }
-    query += ")";
+    query += ')';
     return query;
   }
 
   queryFunctionToCaqlFind() {
-    if (this.target.paneltype === "Heatmap") {
-      return "find:histogram";
+    if (this.target.paneltype === 'Heatmap') {
+      return 'find:histogram';
     }
-    var findFunction = "find";
-    var egressOverride = this.target.egressoverride;
-    if (egressOverride !== "average" ) {
+    let findFunction = 'find';
+    let egressOverride = this.target.egressoverride;
+    if (egressOverride !== 'average') {
       egressOverride = this.caqlFindFunctions[egressOverride];
-      findFunction += ":" + egressOverride;
+      findFunction += ':' + egressOverride;
     }
     return findFunction;
   }
 
   buildCaqlLabel() {
-    var labeltype = this.target.labeltype;
-    var metriclabel = this.target.metriclabel;
-    if (labeltype !== "default") {
-      if (labeltype === "custom" && metriclabel !== "") {
-        metriclabel = metriclabel.replace(/'/g, "\"");
+    const labeltype = this.target.labeltype;
+    let metriclabel = this.target.metriclabel;
+    if (labeltype !== 'default') {
+      if (labeltype === 'custom' && metriclabel !== '') {
+        metriclabel = metriclabel.replace(/'/g, '"');
         return " | label('" + metriclabel + "')";
-      }
-      else if (labeltype === "name") {
+      } else if (labeltype === 'name') {
         return " | label('%n')";
-      }
-      else if (labeltype === "cardinality") {
+      } else if (labeltype === 'cardinality') {
         return " | label('%n | %t-{*}')";
       }
     }
@@ -546,76 +515,61 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentsToCaqlFind() {
-    var segments = this.segments.slice();
+    const segments = this.segments.slice();
     // First element is always metric name
-    var metricName = segments.shift().value;
-    var tagless = segments.length === 1 && segments[0]._type == SegmentType.TagPlus;
-    if (metricName === "*" && tagless) {
-      return "";
+    const metricName = segments.shift().value;
+    const tagless = segments.length === 1 && segments[0]._type === SegmentType.TagPlus;
+    if (metricName === '*' && tagless) {
+      return '';
     }
-    var query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
+    let query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
     if (tagless) {
-      query += ")" + this.buildCaqlLabel();
+      query += ')' + this.buildCaqlLabel();
       return query;
     }
-    var firstTag = true;
-    var noComma = false; // because last was a tag:pair
-    for ( let segment of segments ) {
-        let type = segment._type;
-        if( type === SegmentType.TagPlus ) {
-            continue;
+    let firstTag = true;
+    let noComma = false; // because last was a tag:pair
+    for (const segment of segments) {
+      const type = segment._type;
+      if (type === SegmentType.TagPlus) {
+        continue;
+      }
+      if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
+        query += ',';
+        if (firstTag) {
+          query += " '";
+          firstTag = false;
         }
-        if( !noComma && type !== SegmentType.TagEnd && type !==SegmentType.TagSep ) {
-            query += ","
-            if (firstTag) {
-              query += " '";
-              firstTag = false;
-            }
-        }
-        if( type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep ) {
-            noComma = true;
-        } else {
-            noComma = false;
-        }
+      }
+      if (type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep) {
+        noComma = true;
+      } else {
+        noComma = false;
+      }
 
-        query += encodeTag(type, segment.value);
+      query += encodeTag(type, segment.value);
     }
     query += "')" + this.buildCaqlLabel();
     return query;
   }
 
   updateModelTarget() {
-    var streamTags = this.segmentsToStreamTags();
-    //console.log("updateModelTarget() " + streamTags);
-    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    const streamTags = this.segmentsToStreamTags();
+    log(() => 'updateModelTarget() streamTags = ' + streamTags);
     this.queryModel.target.query = streamTags;
   }
 
   targetChanged() {
-    //console.log("targetChanged()");
+    log(() => 'targetChanged()');
     if (this.queryModel.error) {
       return;
     }
 
-    var oldTarget = this.queryModel.target.query;
+    const oldTarget = this.queryModel.target.query;
     this.updateModelTarget();
 
     if (this.queryModel.target !== oldTarget) {
       this.panelCtrl.refresh();
     }
   }
-
-  showDelimiter(index) {
-    return index !== this.segments.length - 1;
-  }
-
-  escapeRegExp(regexp) {
-    return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
-  }
-}
-
-function mapToDropdownOptions(results) {
-  return _.map(results, value => {
-    return { text: value, value: value };
-  });
 }

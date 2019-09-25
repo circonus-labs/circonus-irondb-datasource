@@ -1,4 +1,18 @@
 
+## 0.9.1
+
+ * Support for IRONdb activity tracking
+ * Add client-side caching of requests
+ * Upgrade to new Grafana plugin TypeScript SDK
+ * Use IRONdb /fetch API
+ * Handle Base64 encoded metrics correctly
+ * Native histogram support
+ * Support for custom metric labels and CAQL label interpolation syntax
+
+## 0.9.0
+
+ * New version of plugin that is fully IRONdb native without using Graphite APIs.
+
 ## 0.8.7
 
  * Use Grafana dropdown control rather than `select` element

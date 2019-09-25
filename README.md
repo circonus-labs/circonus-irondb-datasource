@@ -1,6 +1,6 @@
 # IRONdb Datasource
 
-This is the plugin for IRONdb 0.11.9 and newer. It is evolving and we continue to track its API.
+This is the plugin for IRONdb 0.17.1 and newer. It is evolving and we continue to track its API.
 
 Read more about IRONdb here:
 
@@ -92,7 +92,7 @@ Your new template variable should now appear in the query builder!
 
 # Development
 
-The build process requires node, npm, typescrypt, and tslint
+The build process requires node, npm, yarn, typescrypt, and tslint
 
 On Cent7 setup:
 
@@ -100,13 +100,11 @@ On Cent7 setup:
 # One time setup
 sudo yum install node bzip2
 sudo npm install -g typescript tslint
-npm install .
-npm install grunt
-npm install load-grunt-tasks
+yarn
 
 # Build
-./node_modules/grunt/bin/grunt
+yarn build
 
 # Test
-./docker-up
+yarn test
 ```

@@ -3,35 +3,21 @@
   "version": "0.8.7",
   "description": "IRONdb Data Source for Grafana.",
   "scripts": {
-    "build": "grunt",
-    "test": "./node_modules/karma/bin/karma start"
+    "build": "grafana-toolkit plugin:build",
+    "test": "grafana-toolkit plugin:test",
+    "dev": "grafana-toolkit plugin:dev",
+    "watch": "grafana-toolkit plugin:dev --watch"
   },
   "author": "Circonus",
-  "license": "BSD 3-clause",
+  "license": "BSD-3-clause",
   "dependencies": {
-    "load-grunt-tasks": "^4.0.0",
-    "lodash": "^4.17.4",
-    "moment": "^2.18.1",
-    "q": "^1.5.0",
-    "systemjs": "^0.19.47"
+    "memoizee": "^0.4.14"
   },
   "devDependencies": {
-    "@types/lodash": "^4.14.74",
-    "grafana-sdk-mocks": "github:grafana/grafana-sdk-mocks",
-    "grunt": "^1.0.4",
-    "grunt-contrib-clean": "^1.1.0",
-    "grunt-contrib-copy": "^1.0.0",
-    "grunt-contrib-watch": "^1.0.0",
-    "grunt-typescript": "^0.8.0",
-    "karma": "^1.7.0",
-    "karma-chrome-launcher": "^2.2.0",
-    "karma-expect": "^1.1.3",
-    "karma-mocha": "^1.3.0",
-    "karma-phantomjs-launcher": "^1.0.4",
-    "karma-sinon": "^1.0.5",
-    "karma-systemjs": "^0.16.0",
-    "plugin-typescript": "^7.1.0",
-    "sinon": "^3.2.1",
-    "systemjs-plugin-css": "^0.1.35"
+    "@grafana/data": "^6.4.0-beta.1",
+    "@grafana/ui": "^6.4.0-beta.1",
+    "@grafana/toolkit": "^6.4.0-beta.1",
+    "@types/grafana": "github:CorpGlory/types-grafana.git",
+    "@types/memoizee": "^0.4.2"
   }
 }
