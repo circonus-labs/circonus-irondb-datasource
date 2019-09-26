@@ -404,7 +404,7 @@ export default class IrondbDatasource {
       });
   }
 
-  getRollupSpan(options, start, end) {
+  getRollupSpan(options, start, end, isCaql) {
     // Pick a reasonable period for CAQL
     // We assume will use something close the request interval
     // unless it would produce more than maxDataPoints / 8
@@ -419,15 +419,17 @@ export default class IrondbDatasource {
     // that will make it pretty.
     const align = [86400, 3600, 1800, 1200, 900, 300, 60, 30, 15, 10, 5, 1];
     for (const j in align) {
-      if (period > 1000 * align[j]) {
-        period = Math.floor(period / (1000 * align[j])) * (1000 * align[j]);
+      if (period > align[j]) {
+        period = Math.floor(period / align[j]) * align[j];
         break;
       }
     }
-    if (period < 60) {
-      period = 60;
-    } else {
-      period = period - (period % 60);
+    if (isCaql) {
+      if (period < 60) {
+        period = 60;
+      } else {
+        period = period - (period % 60);
+      }
     }
     return period;
   }
@@ -490,18 +492,17 @@ export default class IrondbDatasource {
     const cleanOptions = {};
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
-    const period = this.getRollupSpan(options, start, end);
 
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
     cleanOptions['std']['end'] = end;
     cleanOptions['std']['names'] = [];
-    cleanOptions['std']['interval'] = period;
+    cleanOptions['std']['interval'] = this.getRollupSpan(options, start, end, false);
     cleanOptions['caql'] = {};
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
     cleanOptions['caql']['names'] = [];
-    cleanOptions['caql']['interval'] = period;
+    cleanOptions['caql']['interval'] = this.getRollupSpan(options, start, end, true);
 
     const targets = _.reject(options.targets, target => {
       return target.hide || !target['query'] || target['query'].length === 0;
