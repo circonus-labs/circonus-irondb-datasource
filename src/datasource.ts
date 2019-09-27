@@ -16,7 +16,7 @@ const DURATION_UNITS = {
 };
 
 function parseDurationMs(duration: string): number {
-  if (!/^[0-9]+(ms|s|m|h|d)?$/g.test(duration)) {
+  if (!/^[0-9]+(ms|s|m|h|d)?$/g.test(duration.toLocaleLowerCase())) {
     throw new Error('Invalid time duration: ' + duration);
   }
   let unit = DURATION_UNITS_DEFAULT;
@@ -27,6 +27,46 @@ function parseDurationMs(duration: string): number {
     }
   }
   return parseInt(duration, 10) * DURATION_UNITS[unit];
+}
+
+const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
+const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
+const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map(a => a * 60);
+const _d = [24, 12, 8, 6, 4, 3, 2, 1].map(a => a * 60 * 60);
+const _matchset = [_s, _m, _h, _d];
+
+function nudgeInterval(input, dir) {
+  if (dir !== -1) {
+    dir = 1;
+  }
+  // dir says if we're not a match do we choose 1 (larger) or -1 (smaller)
+  if (input < 0.001) {
+    return 0.001;
+  }
+  for (let si = 0; si < _matchset.length; si++) {
+    const set = _matchset[si];
+    if (input < set[0]) {
+      for (let idx = 1; idx < set.length; idx++) {
+        if (input > set[idx]) {
+          if (dir === -1) {
+            return set[idx];
+          } else {
+            return set[idx - 1];
+          }
+        }
+        if (input === set[idx]) {
+          return set[idx];
+        }
+      }
+    }
+  }
+  if (input % 86400 === 0) {
+    return input;
+  }
+  if (dir === 1) {
+    return (1 + Math.floor(input / 86400)) * 86400;
+  }
+  return Math.floor(input / 86400) * 86400;
 }
 
 export default class IrondbDatasource {
@@ -315,12 +355,9 @@ export default class IrondbDatasource {
         options.url = this.url;
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/irondb';
-          options.url = options.url + '/fetch';
         }
+        options.url = options.url + '/fetch';
         options.method = 'POST';
-        if ('standalone' === this.irondbType) {
-          options.url = options.url + '/fetch';
-        }
         const metricLabels = [];
         const start = irondbOptions['std']['start'];
         const end = irondbOptions['std']['end'];
@@ -429,6 +466,7 @@ export default class IrondbDatasource {
   }
 
   static readonly MAX_DATAPOINTS_THRESHOLD = 1.5;
+  static readonly MAX_EXACT_DATAPOINTS_THRESHOLD = 1.5;
   static readonly MIN_DURATION_MS_FETCH = 1;
   static readonly MIN_DURATION_MS_CAQL = 60 * 1000;
   static readonly ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], x => x * 1000);
@@ -456,16 +494,15 @@ export default class IrondbDatasource {
       rolluptype = 'automatic';
       log(() => `getRollupSpan() defaulting to automatic`);
     }
-    let rollupMs;
     if (rolluptype === 'exact') {
       const exactMs = parseDurationMs(metricrollup);
       const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
       log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
-      if (exactDatapoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD > options.maxDataPoints) {
+      if (exactDatapoints > options.maxDataPoints * IrondbDatasource.MAX_EXACT_DATAPOINTS_THRESHOLD) {
         throw new Error('Too many datapoints requested');
       }
       IrondbDatasource.checkRollupAligned(exactMs);
-      rollupMs = exactMs;
+      return exactMs / 1000.0;
     } else {
       let minimumMs = IrondbDatasource.MIN_DURATION_MS_FETCH;
       if (isCaql) {
@@ -479,11 +516,13 @@ export default class IrondbDatasource {
       if (intervalMs < minimumMs) {
         intervalMs = minimumMs;
       }
-      IrondbDatasource.checkRollupAligned(intervalMs);
-      rollupMs = intervalMs;
+      let interval = nudgeInterval(intervalMs / 1000, -1);
+      while ((end - start) / interval > options.maxDatapoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD) {
+        interval = nudgeInterval(interval + 0.001, 1);
+      }
+      log(() => `getRollupSpan() intervalMs = ${intervalMs} -> interval ${interval}`);
+      return interval;
     }
-    log(() => `getRollupSpan() rollupMs = ${rollupMs}`);
-    return rollupMs / 1000.0;
   }
 
   filterMetricsByType(target, data) {
