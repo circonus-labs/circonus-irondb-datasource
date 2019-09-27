@@ -72,5 +72,22 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
+    <div class="gf-form">
+      <div class="gf-form">
+        <label class="gf-form-label width-6 query-keyword">Resolution</label>
+      </div>
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="rolluptype" model="ctrl.target.rolluptype" on-change="ctrl.rollupTypeValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.rollupTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div ng-if="ctrl.target.rolluptype!=='automatic'" class="gf-form gf-form--grow">
+        <input id="metricrollup" class="gf-form-input" type="text" ng-model='ctrl.target.metricrollup' ng-keyup="ctrl.metricRollupKeyUp($event)" ng-blur="ctrl.updateMetricRollupValue()" placeholder="rollup period"></input>
+      </div>
+      <div class="gf-form gf-form--grow">
+        <div class="gf-form-label gf-form-label--grow"></div>
+      </div>
+    </div>
 
 </query-editor-row>
