@@ -32,6 +32,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'counter', text: 'rate of positive change (counter)' },
     { value: 'counter_stddev', text: 'rate of positive change σ (counter_stddev)' },
   ];
+  // prettier-ignore
+  rollupTypeOptions = [
+    { value: 'automatic', text: 'automatic' },
+    { value: 'minimum', text: 'minimum' },
+    { value: 'exact', text: 'exact' },
+  ];
   caqlFindFunctions = {
     count: 'count',
     average: 'average',
@@ -52,6 +58,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.egressoverride = this.target.egressoverride || 'average';
     this.target.metriclabel = this.target.metriclabel || '';
     this.target.labeltype = this.target.labeltype || 'default';
+    this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.paneltype = this.panelCtrl.pluginName;
@@ -66,6 +73,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.query = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
+    this.target.rolluptype = 'automatic';
     this.emptySegments();
     this.parseTarget();
     this.panelCtrl.refresh();
@@ -120,6 +128,41 @@ export class IrondbQueryCtrl extends QueryCtrl {
   updateMetricLabelValue(refresh = true) {
     if (this.target.metriclabel === '' && this.target.labeltype === 'custom') {
       this.target.labeltype = 'default';
+    }
+    if (refresh) {
+      this.panelCtrl.refresh();
+    }
+  }
+
+  rollupTypeValueChanged() {
+    let refresh = true;
+    if (this.target.rolluptype !== 'automatic') {
+      if (_.isEmpty(this.target.metricrollup)) {
+        refresh = false;
+      }
+      setTimeout(() => {
+        document.getElementById('metricrollup').focus();
+      }, 50);
+    }
+    if (refresh) {
+      this.panelCtrl.refresh();
+    }
+  }
+
+  metricRollupKeyUp(event) {
+    const self = this;
+    const element = event.currentTarget;
+    if (event.keyCode === 13) {
+      setTimeout(() => {
+        self.target.metricrollup = element.value;
+        self.updateMetricRollupValue();
+      }, 0);
+    }
+  }
+
+  updateMetricRollupValue(refresh = true) {
+    if (this.target.metricrollup === '' && this.target.rolluptype !== 'automatic') {
+      this.target.rolluptype = 'automatic';
     }
     if (refresh) {
       this.panelCtrl.refresh();

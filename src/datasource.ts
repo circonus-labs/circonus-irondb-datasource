@@ -6,6 +6,29 @@ import { metaInterpolateLabel } from './irondb_query';
 
 const log = Log('IrondbDatasource');
 
+const DURATION_UNITS_DEFAULT = 's';
+const DURATION_UNITS = {
+  ms: 1,
+  s: 1000,
+  m: 1000 * 60,
+  h: 1000 * 60 * 60,
+  d: 1000 * 60 * 60 * 24,
+};
+
+function parseDurationMs(duration: string): number {
+  if (!/^[0-9]+(ms|s|m|h|d)?$/g.test(duration)) {
+    throw new Error('Invalid time duration: ' + duration);
+  }
+  let unit = DURATION_UNITS_DEFAULT;
+  for (const k in DURATION_UNITS) {
+    if (duration.endsWith(k)) {
+      unit = k;
+      duration = duration.slice(0, duration.length - k.length);
+    }
+  }
+  return parseInt(duration, 10) * DURATION_UNITS[unit];
+}
+
 export default class IrondbDatasource {
   id: number;
   name: string;
@@ -287,30 +310,28 @@ export default class IrondbDatasource {
     headers['Accept'] = 'application/json';
     if (irondbOptions['std']['names'].length) {
       const paneltype = irondbOptions['std']['names'][0]['leaf_data']['paneltype'] || 'Graph';
-      options = {};
-      options.url = this.url;
-      if ('hosted' === this.irondbType) {
-        options.url = options.url + '/irondb';
-        options.url = options.url + '/fetch';
-      }
-      options.method = 'POST';
-      if ('standalone' === this.irondbType) {
-        options.url = options.url + '/fetch';
-      }
-      const metricLabels = [];
-      const interval = irondbOptions['std']['interval'];
-      let start = irondbOptions['std']['start'];
-      let end = irondbOptions['std']['end'];
-      start = Math.floor(start - (start % interval));
-      end = Math.floor(end - (end % interval));
-      const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
-      const streams = [];
-      const data = { streams: streams };
-      data['period'] = interval;
-      data['start'] = start;
-      data['count'] = Math.round((end - start) / interval);
-      data['reduce'] = [{ label: '', method: reduce }];
       for (let i = 0; i < irondbOptions['std']['names'].length; i++) {
+        options = {};
+        options.url = this.url;
+        if ('hosted' === this.irondbType) {
+          options.url = options.url + '/irondb';
+          options.url = options.url + '/fetch';
+        }
+        options.method = 'POST';
+        if ('standalone' === this.irondbType) {
+          options.url = options.url + '/fetch';
+        }
+        const metricLabels = [];
+        const start = irondbOptions['std']['start'];
+        const end = irondbOptions['std']['end'];
+        const interval = this.getRollupSpan(irondbOptions, start, end, false, irondbOptions['std']['names'][i]['leaf_data']);
+        const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
+        const streams = [];
+        const data = { streams: streams };
+        data['period'] = interval;
+        data['start'] = start;
+        data['count'] = Math.round((end - start) / interval);
+        data['reduce'] = [{ label: '', method: reduce }];
         const metrictype = paneltype === 'Heatmap' ? 'histogram' : 'numeric';
         metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
 
@@ -322,22 +343,22 @@ export default class IrondbDatasource {
         stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
         stream['kind'] = metrictype;
         streams.push(stream);
+        log(() => 'irondbRequest() data = ' + JSON.stringify(data));
+        options.data = data;
+        options.name = 'fetch';
+        options.headers = headers;
+        if (this.basicAuth || this.withCredentials) {
+          options.withCredentials = true;
+        }
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        options.metricLabels = metricLabels;
+        options.paneltype = paneltype;
+        options.isCaql = false;
+        options.retry = 1;
+        queries.push(options);
       }
-      log(() => 'irondbRequest() data = ' + JSON.stringify(data));
-      options.data = data;
-      options.name = 'fetch';
-      options.headers = headers;
-      if (this.basicAuth || this.withCredentials) {
-        options.withCredentials = true;
-      }
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
-      }
-      options.metricLabels = metricLabels;
-      options.paneltype = paneltype;
-      options.isCaql = false;
-      options.retry = 1;
-      queries.push(options);
     }
     if (irondbOptions['caql']['names'].length) {
       for (let i = 0; i < irondbOptions['caql']['names'].length; i++) {
@@ -351,15 +372,18 @@ export default class IrondbDatasource {
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/public';
         }
-        const caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i]);
-        options.url = options.url + '/caql_v1?format=DF4&start=' + irondbOptions['caql']['start'];
-        options.url = options.url + '&end=' + irondbOptions['caql']['end'];
-        options.url = options.url + '&period=' + irondbOptions['caql']['interval'];
+        const start = irondbOptions['caql']['start'];
+        const end = irondbOptions['caql']['end'];
+        const interval = this.getRollupSpan(irondbOptions, start, end, true, irondbOptions['caql']['names'][i].leaf_data);
+        const caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i].leaf_name);
+        options.url = options.url + '/caql_v1?format=DF4&start=' + start;
+        options.url = options.url + '&end=' + end;
+        options.url = options.url + '&period=' + interval;
         options.url = options.url + '&q=' + encodeURIComponent(caqlQuery);
         options.name = irondbOptions['caql']['names'][i];
         options.headers = headers;
-        options.start = irondbOptions['caql']['start'];
-        options.end = irondbOptions['caql']['end'];
+        options.start = start;
+        options.end = end;
         options.retry = 1;
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
@@ -404,34 +428,62 @@ export default class IrondbDatasource {
       });
   }
 
-  getRollupSpan(options, start, end, isCaql) {
-    // Pick a reasonable period for CAQL
-    // We assume will use something close the request interval
-    // unless it would produce more than maxDataPoints / 8
-    // CAQL analytics at one point per pixel is almost never what
-    // someone will want.
-    let estdp = Math.floor(((end - start) * 1000) / options.intervalMs);
-    if (estdp > options.maxDataPoints / 2) {
-      estdp = options.maxDataPoints / 2;
-    }
-    let period = Math.ceil((end - start) / estdp);
-    // The period is in the right realm now, force align to something
-    // that will make it pretty.
-    const align = [86400, 3600, 1800, 1200, 900, 300, 60, 30, 15, 10, 5, 1];
-    for (const j in align) {
-      if (period > align[j]) {
-        period = Math.floor(period / align[j]) * align[j];
-        break;
+  static readonly MAX_DATAPOINTS_THRESHOLD = 1.5;
+  static readonly MIN_DURATION_MS_FETCH = 1;
+  static readonly MIN_DURATION_MS_CAQL = 60 * 1000;
+  static readonly ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], x => x * 1000);
+  static readonly ROLLUP_ALIGN_MS_1DAY = 86400 * 1000;
+
+  static checkRollupAligned(rollupMs) {
+    for (const alignMs of IrondbDatasource.ROLLUP_ALIGN_MS) {
+      if (rollupMs < alignMs) {
+        if (alignMs % rollupMs !== 0) {
+          throw new Error('Unaligned rollup period requested');
+        }
       }
     }
-    if (isCaql) {
-      if (period < 60) {
-        period = 60;
-      } else {
-        period = period - (period % 60);
-      }
+    if (rollupMs > IrondbDatasource.ROLLUP_ALIGN_MS_1DAY && rollupMs % IrondbDatasource.ROLLUP_ALIGN_MS_1DAY !== 0) {
+      throw new Error('Unaligned rollup period requested');
     }
-    return period;
+  }
+
+  getRollupSpan(options, start, end, isCaql, leafData) {
+    log(() => `getRollupSpan() intervalMs = ${options.intervalMs}, maxDataPoints = ${options.maxDataPoints}`);
+    log(() => `getRollupSpan() ${isCaql ? 'CAQL' : '/fetch'} ${JSON.stringify(leafData)}`);
+    let rolluptype = leafData.rolluptype;
+    const metricrollup = leafData.metricrollup;
+    if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
+      rolluptype = 'automatic';
+      log(() => `getRollupSpan() defaulting to automatic`);
+    }
+    let rollupMs;
+    if (rolluptype === 'exact') {
+      const exactMs = parseDurationMs(metricrollup);
+      const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
+      log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
+      if (exactDatapoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD > options.maxDataPoints) {
+        throw new Error('Too many datapoints requested');
+      }
+      IrondbDatasource.checkRollupAligned(exactMs);
+      rollupMs = exactMs;
+    } else {
+      let minimumMs = IrondbDatasource.MIN_DURATION_MS_FETCH;
+      if (isCaql) {
+        minimumMs = IrondbDatasource.MIN_DURATION_MS_CAQL;
+      }
+      if (rolluptype === 'minimum') {
+        minimumMs = parseDurationMs(metricrollup);
+        log(() => `getRollupSpan() minimumMs = ${minimumMs}`);
+      }
+      let intervalMs = options.intervalMs;
+      if (intervalMs < minimumMs) {
+        intervalMs = minimumMs;
+      }
+      IrondbDatasource.checkRollupAligned(intervalMs);
+      rollupMs = intervalMs;
+    }
+    log(() => `getRollupSpan() rollupMs = ${rollupMs}`);
+    return rollupMs / 1000.0;
   }
 
   filterMetricsByType(target, data) {
@@ -467,6 +519,10 @@ export default class IrondbDatasource {
       metriclabel = this.templateSrv.replace(metriclabel);
       result[i]['leaf_data'].metriclabel = metriclabel;
     }
+    if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
+      result[i]['leaf_data'].rolluptype = target.rolluptype;
+      result[i]['leaf_data'].metricrollup = target.metricrollup;
+    }
     return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
   }
 
@@ -493,16 +549,16 @@ export default class IrondbDatasource {
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
 
+    cleanOptions['maxDataPoints'] = options.maxDataPoints;
+    cleanOptions['intervalMs'] = options.intervalMs;
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
     cleanOptions['std']['end'] = end;
     cleanOptions['std']['names'] = [];
-    cleanOptions['std']['interval'] = this.getRollupSpan(options, start, end, false);
     cleanOptions['caql'] = {};
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
     cleanOptions['caql']['names'] = [];
-    cleanOptions['caql']['interval'] = this.getRollupSpan(options, start, end, true);
 
     const targets = _.reject(options.targets, target => {
       return target.hide || !target['query'] || target['query'].length === 0;
@@ -514,7 +570,13 @@ export default class IrondbDatasource {
 
     const promises = targets.map(target => {
       if (target.isCaql) {
-        cleanOptions['caql']['names'].push(target['query']);
+        cleanOptions['caql']['names'].push({
+          leaf_name: target['query'],
+          leaf_data: {
+            rolluptype: target.rolluptype,
+            metricrollup: target.metricrollup,
+          },
+        });
         return Promise.resolve(cleanOptions);
       } else {
         return this.buildFetchParamsAsync(cleanOptions, target, start, end);
