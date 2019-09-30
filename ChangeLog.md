@@ -1,6 +1,7 @@
 
 ## 0.9.1
 
+ * Support custom rollup resolution
  * Support for IRONdb activity tracking
  * Add client-side caching of requests
  * Upgrade to new Grafana plugin TypeScript SDK
