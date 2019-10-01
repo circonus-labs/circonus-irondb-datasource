@@ -587,9 +587,10 @@ export default class IrondbDatasource {
     const cleanOptions = {};
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
+    const intervalMs = Math.round((options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints);
 
     cleanOptions['maxDataPoints'] = options.maxDataPoints;
-    cleanOptions['intervalMs'] = options.intervalMs;
+    cleanOptions['intervalMs'] = intervalMs;
     cleanOptions['std'] = {};
     cleanOptions['std']['start'] = start;
     cleanOptions['std']['end'] = end;
