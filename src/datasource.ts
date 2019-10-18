@@ -359,9 +359,11 @@ export default class IrondbDatasource {
         options.url = options.url + '/fetch';
         options.method = 'POST';
         const metricLabels = [];
-        const start = irondbOptions['std']['start'];
-        const end = irondbOptions['std']['end'];
+        let start = irondbOptions['std']['start'];
+        let end = irondbOptions['std']['end'];
         const interval = this.getRollupSpan(irondbOptions, start, end, false, irondbOptions['std']['names'][i]['leaf_data']);
+        start -= interval;
+        end += interval;
         const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
         const streams = [];
         const data = { streams: streams };
@@ -409,12 +411,14 @@ export default class IrondbDatasource {
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/public';
         }
-        const start = irondbOptions['caql']['start'];
-        const end = irondbOptions['caql']['end'];
+        let start = irondbOptions['caql']['start'];
+        let end = irondbOptions['caql']['end'];
         const interval = this.getRollupSpan(irondbOptions, start, end, true, irondbOptions['caql']['names'][i].leaf_data);
+        start -= interval;
+        end += interval;
         const caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i].leaf_name);
-        options.url = options.url + '/caql_v1?format=DF4&start=' + start;
-        options.url = options.url + '&end=' + end;
+        options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
+        options.url = options.url + '&end=' + end.toFixed(3);
         options.url = options.url + '&period=' + interval;
         options.url = options.url + '&q=' + encodeURIComponent(caqlQuery);
         options.name = irondbOptions['caql']['names'][i];
