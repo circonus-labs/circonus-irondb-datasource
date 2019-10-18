@@ -1,4 +1,9 @@
 
+## 0.9.2
+
+ * Expand time range start and end by one interval each
+ * Fix subsecond queries with interval below 10ms
+
 ## 0.9.1
 
  * Support custom rollup resolution
