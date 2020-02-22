@@ -26,7 +26,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   egressTypeOptions = [
     { value: 'count', text: 'number of data points (count)' },
     { value: 'average', text: 'average value (gauge)' },
-    { value: 'average_stddev', text: 'standard deviation a.k.a. σ (stddev)' },
+    { value: 'stddev', text: 'standard deviation a.k.a. σ (stddev)' },
     { value: 'derive', text: 'rate of change (derive)' },
     { value: 'derive_stddev', text: 'rate of change σ (derive_stddev)' },
     { value: 'counter', text: 'rate of positive change (counter)' },
@@ -41,7 +41,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   caqlFindFunctions = {
     count: 'count',
     average: 'average',
-    average_stddev: 'stddev',
+    stddev: 'stddev',
     derive: 'derivative',
     derive_stddev: 'derivative_stddev',
     counter: 'counter',
