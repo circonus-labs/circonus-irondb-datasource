@@ -653,7 +653,11 @@ export default class IrondbDatasource {
     const cleanData = [];
     const st = result.data.head.start;
     const period = result.data.head.period;
+    const error = result.data.head.error as any[];
 
+    if (!_.isEmpty(error)) {
+      throw new Error(error.join('\n'));
+    }
     if (!data || data.length === 0) {
       return { data: cleanData };
     }
