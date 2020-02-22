@@ -69,6 +69,16 @@ function nudgeInterval(input, dir) {
   return Math.floor(input / 86400) * 86400;
 }
 
+const HISTOGRAM_TRANSFORMS = {
+  count: 'count',
+  average: 'average',
+  stddev: 'stddev',
+  derive: 'rate',
+  derive_stddev: 'derive_stddev',
+  counter: 'rate',
+  counter_stddev: 'counter_stddev',
+};
+
 export default class IrondbDatasource {
   id: number;
   name: string;
@@ -371,12 +381,18 @@ export default class IrondbDatasource {
         data['start'] = start;
         data['count'] = Math.round((end - start) / interval);
         data['reduce'] = [{ label: '', method: reduce }];
-        const metrictype = paneltype === 'Heatmap' ? 'histogram' : 'numeric';
+        const metrictype = irondbOptions['std']['names'][i]['leaf_data']['metrictype'];
         metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
 
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
-        transform = paneltype === 'Heatmap' ? 'none' : transform;
+        if (metrictype === 'histogram') {
+          if (paneltype === 'Heatmap') {
+            transform = 'none';
+          } else {
+            transform = HISTOGRAM_TRANSFORMS[transform];
+          }
+        }
         stream['transform'] = transform;
         stream['name'] = irondbOptions['std']['names'][i]['leaf_name'];
         stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
@@ -563,6 +579,7 @@ export default class IrondbDatasource {
       result[i]['leaf_data'].rolluptype = target.rolluptype;
       result[i]['leaf_data'].metricrollup = target.metricrollup;
     }
+    result[i]['leaf_data'].metrictype = result[i]['type'];
     return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
   }
 
