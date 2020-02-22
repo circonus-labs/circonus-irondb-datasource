@@ -530,14 +530,11 @@ export default class IrondbDatasource {
   }
 
   filterMetricsByType(target, data) {
-    // Don't mix numeric results with histograms and text metrics
-    let metricFilter = 'numeric';
-    if (target['paneltype'] === 'Heatmap') {
-      metricFilter = 'histogram';
-    }
+    // Don't mix text metrics with numeric and histogram results
+    const metricFilter = 'text';
     return _.filter(data, metric => {
       const metricTypes = metric.type.split(',');
-      return _.includes(metricTypes, metricFilter);
+      return !_.includes(metricTypes, metricFilter);
     });
   }
 
