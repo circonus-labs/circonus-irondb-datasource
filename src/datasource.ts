@@ -2,7 +2,7 @@ import _ from 'lodash';
 import Log from './log';
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
-import { metaInterpolateLabel, decodeNameAndTags } from './irondb_query';
+import { metaInterpolateLabel, decodeNameAndTags, isStatsdCounter } from './irondb_query';
 
 const log = Log('IrondbDatasource');
 
@@ -391,7 +391,11 @@ export default class IrondbDatasource {
             transform = 'none';
           } else {
             transform = HISTOGRAM_TRANSFORMS[transform];
-            const transformMode = 'default';
+            const leafName = irondbOptions['std']['names'][i]['leaf_name'];
+            let transformMode = 'default';
+            if (isStatsdCounter(leafName)) {
+              transformMode = 'statsd_counter';
+            }
             irondbOptions['std']['names'][i]['leaf_data']['target']['hist_transform'] = transformMode;
           }
         }
@@ -563,13 +567,16 @@ export default class IrondbDatasource {
       paneltype: result[i]['target']['paneltype'],
       target: target,
     };
+    const leafName = result[i]['metric_name'];
     if (target.egressoverride !== 'average') {
       if (target.egressoverride === 'automatic') {
+        if (isStatsdCounter(leafName)) {
+          result[i]['leaf_data'].egress_function = 'counter';
+        }
       } else {
         result[i]['leaf_data'].egress_function = target.egressoverride;
       }
     }
-    const leafName = result[i]['metric_name'];
     if (target.labeltype !== 'default') {
       let metriclabel = target.metriclabel;
       if (target.labeltype === 'name') {

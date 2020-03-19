@@ -555,7 +555,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (this.target.hist_transform !== undefined) {
       let egressOverride = this.target.egressoverride;
       if (egressOverride === 'automatic') {
-        egressOverride = 'average';
+        if (this.target.hist_transform === 'statsd_counter') {
+          egressOverride = 'counter';
+        } else {
+          egressOverride = 'average';
+        }
       }
       return this.histogramTransforms[egressOverride];
     } else {
