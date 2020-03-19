@@ -24,9 +24,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'custom', text: 'custom' },
   ];
   egressTypeOptions = [
+    { value: 'automatic', text: 'automatic' },
     { value: 'count', text: 'number of data points (count)' },
     { value: 'average', text: 'average value (gauge)' },
-    { value: 'average_stddev', text: 'standard deviation a.k.a. σ (stddev)' },
+    { value: 'stddev', text: 'standard deviation a.k.a. σ (stddev)' },
     { value: 'derive', text: 'rate of change (derive)' },
     { value: 'derive_stddev', text: 'rate of change σ (derive_stddev)' },
     { value: 'counter', text: 'rate of positive change (counter)' },
@@ -41,11 +42,21 @@ export class IrondbQueryCtrl extends QueryCtrl {
   caqlFindFunctions = {
     count: 'count',
     average: 'average',
-    average_stddev: 'stddev',
+    stddev: 'stddev',
     derive: 'derivative',
     derive_stddev: 'derivative_stddev',
     counter: 'counter',
     counter_stddev: 'counter_stddev',
+  };
+  // prettier-ignore
+  histogramTransforms = {
+    count:          ' | histogram:count()',
+    average:        ' | histogram:mean()',
+    stddev:         ' | histogram:stddev()',
+    derive:         ' | histogram:rate()',
+    derive_stddev:  '', // FIXME
+    counter:        ' | histogram:rate()',
+    counter_stddev: '', // FIXME
   };
   segments: any[];
 
@@ -528,7 +539,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   queryFunctionToCaqlFind() {
-    if (this.target.paneltype === 'Heatmap') {
+    if (this.target.paneltype === 'Heatmap' || this.target.hist_transform !== undefined) {
       return 'find:histogram';
     }
     let findFunction = 'find';
@@ -538,6 +549,22 @@ export class IrondbQueryCtrl extends QueryCtrl {
       findFunction += ':' + egressOverride;
     }
     return findFunction;
+  }
+
+  buildHistogramTransform() {
+    if (this.target.hist_transform !== undefined) {
+      let egressOverride = this.target.egressoverride;
+      if (egressOverride === 'automatic') {
+        if (this.target.hist_transform === 'statsd_counter') {
+          egressOverride = 'counter';
+        } else {
+          egressOverride = 'average';
+        }
+      }
+      return this.histogramTransforms[egressOverride];
+    } else {
+      return '';
+    }
   }
 
   buildCaqlLabel() {
@@ -567,7 +594,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     let query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
     if (tagless) {
-      query += ')' + this.buildCaqlLabel();
+      query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
       return query;
     }
     let firstTag = true;
@@ -592,7 +619,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
       query += encodeTag(type, segment.value);
     }
-    query += "')" + this.buildCaqlLabel();
+    query += "')" + this.buildHistogramTransform() + this.buildCaqlLabel();
     return query;
   }
 

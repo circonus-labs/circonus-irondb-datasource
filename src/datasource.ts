@@ -2,7 +2,7 @@ import _ from 'lodash';
 import Log from './log';
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
-import { metaInterpolateLabel } from './irondb_query';
+import { metaInterpolateLabel, decodeNameAndTags, isStatsdCounter } from './irondb_query';
 
 const log = Log('IrondbDatasource');
 
@@ -68,6 +68,16 @@ function nudgeInterval(input, dir) {
   }
   return Math.floor(input / 86400) * 86400;
 }
+
+const HISTOGRAM_TRANSFORMS = {
+  count: 'count',
+  average: 'average',
+  stddev: 'stddev',
+  derive: 'rate',
+  derive_stddev: 'derive_stddev',
+  counter: 'rate',
+  counter_stddev: 'counter_stddev',
+};
 
 export default class IrondbDatasource {
   id: number;
@@ -371,12 +381,24 @@ export default class IrondbDatasource {
         data['start'] = start;
         data['count'] = Math.round((end - start) / interval);
         data['reduce'] = [{ label: '', method: reduce }];
-        const metrictype = paneltype === 'Heatmap' ? 'histogram' : 'numeric';
+        const metrictype = irondbOptions['std']['names'][i]['leaf_data']['metrictype'];
         metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
 
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
-        transform = paneltype === 'Heatmap' ? 'none' : transform;
+        if (metrictype === 'histogram') {
+          if (paneltype === 'Heatmap') {
+            transform = 'none';
+          } else {
+            transform = HISTOGRAM_TRANSFORMS[transform];
+            const leafName = irondbOptions['std']['names'][i]['leaf_name'];
+            let transformMode = 'default';
+            if (isStatsdCounter(leafName)) {
+              transformMode = 'statsd_counter';
+            }
+            irondbOptions['std']['names'][i]['leaf_data']['target']['hist_transform'] = transformMode;
+          }
+        }
         stream['transform'] = transform;
         stream['name'] = irondbOptions['std']['names'][i]['leaf_name'];
         stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
@@ -530,14 +552,11 @@ export default class IrondbDatasource {
   }
 
   filterMetricsByType(target, data) {
-    // Don't mix numeric results with histograms and text metrics
-    let metricFilter = 'numeric';
-    if (target['paneltype'] === 'Heatmap') {
-      metricFilter = 'histogram';
-    }
+    // Don't mix text metrics with numeric and histogram results
+    const metricFilter = 'text';
     return _.filter(data, metric => {
       const metricTypes = metric.type.split(',');
-      return _.includes(metricTypes, metricFilter);
+      return !_.includes(metricTypes, metricFilter);
     });
   }
 
@@ -546,11 +565,18 @@ export default class IrondbDatasource {
       egress_function: 'average',
       uuid: result[i]['uuid'],
       paneltype: result[i]['target']['paneltype'],
+      target: target,
     };
-    if (target.egressoverride !== 'average') {
-      result[i]['leaf_data'].egress_function = target.egressoverride;
-    }
     const leafName = result[i]['metric_name'];
+    if (target.egressoverride !== 'average') {
+      if (target.egressoverride === 'automatic') {
+        if (isStatsdCounter(leafName)) {
+          result[i]['leaf_data'].egress_function = 'counter';
+        }
+      } else {
+        result[i]['leaf_data'].egress_function = target.egressoverride;
+      }
+    }
     if (target.labeltype !== 'default') {
       let metriclabel = target.metriclabel;
       if (target.labeltype === 'name') {
@@ -566,6 +592,7 @@ export default class IrondbDatasource {
       result[i]['leaf_data'].rolluptype = target.rolluptype;
       result[i]['leaf_data'].metricrollup = target.metricrollup;
     }
+    result[i]['leaf_data'].metrictype = result[i]['type'];
     return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
   }
 
@@ -653,7 +680,11 @@ export default class IrondbDatasource {
     const cleanData = [];
     const st = result.data.head.start;
     const period = result.data.head.period;
+    const error = result.data.head.error as any[];
 
+    if (!_.isEmpty(error)) {
+      throw new Error(error.join('\n'));
+    }
     if (!data || data.length === 0) {
       return { data: cleanData };
     }
@@ -662,6 +693,7 @@ export default class IrondbDatasource {
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       let lname = meta[si] ? meta[si].label : dummy;
+      lname = decodeNameAndTags(lname);
       const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;

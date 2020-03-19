@@ -227,6 +227,16 @@ export function decodeNameAndTags(name: string): string {
   return metric + '|ST[' + tags.join(',') + ']';
 }
 
+export function isStatsdCounter(name: string): boolean {
+  const [metric, rawTags] = taglessNameAndTags(name);
+  const tagSet = splitTags(rawTags);
+  const statsdType = tagSet['statsd_type'];
+  if (statsdType !== undefined && statsdType.includes('count')) {
+    return true;
+  }
+  return false;
+}
+
 export default class IrondbQuery {
   datasource: any;
   target: any;
