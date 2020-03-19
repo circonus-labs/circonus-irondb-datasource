@@ -224,7 +224,7 @@ export function decodeNameAndTags(name: string): string {
   for (const tagCat of _.keys(tagSet)) {
     tags.push(tagCat + ':' + tagSet[tagCat][0]);
   }
-  return metric + '|ST[' + tags.join(',') + ']';
+  return metric + (tags.length > 1 ? '|ST[' + tags.join(',') + ']' : '');
 }
 
 export function isStatsdCounter(name: string): boolean {
