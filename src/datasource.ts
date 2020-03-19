@@ -564,7 +564,10 @@ export default class IrondbDatasource {
       target: target,
     };
     if (target.egressoverride !== 'average') {
-      result[i]['leaf_data'].egress_function = target.egressoverride;
+      if (target.egressoverride === 'automatic') {
+      } else {
+        result[i]['leaf_data'].egress_function = target.egressoverride;
+      }
     }
     const leafName = result[i]['metric_name'];
     if (target.labeltype !== 'default') {

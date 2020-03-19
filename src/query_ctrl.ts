@@ -24,6 +24,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'custom', text: 'custom' },
   ];
   egressTypeOptions = [
+    { value: 'automatic', text: 'automatic' },
     { value: 'count', text: 'number of data points (count)' },
     { value: 'average', text: 'average value (gauge)' },
     { value: 'stddev', text: 'standard deviation a.k.a. σ (stddev)' },
@@ -552,7 +553,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   buildHistogramTransform() {
     if (this.target.hist_transform !== undefined) {
-      const egressOverride = this.target.egressoverride;
+      let egressOverride = this.target.egressoverride;
+      if (egressOverride === 'automatic') {
+        egressOverride = 'average';
+      }
       return this.histogramTransforms[egressOverride];
     } else {
       return '';
