@@ -1,4 +1,8 @@
 
+## 0.9.3
+
+ * Support histogram transforms for graphs
+
 ## 0.9.2
 
  * Expand time range start and end by one interval each
