@@ -2,7 +2,7 @@ import _ from 'lodash';
 import Log from './log';
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
-import { metaInterpolateLabel } from './irondb_query';
+import { metaInterpolateLabel, decodeNameAndTags } from './irondb_query';
 
 const log = Log('IrondbDatasource');
 
@@ -680,6 +680,7 @@ export default class IrondbDatasource {
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       let lname = meta[si] ? meta[si].label : dummy;
+      lname = decodeNameAndTags(lname);
       const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;
