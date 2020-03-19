@@ -391,6 +391,8 @@ export default class IrondbDatasource {
             transform = 'none';
           } else {
             transform = HISTOGRAM_TRANSFORMS[transform];
+            const transformMode = 'default';
+            irondbOptions['std']['names'][i]['leaf_data']['target']['hist_transform'] = transformMode;
           }
         }
         stream['transform'] = transform;
@@ -559,6 +561,7 @@ export default class IrondbDatasource {
       egress_function: 'average',
       uuid: result[i]['uuid'],
       paneltype: result[i]['target']['paneltype'],
+      target: target,
     };
     if (target.egressoverride !== 'average') {
       result[i]['leaf_data'].egress_function = target.egressoverride;

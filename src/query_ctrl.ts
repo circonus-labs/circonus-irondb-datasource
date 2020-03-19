@@ -47,6 +47,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
     counter: 'counter',
     counter_stddev: 'counter_stddev',
   };
+  // prettier-ignore
+  histogramTransforms = {
+    count:          ' | histogram:count()',
+    average:        ' | histogram:mean()',
+    stddev:         ' | histogram:stddev()',
+    derive:         ' | histogram:rate()',
+    derive_stddev:  '', // FIXME
+    counter:        ' | histogram:rate()',
+    counter_stddev: '', // FIXME
+  };
   segments: any[];
 
   /** @ngInject */
@@ -528,7 +538,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   queryFunctionToCaqlFind() {
-    if (this.target.paneltype === 'Heatmap') {
+    if (this.target.paneltype === 'Heatmap' || this.target.hist_transform !== undefined) {
       return 'find:histogram';
     }
     let findFunction = 'find';
@@ -538,6 +548,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
       findFunction += ':' + egressOverride;
     }
     return findFunction;
+  }
+
+  buildHistogramTransform() {
+    if (this.target.hist_transform !== undefined) {
+      const egressOverride = this.target.egressoverride;
+      return this.histogramTransforms[egressOverride];
+    } else {
+      return '';
+    }
   }
 
   buildCaqlLabel() {
@@ -567,7 +586,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
     let query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
     if (tagless) {
-      query += ')' + this.buildCaqlLabel();
+      query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
       return query;
     }
     let firstTag = true;
@@ -592,7 +611,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
       query += encodeTag(type, segment.value);
     }
-    query += "')" + this.buildCaqlLabel();
+    query += "')" + this.buildHistogramTransform() + this.buildCaqlLabel();
     return query;
   }
 
