@@ -1,4 +1,8 @@
 
+## 0.9.4
+
+ * Fix labels for untagged metrics
+
 ## 0.9.3
 
  * Support histogram transforms for graphs
