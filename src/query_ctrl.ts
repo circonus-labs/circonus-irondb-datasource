@@ -72,7 +72,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
-    this.target.paneltype = this.panelCtrl.pluginName;
+    this.target.paneltype = this.panelCtrl.panel.type;
+    this.target.dataFormat = this.panelCtrl.panel.dataFormat;
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
@@ -85,6 +86,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
+    this.target.dataFormat = '';
     this.emptySegments();
     this.parseTarget();
     this.panelCtrl.refresh();

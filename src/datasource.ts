@@ -360,6 +360,7 @@ export default class IrondbDatasource {
     headers['Accept'] = 'application/json';
     if (irondbOptions['std']['names'].length) {
       const paneltype = irondbOptions['std']['names'][0]['leaf_data']['paneltype'] || 'Graph';
+      const dataFormat = irondbOptions['std']['names'][0]['leaf_data']['dataFormat'] || '';
       for (let i = 0; i < irondbOptions['std']['names'].length; i++) {
         options = {};
         options.url = this.url;
@@ -374,7 +375,7 @@ export default class IrondbDatasource {
         const interval = this.getRollupSpan(irondbOptions, start, end, false, irondbOptions['std']['names'][i]['leaf_data']);
         start -= interval;
         end += interval;
-        const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
+        const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
         const streams = [];
         const data = { streams: streams };
         data['period'] = interval;
@@ -387,7 +388,7 @@ export default class IrondbDatasource {
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
         if (metrictype === 'histogram') {
-          if (paneltype === 'Heatmap') {
+          if (paneltype === 'heatmap') {
             transform = 'none';
           } else {
             transform = HISTOGRAM_TRANSFORMS[transform];
@@ -416,6 +417,7 @@ export default class IrondbDatasource {
         }
         options.metricLabels = metricLabels;
         options.paneltype = paneltype;
+        options.dataFormat = dataFormat;
         options.isCaql = false;
         options.retry = 1;
         queries.push(options);
@@ -424,6 +426,8 @@ export default class IrondbDatasource {
     if (irondbOptions['caql']['names'].length) {
       for (let i = 0; i < irondbOptions['caql']['names'].length; i++) {
         options = {};
+        options.paneltype = irondbOptions['caql']['names'][i].leaf_data.paneltype;
+        options.dataFormat = irondbOptions['caql']['names'][i].leaf_data.dataFormat;
         options.url = this.url;
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/irondb';
@@ -512,7 +516,13 @@ export default class IrondbDatasource {
   }
 
   getRollupSpan(options, start, end, isCaql, leafData) {
-    log(() => `getRollupSpan() intervalMs = ${options.intervalMs}, maxDataPoints = ${options.maxDataPoints}`);
+    var maxDataPoints = options.maxDataPoints;
+    const paneltype = leafData.paneltype;
+    const dataFormat = leafData.dataFormat;
+    if (dataFormat === 'tsbuckets' || paneltype === 'heatmap') {
+      maxDataPoints = 80; /* Antying larger makes grafana choke */
+    }
+    log(() => `getRollupSpan() intervalMs = ${options.intervalMs}, maxDataPoints = ${maxDataPoints}`);
     log(() => `getRollupSpan() ${isCaql ? 'CAQL' : '/fetch'} ${JSON.stringify(leafData)}`);
     let rolluptype = leafData.rolluptype;
     const metricrollup = leafData.metricrollup;
@@ -524,7 +534,7 @@ export default class IrondbDatasource {
       const exactMs = parseDurationMs(metricrollup);
       const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
       log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
-      if (exactDatapoints > options.maxDataPoints * IrondbDatasource.MAX_EXACT_DATAPOINTS_THRESHOLD) {
+      if (exactDatapoints > maxDataPoints * IrondbDatasource.MAX_EXACT_DATAPOINTS_THRESHOLD) {
         throw new Error('Too many datapoints requested');
       }
       IrondbDatasource.checkRollupAligned(exactMs);
@@ -543,7 +553,7 @@ export default class IrondbDatasource {
         intervalMs = minimumMs;
       }
       let interval = nudgeInterval(intervalMs / 1000, -1);
-      while ((end - start) / interval > options.maxDatapoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD) {
+      while ((end - start) / interval > maxDataPoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD) {
         interval = nudgeInterval(interval + 0.001, 1);
       }
       log(() => `getRollupSpan() intervalMs = ${intervalMs} -> interval ${interval}`);
@@ -646,6 +656,8 @@ export default class IrondbDatasource {
           leaf_data: {
             rolluptype: target.rolluptype,
             metricrollup: target.metricrollup,
+            dataFormat: target.dataFormat,
+            paneltype: target.paneltype,
           },
         });
         return Promise.resolve(cleanOptions);
