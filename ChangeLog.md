@@ -1,4 +1,6 @@
 
+ * Dilate period for tsbuckets/heatmap panels so we don't overwhelm the browser.
+
 ## 0.9.4
 
  * Fix labels for untagged metrics
