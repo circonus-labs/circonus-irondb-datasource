@@ -29,6 +29,12 @@ function parseDurationMs(duration: string): number {
   return parseInt(duration, 10) * DURATION_UNITS[unit];
 }
 
+function next_bin(v: number): string {
+  const x = Math.floor(Math.log(v * 1.001) / Math.log(10));
+  v += Math.pow(10, x - 1);
+  return v.toPrecision(2);
+}
+
 const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
 const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
 const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map(a => a * 60);
@@ -67,6 +73,13 @@ function nudgeInterval(input, dir) {
     return (1 + Math.floor(input / 86400)) * 86400;
   }
   return Math.floor(input / 86400) * 86400;
+}
+
+function collapse(v, mb) {
+  if (v < mb) {
+    return 0;
+  }
+  return v;
 }
 
 const HISTOGRAM_TRANSFORMS = {
@@ -416,6 +429,8 @@ export default class IrondbDatasource {
         }
         options.metricLabels = metricLabels;
         options.paneltype = paneltype;
+        options.yMax = irondbOptions['std']['names'][0]['leaf_data']['yMax'];
+        options.yMin = irondbOptions['std']['names'][0]['leaf_data']['yMin'];
         options.isCaql = false;
         options.retry = 1;
         queries.push(options);
@@ -424,6 +439,8 @@ export default class IrondbDatasource {
     if (irondbOptions['caql']['names'].length) {
       for (let i = 0; i < irondbOptions['caql']['names'].length; i++) {
         options = {};
+        options.yMax = irondbOptions['caql']['names'][i].leaf_data.yMax;
+        options.yMin = irondbOptions['caql']['names'][i].leaf_data.yMin;
         options.url = this.url;
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/irondb';
@@ -646,6 +663,8 @@ export default class IrondbDatasource {
           leaf_data: {
             rolluptype: target.rolluptype,
             metricrollup: target.metricrollup,
+            yMax: target.yMax,
+            yMin: target.yMin,
           },
         });
         return Promise.resolve(cleanOptions);
@@ -690,6 +709,26 @@ export default class IrondbDatasource {
     }
     // Only supports one histogram.. So sad.
     const lookaside = {};
+    let vmax: number = query.yMax;
+    if (vmax === null) {
+      for (let si = 0; si < data.length; si++) {
+        for (let i = 0; i < data[si].length; i++) {
+          if (data[si][i] !== null) {
+            for (let vstr in data[si][i]) {
+              let v = parseFloat(vstr);
+              vmax = v > vmax ? v : vmax;
+            }
+          }
+        }
+      }
+    }
+
+    let minbase: number;
+    if (vmax > 0) {
+      // -2 here is == /100
+      minbase = Math.pow(10, Math.floor(Math.log(vmax) / Math.log(10)) - 2);
+    }
+
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       let lname = meta[si] ? meta[si].label : dummy;
@@ -706,6 +745,11 @@ export default class IrondbDatasource {
         if (ts < query.start * 1000) {
           continue;
         }
+        const tsstr = ts.toString();
+        if (_.isUndefined(lookaside['0.0'])) {
+          lookaside['0.0'] = { target: '0.0', datapoints: [], _ts: {} };
+          cleanData.push(lookaside['0.0']);
+        }
         if (data[si][i].constructor === Number) {
           if (cleanData[si] === undefined) {
             cleanData[si] = { target: lname, datapoints: [] };
@@ -714,12 +758,20 @@ export default class IrondbDatasource {
         } else if (data[si][i].constructor === Object) {
           for (let vstr in data[si][i]) {
             const cnt = data[si][i][vstr];
-            const v = parseFloat(vstr);
-            vstr = v.toString();
-            const tsstr = ts.toString();
+            const v = minbase !== null ? collapse(parseFloat(vstr), minbase) : parseFloat(vstr);
+            console.log(vmax, minbase, vstr, v);
+            vstr = v.toPrecision(2);
             if (_.isUndefined(lookaside[vstr])) {
               lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
               cleanData.push(lookaside[vstr]);
+              if (v > 0) {
+                const nextvstr = next_bin(v);
+                if (_.isUndefined(lookaside[nextvstr])) {
+                  lookaside[nextvstr] = { target: nextvstr, datapoints: [], _ts: {} };
+                  lookaside[nextvstr]._ts[tsstr] = [0, ts];
+                  cleanData.push(lookaside[nextvstr]);
+                }
+              }
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
               lookaside[vstr]._ts[tsstr] = [cnt, ts];
