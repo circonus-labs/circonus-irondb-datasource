@@ -526,7 +526,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
       if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
         query += ',';
       }
-      if (type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep) {
+      if (
+        type === SegmentType.TagOp ||
+        type === SegmentType.TagPair ||
+        type === SegmentType.TagCat ||
+        type === SegmentType.TagSep
+      ) {
         noComma = true;
       } else {
         noComma = false;
@@ -611,7 +616,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
           firstTag = false;
         }
       }
-      if (type === SegmentType.TagOp || type === SegmentType.TagPair || type === SegmentType.TagCat || type === SegmentType.TagSep) {
+      if (
+        type === SegmentType.TagOp ||
+        type === SegmentType.TagPair ||
+        type === SegmentType.TagCat ||
+        type === SegmentType.TagSep
+      ) {
         noComma = true;
       } else {
         noComma = false;

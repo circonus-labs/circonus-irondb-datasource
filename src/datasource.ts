@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import Log from './log';
+
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
 import { metaInterpolateLabel, decodeNameAndTags, isStatsdCounter } from './irondb_query';
@@ -167,7 +168,10 @@ export default class IrondbDatasource {
     log(() => 'query() options = ' + JSON.stringify(options));
 
     if (!_.isUndefined(this.queryRange) && !_.isEqual(options.rangeRaw, this.queryRange)) {
-      log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.rangeRaw));
+      log(
+        () =>
+          'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.rangeRaw)
+      );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
         const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
@@ -207,13 +211,44 @@ export default class IrondbDatasource {
     throw new Error('Annotation Support not implemented yet.');
   }
 
+  interpolateExpr(value: string | string[] = [], variable: any) {
+    // if no multi or include all do not regexEscape
+    if (!variable.multi && !variable.includeAll) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (value.length === 1) {
+      return value[0];
+    }
+
+    let q = '';
+    for (let i = 0; i < value.length; i++) {
+      if (i > 0) {
+        q = q + ',';
+      }
+      q = q + value[i];
+      i = i + 1;
+    }
+    return q;
+  }
+
   metricFindQuery(query: string, options: any) {
     const variable = options.variable;
-    if (query !== '' && variable !== undefined) {
-      const metricName = query;
+    if (query !== '' && variable !== undefined && variable.useTags) {
+      log(() => 'metricFindQuery() incoming query = ' + query);
+      let metricQuery = this.templateSrv.replace(query, null, this.interpolateExpr);
       const tagCat = variable.tagValuesQuery;
-      if (variable.useTags && tagCat !== '') {
-        return this.metricTagValsQuery(metricName, tagCat).then(results => {
+      log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
+      log(() => 'metricFindQuery() tagCat = ' + tagCat);
+      if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
+        metricQuery = 'and(__name:' + metricQuery + ')';
+      }
+      if (tagCat !== '') {
+        return this.metricTagValsQuery(metricQuery, tagCat).then(results => {
           return _.map(results.data, result => {
             return { value: result };
           });
@@ -243,15 +278,14 @@ export default class IrondbDatasource {
   }
 
   metricTagCatsQuery(query: string) {
-    let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=';
-    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=' + query;
     log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
-  metricTagValsQuery(query: string, cat: string) {
+  metricTagValsQuery(metricQuery: string, cat: string) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
-    queryUrl = queryUrl + 'and(__name:' + query + ')';
+    queryUrl = queryUrl + metricQuery;
     log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
@@ -371,7 +405,13 @@ export default class IrondbDatasource {
         const metricLabels = [];
         let start = irondbOptions['std']['start'];
         let end = irondbOptions['std']['end'];
-        const interval = this.getRollupSpan(irondbOptions, start, end, false, irondbOptions['std']['names'][i]['leaf_data']);
+        const interval = this.getRollupSpan(
+          irondbOptions,
+          start,
+          end,
+          false,
+          irondbOptions['std']['names'][i]['leaf_data']
+        );
         start -= interval;
         end += interval;
         const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
@@ -435,7 +475,13 @@ export default class IrondbDatasource {
         }
         let start = irondbOptions['caql']['start'];
         let end = irondbOptions['caql']['end'];
-        const interval = this.getRollupSpan(irondbOptions, start, end, true, irondbOptions['caql']['names'][i].leaf_data);
+        const interval = this.getRollupSpan(
+          irondbOptions,
+          start,
+          end,
+          true,
+          irondbOptions['caql']['names'][i].leaf_data
+        );
         start -= interval;
         end += interval;
         const caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i].leaf_name);
@@ -733,7 +779,9 @@ export default class IrondbDatasource {
     }
     for (let i = 0; i < cleanData.length; i++) {
       if (_.isUndefined(cleanData[i])) {
-        log(() => 'convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"');
+        log(
+          () => 'convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"'
+        );
         continue;
       }
       delete cleanData[i]._ts;
