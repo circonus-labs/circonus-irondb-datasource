@@ -238,8 +238,10 @@ export default class IrondbDatasource {
 
   metricFindQuery(query: string, options: any) {
     const variable = options.variable;
-    if (query !== '' && variable !== undefined && variable.useTags) {
+    log(() => 'Options: ' + JSON.stringify(options));
+    if (query !== '' && variable !== undefined && (variable.regex !== '' || variable.useTags)) {
       log(() => 'metricFindQuery() incoming query = ' + query);
+      log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
       let metricQuery = this.templateSrv.replace(query, null, this.interpolateExpr);
       const tagCat = variable.tagValuesQuery;
       log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
@@ -251,6 +253,12 @@ export default class IrondbDatasource {
         return this.metricTagValsQuery(metricQuery, tagCat).then(results => {
           return _.map(results.data, result => {
             return { value: result };
+          });
+        });
+      } else {
+        return this.metricTagsQuery(metricQuery).then(results => {
+          return _.map(results.data, result => {
+            return { value: result.metric_name };
           });
         });
       }
