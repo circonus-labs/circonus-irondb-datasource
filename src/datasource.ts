@@ -3,7 +3,14 @@ import Log from './log';
 
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
-import { metaInterpolateLabel, decodeNameAndTags, isStatsdCounter } from './irondb_query';
+import {
+  metaInterpolateLabel,
+  decodeNameAndTags,
+  isStatsdCounter,
+  taglessName,
+  taglessNameAndTags,
+  decodeTag,
+} from './irondb_query';
 
 const log = Log('IrondbDatasource');
 
@@ -747,11 +754,26 @@ export default class IrondbDatasource {
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       let lname = meta[si] ? meta[si].label : dummy;
-      lname = decodeNameAndTags(lname);
+      let tags: any;
+      [lname, tags] = taglessNameAndTags(lname);
       const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;
       }
+      log(() => 'convertIrondbDf4DataToGrafana() tags: ' + tags);
+      const labels = {};
+      if (tags !== '') {
+        for (const tag of tags.split(/,/g)) {
+          const tagSep = tag.split(/:/g);
+          let tagCat = tagSep.shift();
+          let tagVal = tagSep.join(':');
+          tagCat = decodeTag(tagCat);
+          tagVal = decodeTag(tagVal);
+          labels[tagCat] = tagVal;
+        }
+        labels['__name'] = lname;
+      }
+      log(() => 'convertIrondbDf4DataToGrafana() Labels: ' + JSON.stringify(labels));
       for (let i = 0; i < data[si].length; i++) {
         if (data[si][i] === null) {
           continue;
@@ -762,7 +784,7 @@ export default class IrondbDatasource {
         }
         if (data[si][i].constructor === Number) {
           if (cleanData[si] === undefined) {
-            cleanData[si] = { target: lname, datapoints: [] };
+            cleanData[si] = { target: lname, tags: labels, datapoints: [] };
           }
           cleanData[si].datapoints.push([data[si][i], ts]);
         } else if (data[si][i].constructor === Object) {
@@ -772,7 +794,7 @@ export default class IrondbDatasource {
             vstr = v.toString();
             const tsstr = ts.toString();
             if (_.isUndefined(lookaside[vstr])) {
-              lookaside[vstr] = { target: vstr, datapoints: [], _ts: {} };
+              lookaside[vstr] = { target: vstr, tags: labels, datapoints: [], _ts: {} };
               cleanData.push(lookaside[vstr]);
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {

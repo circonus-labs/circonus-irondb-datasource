@@ -37,7 +37,7 @@ function splitTags(tags: string, decode = true): TagSet {
   return outTags;
 }
 
-function taglessNameAndTags(name: string): [string, string] {
+export function taglessNameAndTags(name: string): [string, string] {
   let tags = '';
   const tagStart = name.indexOf('ST[');
   if (tagStart !== -1) {
