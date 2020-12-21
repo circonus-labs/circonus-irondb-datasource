@@ -33,11 +33,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'counter', text: 'rate of positive change (counter)' },
     { value: 'counter_stddev', text: 'rate of positive change σ (counter_stddev)' },
   ];
-  // prettier-ignore
   rollupTypeOptions = [
     { value: 'automatic', text: 'automatic' },
     { value: 'minimum', text: 'minimum' },
     { value: 'exact', text: 'exact' },
+  ];
+  formatOptions = [
+    { value: 'ts', text: 'Time Series' },
+    { value: 'table', text: 'Table' },
+    { value: 'heatmap', text: 'Heatmap' },
   ];
   caqlFindFunctions = {
     count: 'count',
@@ -72,7 +76,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
-    this.target.paneltype = this.panelCtrl.pluginName;
+    this.target.format = this.target.format || 'ts';
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
@@ -85,6 +89,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
+    this.target.format = 'ts';
     this.emptySegments();
     this.parseTarget();
     this.panelCtrl.refresh();

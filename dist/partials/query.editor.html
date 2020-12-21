@@ -41,7 +41,7 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="!ctrl.target.isCaql&&ctrl.target.paneltype!=='Heatmap'" class="gf-form">
+    <div ng-if="!ctrl.target.isCaql&&ctrl.target.format!=='heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Label</label>
       </div>
@@ -58,7 +58,7 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="!ctrl.target.isCaql&&ctrl.target.paneltype!=='Heatmap'" class="gf-form">
+    <div ng-if="!ctrl.target.isCaql&&ctrl.target.format!=='heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Value Type</label>
       </div>
@@ -89,5 +89,20 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
+    <div class="gf-form">
+        <div class="gf-form">
+            <label class="gf-form-label width-6 query-keyword">Format</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="format" model="ctrl.target.format" css-class="gf-size-auto"
+                              get-options="ctrl.formatOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+        <div class="gf-form gf-form--grow">
+            <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+    </div>
+
 
 </query-editor-row>

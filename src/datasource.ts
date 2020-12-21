@@ -12,7 +12,32 @@ import {
   decodeTag,
 } from './irondb_query';
 
+import {
+  ArrayVector,
+  DataFrame,
+  Field,
+  FieldType,
+  formatLabels,
+  Labels,
+  MutableField,
+  ScopedVars,
+  TIME_SERIES_TIME_FIELD_NAME,
+  TIME_SERIES_VALUE_FIELD_NAME,
+  DataSourceApi,
+  DataSourceJsonData,
+  DataQuery,
+  DataSourceInstanceSettings,
+  DataQueryResponse,
+  DataQueryRequest,
+  AnnotationQueryRequest,
+  AnnotationEvent,
+  LoadingState,
+  TimeSeries,
+} from '@grafana/data';
+
 const log = Log('IrondbDatasource');
+
+import { map } from 'rxjs/operators';
 
 const DURATION_UNITS_DEFAULT = 's';
 const DURATION_UNITS = {
@@ -87,7 +112,31 @@ const HISTOGRAM_TRANSFORMS = {
   counter_stddev: 'counter_stddev',
 };
 
-export default class IrondbDatasource {
+export interface IrondbQueryInterface extends DataQuery {
+  expr: string;
+  format?: string;
+  instant?: boolean;
+  range?: boolean;
+  hinting?: boolean;
+  interval?: string;
+  intervalFactor?: number;
+  legendFormat?: string;
+  valueWithRefId?: boolean;
+  requestId?: string;
+  showingGraph?: boolean;
+  showingTable?: boolean;
+}
+
+export interface IrondbOptions extends DataSourceJsonData {
+  accountId?: number;
+  irondbType: string;
+  resultsLimit: string;
+  apiToken?: string;
+  useCaching?: boolean;
+  activityTracking?: boolean;
+}
+
+export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface, IrondbOptions> {
   id: number;
   name: string;
   type: string;
@@ -154,16 +203,22 @@ export default class IrondbDatasource {
   }
 
   /** @ngInject */
-  constructor(instanceSettings, private $q, private backendSrv, private templateSrv) {
+  constructor(
+    instanceSettings: DataSourceInstanceSettings<IrondbOptions>,
+    private $q,
+    private backendSrv,
+    private templateSrv
+  ) {
+    super(instanceSettings);
     this.type = 'irondb';
     this.name = instanceSettings.name;
     this.id = instanceSettings.id;
-    this.accountId = (instanceSettings.jsonData || {}).accountId;
-    this.irondbType = (instanceSettings.jsonData || {}).irondbType;
-    this.resultsLimit = (instanceSettings.jsonData || {}).resultsLimit;
-    this.apiToken = (instanceSettings.jsonData || {}).apiToken;
-    this.useCaching = (instanceSettings.jsonData || {}).useCaching;
-    this.activityTracking = (instanceSettings.jsonData || {}).activityTracking;
+    this.accountId = instanceSettings.jsonData.accountId;
+    this.irondbType = instanceSettings.jsonData.irondbType;
+    this.resultsLimit = instanceSettings.jsonData.resultsLimit;
+    this.apiToken = instanceSettings.jsonData.apiToken;
+    this.useCaching = instanceSettings.jsonData.useCaching;
+    this.activityTracking = instanceSettings.jsonData.activityTracking;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
     this.supportMetrics = true;
@@ -171,7 +226,7 @@ export default class IrondbDatasource {
     this.datasourceRequest = IrondbDatasource.setupCache(this.useCaching, backendSrv);
   }
 
-  query(options) {
+  query(options: DataQueryRequest<IrondbQueryInterface>): Promise<DataQueryResponse> {
     log(() => 'query() options = ' + JSON.stringify(options));
 
     if (!_.isUndefined(this.queryRange) && !_.isEqual(options.rangeRaw, this.queryRange)) {
@@ -199,10 +254,12 @@ export default class IrondbDatasource {
         return this.irondbRequest(irondbOptions[0]);
       })
       .then(queryResults => {
-        if (queryResults['data'].constructor === Array) {
-          queryResults['data'].sort((a, b): number => {
-            return a['target'].localeCompare(b['target']);
-          });
+        if (queryResults.t === 'ts') {
+          if (queryResults['data'].constructor === Array) {
+            queryResults['data'].sort((a, b): number => {
+              return a['target'].localeCompare(b['target']);
+            });
+          }
         }
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
@@ -214,7 +271,7 @@ export default class IrondbDatasource {
       });
   }
 
-  annotationQuery(options) {
+  annotationQuery(options: AnnotationQueryRequest<IrondbQueryInterface>): Promise<AnnotationEvent[]> {
     throw new Error('Annotation Support not implemented yet.');
   }
 
@@ -398,6 +455,7 @@ export default class IrondbDatasource {
     const queries = [];
     const queryResults = {};
     queryResults['data'] = [];
+    queryResults['t'] = 'ts';
 
     if ('hosted' === this.irondbType) {
       headers['X-Circonus-Auth-Token'] = this.apiToken;
@@ -408,7 +466,7 @@ export default class IrondbDatasource {
     headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : 'none';
     headers['Accept'] = 'application/json';
     if (irondbOptions['std']['names'].length) {
-      const paneltype = irondbOptions['std']['names'][0]['leaf_data']['paneltype'] || 'Graph';
+      const paneltype = irondbOptions['std']['names'][0]['leaf_data']['format'] || 'ts';
       for (let i = 0; i < irondbOptions['std']['names'].length; i++) {
         options = {};
         options.url = this.url;
@@ -429,7 +487,7 @@ export default class IrondbDatasource {
         );
         start -= interval;
         end += interval;
-        const reduce = paneltype === 'Heatmap' ? 'merge' : 'pass';
+        const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
         const streams = [];
         const data = { streams: streams };
         data['period'] = interval;
@@ -442,7 +500,7 @@ export default class IrondbDatasource {
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
         if (metrictype === 'histogram') {
-          if (paneltype === 'Heatmap') {
+          if (paneltype === 'heatmap') {
             transform = 'none';
           } else {
             transform = HISTOGRAM_TRANSFORMS[transform];
@@ -471,6 +529,7 @@ export default class IrondbDatasource {
         }
         options.metricLabels = metricLabels;
         options.paneltype = paneltype;
+        options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
         options.isCaql = false;
         options.retry = 1;
         queries.push(options);
@@ -516,6 +575,7 @@ export default class IrondbDatasource {
           options.headers.Authorization = this.basicAuth;
         }
         options.isCaql = true;
+        options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
         queries.push(options);
       }
     }
@@ -538,6 +598,7 @@ export default class IrondbDatasource {
             if (result['data'].constructor === Object) {
               queryResults['data'].push(result['data']);
             }
+            queryResults['t'] = result['t'];
             return queryResults;
           })
       )
@@ -681,6 +742,8 @@ export default class IrondbDatasource {
     const end = new Date(options.range.to).getTime() / 1000;
     const intervalMs = Math.round((options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints);
 
+    cleanOptions['meta'] = options.meta;
+    cleanOptions['refId'] = options.refId;
     cleanOptions['maxDataPoints'] = options.maxDataPoints;
     cleanOptions['intervalMs'] = intervalMs;
     cleanOptions['std'] = {};
@@ -707,6 +770,7 @@ export default class IrondbDatasource {
           leaf_data: {
             rolluptype: target.rolluptype,
             metricrollup: target.metricrollup,
+            format: target.format,
           },
         });
         return Promise.resolve(cleanOptions);
@@ -742,6 +806,7 @@ export default class IrondbDatasource {
     const st = result.data.head.start;
     const period = result.data.head.period;
     const error = result.data.head.error as any[];
+    const format = query.format || 'ts';
 
     if (!_.isEmpty(error)) {
       throw new Error(error.join('\n'));
@@ -749,6 +814,93 @@ export default class IrondbDatasource {
     if (!data || data.length === 0) {
       return { data: cleanData };
     }
+    log(() => 'Format: ' + format);
+
+    if (format === 'table') {
+      // to tabulate we need to invert the data that comes back and iterate
+      // values for each return instead of each return then values.
+      // we use the first result record to fill the timeField
+      // because we are guaranteed to have the same number of records
+      // across all the results due to how irondb works.
+      const timeField = getTimeField();
+      const labelFields = new Set<MutableField>();
+      const valueFields = new Set<MutableField>();
+      const all_labels = {};
+      const all_values = {};
+
+      for (let i = 0; i < data[0].length; i++) {
+        const ts = (st + i * period) * 1000;
+        if (ts < query.start * 1000) {
+          continue;
+        }
+
+        for (let si = 0; si < data.length; si++) {
+          // first we add a timeField entry for each result.
+          // this is in case tag values differ.
+          log(() => 'convertIrondbDf4DataToGrafana(table) ts: ' + ts);
+          timeField.values.add(ts);
+
+          const dummy = name + ' [' + (si + 1) + ']';
+          let lname = meta[si] ? meta[si].label : dummy;
+          const tags = meta[si].tags;
+          const metricLabel = metricLabels[si];
+          if (_.isString(metricLabel)) {
+            lname = metricLabel;
+          }
+          // TODO: parse lname for tags and limit tags to what is in the label
+          // if the label contains tags.
+          log(() => 'convertIrondbDf4DataToGrafana(table) name: ' + lname + ', tags: ' + tags);
+          for (const tag of tags) {
+            const tagSep = tag.split(/:/g);
+            let tagCat = tagSep.shift();
+            let tagVal = tagSep.join(':');
+            if (!tagCat.startsWith('__')) {
+              tagCat = decodeTag(tagCat);
+              tagVal = decodeTag(tagVal);
+              if (!all_labels[tagCat]) {
+                const lfield = {
+                  name: tagCat,
+                  config: { filterable: true },
+                  type: FieldType.other,
+                  values: new ArrayVector(),
+                };
+                all_labels[tagCat] = lfield;
+                labelFields.add(lfield);
+              }
+              const lfield = all_labels[tagCat];
+              lfield.values.add(tagVal);
+            }
+          }
+          if (!all_values[lname]) {
+            const vfield = {
+              name: lname,
+              config: {
+                filterable: true,
+                displayName: lname,
+              },
+              type: FieldType.number,
+              values: new ArrayVector(),
+            };
+            all_values[lname] = vfield;
+            valueFields.add(vfield);
+          }
+          const vfield = all_values[lname];
+          if (data[si][i].constructor === Number) {
+            vfield.values.add(data[si][i]);
+          }
+        }
+      }
+
+      return {
+        t: 'table',
+        data: {
+          length: timeField.values.length,
+          fields: [timeField, ...labelFields, ...valueFields],
+        },
+        state: LoadingState.Done,
+      };
+    }
+
     // Only supports one histogram.. So sad.
     const lookaside = {};
     for (let si = 0; si < data.length; si++) {
@@ -816,6 +968,29 @@ export default class IrondbDatasource {
       }
       delete cleanData[i]._ts;
     }
-    return { data: _.compact(cleanData) };
+    return {
+      t: 'ts',
+      data: _.compact(cleanData),
+    };
   }
+}
+
+function getTimeField(): MutableField {
+  return {
+    name: TIME_SERIES_TIME_FIELD_NAME,
+    type: FieldType.time,
+    config: {},
+    values: new ArrayVector<number>(),
+  };
+}
+
+function getValueField({ valueName = TIME_SERIES_VALUE_FIELD_NAME, displayName }): MutableField {
+  return {
+    name: valueName,
+    type: FieldType.number,
+    config: {
+      displayName,
+    },
+    values: new ArrayVector<number>(),
+  };
 }
