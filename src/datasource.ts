@@ -28,6 +28,7 @@ import {
   DataQuery,
   DataSourceInstanceSettings,
   DataQueryResponse,
+  DataQueryResponseData,
   DataQueryRequest,
   AnnotationQueryRequest,
   AnnotationEvent,
@@ -842,6 +843,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
           const dummy = name + ' [' + (si + 1) + ']';
           let lname = meta[si] ? meta[si].label : dummy;
+          lname = taglessName(lname);
           const tags = meta[si].tags;
           const metricLabel = metricLabels[si];
           if (_.isString(metricLabel)) {
@@ -901,30 +903,45 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       };
     }
 
+    const dataFrames: DataQueryResponseData[] = [];
+
     // Only supports one histogram.. So sad.
     const lookaside = {};
+
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
-      let lname = meta[si] ? meta[si].label : dummy;
-      let tags: any;
-      [lname, tags] = taglessNameAndTags(lname);
+      const tname = meta[si] ? meta[si].label : dummy;
+      let lname = taglessName(tname);
+      const tags = meta[si].tags;
       const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;
       }
       log(() => 'convertIrondbDf4DataToGrafana() tags: ' + tags);
       const labels = {};
-      if (tags !== '') {
-        for (const tag of tags.split(/,/g)) {
-          const tagSep = tag.split(/:/g);
-          let tagCat = tagSep.shift();
-          let tagVal = tagSep.join(':');
+
+      for (const tag of tags) {
+        const tagSep = tag.split(/:/g);
+        let tagCat = tagSep.shift();
+        let tagVal = tagSep.join(':');
+        if (!tagCat.startsWith('__')) {
           tagCat = decodeTag(tagCat);
           tagVal = decodeTag(tagVal);
           labels[tagCat] = tagVal;
         }
-        labels['__name'] = lname;
       }
+
+      const timeField = getTimeField();
+      const numericValueField = {
+        name: TIME_SERIES_VALUE_FIELD_NAME,
+        type: FieldType.number,
+        config: {
+          displayName: lname,
+        },
+        labels: labels,
+        values: new ArrayVector<number>(),
+      };
+
       log(() => 'convertIrondbDf4DataToGrafana() Labels: ' + JSON.stringify(labels));
       for (let i = 0; i < data[si].length; i++) {
         if (data[si][i] === null) {
@@ -934,11 +951,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (ts < query.start * 1000) {
           continue;
         }
+
         if (data[si][i].constructor === Number) {
-          if (cleanData[si] === undefined) {
-            cleanData[si] = { target: lname, tags: labels, datapoints: [] };
-          }
-          cleanData[si].datapoints.push([data[si][i], ts]);
+          timeField.values.add(ts);
+          numericValueField.values.add(data[si][i]);
         } else if (data[si][i].constructor === Object) {
           for (let vstr in data[si][i]) {
             const cnt = data[si][i][vstr];
@@ -946,8 +962,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             vstr = v.toString();
             const tsstr = ts.toString();
             if (_.isUndefined(lookaside[vstr])) {
-              lookaside[vstr] = { target: vstr, tags: labels, datapoints: [], _ts: {} };
-              cleanData.push(lookaside[vstr]);
+              lookaside[vstr] = { target: vstr, title: vstr, tags: labels, datapoints: [], _ts: {} };
+              dataFrames.push(lookaside[vstr]);
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
               lookaside[vstr]._ts[tsstr] = [cnt, ts];
@@ -958,19 +974,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           }
         }
       }
-    }
-    for (let i = 0; i < cleanData.length; i++) {
-      if (_.isUndefined(cleanData[i])) {
-        log(
-          () => 'convertIrondbDf4DataToGrafana() No data at ' + st + ' for ' + meta[i].kind + ' "' + meta[i].label + '"'
-        );
-        continue;
+      if (numericValueField.values.length > 0) {
+        dataFrames.push({
+          length: timeField.values.length,
+          fields: [timeField, numericValueField],
+        });
       }
-      delete cleanData[i]._ts;
     }
     return {
-      t: 'ts',
-      data: _.compact(cleanData),
+      data: dataFrames,
     };
   }
 }
