@@ -17,6 +17,19 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   defaults = {};
   queryModel: IrondbQuery;
+  alertStateOptions = [
+    { value: 'active', text: 'Active' },
+    { value: 'inactive', text: 'Inactive' },
+  ];
+  queryTypeOptions = [
+    { value: 'caql', text: 'CAQL' },
+    { value: 'basic', text: 'Basic' },
+    { value: 'alerts', text: 'Alerts' },
+  ];
+  localFilterMatchOptions = [
+    { value: 'all', text: 'ALL' },
+    { value: 'any', text: 'ANY' },
+  ];
   labelTypeOptions = [
     { value: 'default', text: 'name and tags' },
     { value: 'name', text: 'name only' },
@@ -69,7 +82,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
     super($scope, $injector);
 
     _.defaultsDeep(this.target, this.defaults);
-    this.target.isCaql = this.target.isCaql || false;
     this.target.egressoverride = this.target.egressoverride || 'average';
     this.target.metriclabel = this.target.metriclabel || '';
     this.target.labeltype = this.target.labeltype || 'default';
@@ -77,6 +89,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
+    this.target.querytype = this.target.querytype || 'caql';
+    this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
+    this.target.local_filter = this.target.local_filter || '';
+    this.target.local_filter_match = this.target.local_filter_match || 'all';
+    this.target.alert_id = this.target.alert_id || '';
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
@@ -84,12 +101,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   resetQueryTarget() {
     log(() => 'resetQueryTarget()');
-    this.target.isCaql = false;
     this.target.query = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
     this.target.format = 'ts';
+    this.target.local_filter = '';
+    this.target.local_filter_match = 'all';
+    this.target.alert_id = '';
     this.emptySegments();
     this.parseTarget();
     this.panelCtrl.refresh();
@@ -97,7 +116,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   toggleEditorMode() {
     log(() => 'toggleEditorMode()');
-    if (this.target.isCaql) {
+    if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
       const onConfirm = () => {
         this.resetQueryTarget();
       };
@@ -106,19 +125,48 @@ export class IrondbQueryCtrl extends QueryCtrl {
       } else {
         appEvents.emit('confirm-modal', {
           title: 'Warning',
-          text2: 'Switching to query builder may overwrite your raw CAQL.',
+          text2: 'Switching to basic may overwrite your raw CAQL.',
           icon: 'fa-exclamation',
           yesText: 'Switch',
           onConfirm: onConfirm,
         });
       }
-    } else {
-      this.target.isCaql = true;
+    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
       const caqlQuery = this.segmentsToCaqlFind();
       log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
       this.target.query = caqlQuery;
       this.panelCtrl.refresh();
+    } else if (this.target.querytype === 'alerts') {
+      this.target.query = '';
+      this.panelCtrl.refresh();
     }
+    this.target.lastQueryType = this.target.querytype;
+  }
+
+  alertStateValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  updateAlertQuery() {
+    this.panelCtrl.refresh();
+  }
+
+  updateAlertId() {
+    this.target.query = '';
+    this.panelCtrl.refresh();
+  }
+
+  updateAlertLocalFilter() {
+    this.panelCtrl.refresh();
+  }
+
+  localFilterMatchValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  queryTypeValueChanged() {
+    this.toggleEditorMode();
+    this.panelCtrl.refresh();
   }
 
   labelTypeValueChanged() {
@@ -194,7 +242,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getCollapsedText() {
-    if (this.target.isCaql) {
+    if (this.target.querytype === 'caql') {
       return this.target.query;
     } else {
       return this.segmentsToCaqlFind();

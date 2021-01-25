@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 
+import micromatch from 'micromatch';
 import memoize from 'memoizee';
 import { Memoized } from 'memoizee';
 import {
@@ -10,6 +11,9 @@ import {
   taglessName,
   taglessNameAndTags,
   decodeTag,
+  splitTags,
+  mergeTags,
+  TagSet,
 } from './irondb_query';
 
 import {
@@ -272,8 +276,174 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       });
   }
 
-  annotationQuery(options: AnnotationQueryRequest<IrondbQueryInterface>): Promise<AnnotationEvent[]> {
-    throw new Error('Annotation Support not implemented yet.');
+  annotationQuery(query: AnnotationQueryRequest<IrondbQueryInterface>): Promise<AnnotationEvent[]> {
+    log(() => 'annotationQuery() options = ' + JSON.stringify(query.annotation));
+    log(() => 'annotationQuery() range = ' + JSON.stringify(query.range));
+
+    this.queryRange = query.rangeRaw;
+
+    let options: any = {};
+    const queries = [];
+    const headers = { 'Content-Type': 'application/json' };
+    // const start = new Date(query.rangeRaw.from).getTime() / 1000;
+    // const end = new Date(query.rangeRaw.to).getTime() / 1000;
+
+    headers['X-Circonus-Auth-Token'] = this.apiToken;
+    headers['X-Circonus-App-Name'] = this.appName;
+    headers['Accept'] = 'application/json';
+
+    if (query.annotation['annotationQueryType'] === 'alerts') {
+      options = {};
+      options.url = this.url;
+      options.url = options.url + '/v2';
+      options.method = 'GET';
+      options.url = options.url + '/alert';
+      const alertId = this.templateSrv.replace(query.annotation['alertId']);
+      const alertQuery = this.templateSrv.replace(query.annotation['annotationQueryText']);
+      if (alertId !== '') {
+        options.url = options.url + '/' + alertId;
+      } else {
+        options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+      }
+      options.headers = headers;
+      options.retry = 1;
+      options.start = query.range.from.valueOf() / 1000;
+      options.end = query.range.to.valueOf() / 1000;
+      options.isAlert = true;
+      options.local_filter = query.annotation['annotationFilterText'];
+      options.local_filter_match = query.annotation['annotationFilterApply'];
+      options.annotation = query.annotation;
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      options.isCaql = false;
+      queries.push(options);
+    }
+
+    return Promise.all(
+      queries.map(query =>
+        this.datasourceRequest(query)
+          .then(result => {
+            log(() => 'annotationQuery() query = ' + JSON.stringify(query));
+            log(() => 'annotationQuery() result = ' + JSON.stringify(result));
+            if (!_.isUndefined(query.isAlert)) {
+              return this.enrichAlertsWithRules(result, query);
+            }
+          })
+          .then(results => {
+            // this is a list of objects with "alert" and "rule" fields.
+            const events: AnnotationEvent[] = [];
+            for (const a of results) {
+              const alert = a['alert'];
+              const rule = a['rule'];
+              const tags: TagSet = {};
+
+              if (alert['_occurred_on'] < query.start || alert['_occurred_on'] > query.end) {
+                continue;
+              }
+
+              const cn = alert['_canonical_metric_name'];
+              const metric = alert['_metric_name'];
+              if (cn !== undefined && cn !== '') {
+                const [n, stream_tags] = taglessNameAndTags(cn);
+                const st = splitTags(stream_tags);
+                mergeTags(tags, st);
+              }
+              for (const tag of alert['_tags']) {
+                const tagSep = tag.split(/:/g);
+                let tagCat = tagSep.shift();
+                if (!tagCat.startsWith('__') && tagCat !== '') {
+                  let tagVal = tagSep.join(':');
+                  tagCat = decodeTag(tagCat);
+                  tagVal = decodeTag(tagVal);
+                  if (tags[tagCat] === undefined) {
+                    tags[tagCat] = [];
+                  }
+                  tags[tagCat].push(tagVal);
+                }
+              }
+
+              const annotationTags = [];
+              for (const tagCat in tags) {
+                annotationTags.push(tagCat + ':' + tags[tagCat][0]);
+              }
+
+              // each circonus alert can produce 2 events, one for the alert and one for the clear.
+              // alert first.
+              const alert_match: any = {};
+              alert_match.metric = metric;
+              alert_match.value = alert['_value'];
+
+              const data: any = {};
+              data.evalMatches = [];
+              data.evalMatches.push(alert_match);
+
+              const event: any = {
+                time: alert['_occurred_on'] * 1000,
+                title: 'ALERTING',
+                text:
+                  '<br />' +
+                  (rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                    ? rule['notes']
+                    : 'Oh no!') +
+                  '<br />' +
+                  'Sev: ' +
+                  alert['_severity'] +
+                  '<br >' +
+                  (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
+                    ? '<a href="' + alert['_metric_link'] + '" target="_blank">Info</a><br />'
+                    : ''),
+                tags: annotationTags,
+                alertId: alert['_cid'].replace('/alert/', ''),
+                newState: 'alerting',
+                source: query.annotation,
+                data: data,
+              };
+
+              events.push(event);
+
+              // clear if it's cleared:
+              if (alert['_cleared_on'] !== null) {
+                const alert_match: any = {};
+                alert_match.metric = metric;
+                alert_match.value = alert['_cleared_value'];
+                const data: any = {};
+                data.evalMatches = [];
+                data.evalMatches.push(alert_match);
+
+                const event: any = {
+                  time: alert['_cleared_on'] * 1000,
+                  title: 'OK',
+                  text:
+                    '<br />' +
+                    (rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                      ? rule['notes']
+                      : 'Yay!') +
+                    '<br />' +
+                    'Sev: ' +
+                    alert['_severity'] +
+                    '<br >' +
+                    (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
+                      ? '<a href="' + alert['_metric_link'] + '" target="_blank">Info</a><br />'
+                      : ''),
+                  tags: annotationTags,
+                  alertId: alert['_cid'].replace('/alert/', ''),
+                  newState: 'ok',
+                  source: query.annotation,
+                  data: data,
+                };
+                events.push(event);
+              }
+            }
+            return events;
+          })
+      )
+    ).then(results => {
+      return results;
+    });
   }
 
   interpolateExpr(value: string | string[] = [], variable: any) {
@@ -477,6 +647,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         options.url = options.url + '/fetch';
         options.method = 'POST';
         const metricLabels = [];
+        const check_tags = [];
         let start = irondbOptions['std']['start'];
         let end = irondbOptions['std']['end'];
         const interval = this.getRollupSpan(
@@ -497,7 +668,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         data['reduce'] = [{ label: '', method: reduce }];
         const metrictype = irondbOptions['std']['names'][i]['leaf_data']['metrictype'];
         metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
-
+        check_tags.push(irondbOptions['std']['names'][i]['leaf_data']['check_tags']);
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
         if (metrictype === 'histogram') {
@@ -529,6 +700,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           options.headers.Authorization = this.basicAuth;
         }
         options.metricLabels = metricLabels;
+        options.check_tags = check_tags;
         options.paneltype = paneltype;
         options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
         options.isCaql = false;
@@ -580,6 +752,38 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         queries.push(options);
       }
     }
+    if (irondbOptions['alert']['names'].length) {
+      for (let i = 0; i < irondbOptions['alert']['names'].length; i++) {
+        options = {};
+        options.url = this.url;
+        if ('hosted' === this.irondbType) {
+          options.url = options.url + '/v2';
+        }
+        options.method = 'GET';
+        options.url = options.url + '/alert';
+        const alertQuery = this.templateSrv.replace(irondbOptions['alert']['names'][i]);
+        if (alertQuery.startsWith('alert_id:')) {
+          options.url = options.url + '/' + alertQuery.split(':')[1];
+        } else {
+          options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+        }
+        options.headers = headers;
+        options.retry = 1;
+        options.start = 0;
+        options.end = 0;
+        options.isAlert = true;
+        options.local_filter = irondbOptions['alert']['local_filters'][i];
+        options.local_filter_match = irondbOptions['alert']['local_filter_matches'][i];
+        if (this.basicAuth || this.withCredentials) {
+          options.withCredentials = true;
+        }
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        options.isCaql = false;
+        queries.push(options);
+      }
+    }
     log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
     return Promise.all(
@@ -588,7 +792,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           .then(result => {
             log(() => 'irondbRequest() query = ' + JSON.stringify(query));
             log(() => 'irondbRequest() result = ' + JSON.stringify(result));
-            return this.convertIrondbDf4DataToGrafana(result, query);
+            if (!_.isUndefined(query.isAlert)) {
+              return this.enrichAlertsWithRules(result, query).then(results => {
+                return this.convertAlertDataToGrafana(results);
+              });
+            } else {
+              return this.convertIrondbDf4DataToGrafana(result, query);
+            }
           })
           .then(result => {
             if (result['data'].constructor === Array) {
@@ -612,6 +822,186 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           this.throwerr(err);
         }
       });
+  }
+
+  filterMatches(pair, alert) {
+    // support keys:
+    //
+    // alert_id
+    // tag
+    // acknowledged
+    if (pair.key === 'alert_id') {
+      if (alert['_cid'].endsWith(pair.value)) {
+        return true;
+      }
+      return false;
+    }
+
+    if (pair.key === 'acknowledge') {
+      if (pair.value === 'true') {
+        return alert['_acknowledge'] !== null;
+      } else {
+        return alert['_acknowledge'] === null;
+      }
+    }
+
+    if (pair.key === 'tag') {
+      const tags: any[] = [];
+      const cn = alert['_canonical_metric_name'];
+      if (cn !== undefined && cn !== '') {
+        const [n, stream_tags] = taglessNameAndTags(cn);
+        const temptags = stream_tags.split(',');
+        for (const tag of temptags) {
+          const tagSep = tag.split(/:/g);
+          let tagCat = tagSep.shift();
+          if (!tagCat.startsWith('__') && tagCat !== '') {
+            let tagVal = tagSep.join(':');
+            tagCat = decodeTag(tagCat);
+            tagVal = decodeTag(tagVal);
+            tags.push({
+              cat: tagCat,
+              val: tagVal,
+            });
+          }
+        }
+      }
+      for (const tag of alert['_tags']) {
+        const tagSep = tag.split(/:/g);
+        let tagCat = tagSep.shift();
+        if (!tagCat.startsWith('__') && tagCat !== '') {
+          let tagVal = tagSep.join(':');
+          tagCat = decodeTag(tagCat);
+          tagVal = decodeTag(tagVal);
+          tags.push({
+            cat: tagCat,
+            val: tagVal,
+          });
+        }
+      }
+
+      let mmatch = false;
+      for (const tag of tags) {
+        const pp = pair.value.split(':');
+        if (tag.cat === pp[0]) {
+          if (micromatch.isMatch(tag.val, pp[1])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  }
+
+  // apply filter_pairs to alert and return true if it doesn't match
+  alertFiltered(filter_pairs, match, alert) {
+    if (filter_pairs.length === 0) {
+      return false; //nothing to filter on, everything matches
+    }
+
+    // AND case
+    if (match === 'all') {
+      for (const pair of filter_pairs) {
+        if (!this.filterMatches(pair, alert)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      for (const pair of filter_pairs) {
+        if (this.filterMatches(pair, alert)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return true;
+  }
+
+  // this also applies any local filters.
+  enrichAlertsWithRules(alerts, query) {
+    const datatemp = alerts.data;
+    let data = [];
+    if (datatemp.constructor === Array) {
+      data = datatemp;
+    } else {
+      data.push(datatemp);
+    }
+    const queries = [];
+    const enrich_results = [];
+
+    const headers = { 'Content-Type': 'application/json' };
+    if ('hosted' !== this.irondbType) {
+      this.throwerr('Alert queries only supported on hosted irondb requests');
+    }
+
+    headers['X-Circonus-Auth-Token'] = this.apiToken;
+    headers['X-Circonus-App-Name'] = this.appName;
+    headers['Accept'] = 'application/json';
+
+    const filter_pairs = [];
+    const filter_match = query['local_filter_match'];
+    if (query['local_filter'] !== undefined && query['local_filter'] !== '') {
+      // parse the filter into match pairs
+      // a filter is a series of field:value tokens separated by commas
+      const tokens = query['local_filter'].split(',');
+      for (const t of tokens) {
+        const x = t.trim();
+        const i = x.indexOf(':');
+        if (i === -1) {
+          continue;
+        }
+        const pair: any = {};
+        pair.key = x.slice(0, i);
+        pair.value = x.slice(i + 1);
+        filter_pairs.push(pair);
+      }
+    }
+
+    for (let i = 0; i < data.length; i++) {
+      if (this.alertFiltered(filter_pairs, filter_match, data[i])) {
+        continue;
+      }
+
+      let options: any = {};
+      options.url = this.url;
+      if ('hosted' === this.irondbType) {
+        options.url = options.url + '/v2';
+      }
+      options.method = 'GET';
+      options.url = options.url + data[i]['_rule_set'];
+      options.headers = headers;
+      options.retry = 1;
+      options.alert_data = data[i];
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      queries.push(options);
+    }
+    return Promise.all(
+      queries.map(query =>
+        this.datasourceRequest(query)
+          .then(result => {
+            log(() => 'enrichAlertsWithRules() query = ' + JSON.stringify(query));
+            log(() => 'enrichAlertsWithRules() result = ' + JSON.stringify(result));
+            return {
+              alert: query.alert_data,
+              rule: result.data,
+            };
+          })
+          .catch(failed => {
+            // TODO: skipping ruleset groups for now, this would be hard to implement
+            return {
+              alert: query.alert_data,
+              rule: null,
+            };
+          })
+      )
+    ).then(results => {
+      return results;
+    });
   }
 
   static readonly MAX_DATAPOINTS_THRESHOLD = 1.5;
@@ -700,22 +1090,48 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         result[i]['leaf_data'].egress_function = target.egressoverride;
       }
     }
-    if (target.labeltype !== 'default') {
-      let metriclabel = target.metriclabel;
-      if (target.labeltype === 'name') {
-        metriclabel = '%n';
-      } else if (target.labeltype === 'cardinality') {
-        metriclabel = '%n | %t-{*}';
-      }
-      metriclabel = metaInterpolateLabel(metriclabel, result, i);
-      metriclabel = this.templateSrv.replace(metriclabel);
-      result[i]['leaf_data'].metriclabel = metriclabel;
+    let metriclabel = target.metriclabel;
+    if (target.labeltype === 'default') {
+      metriclabel = '%n | %t{*}';
+    } else if (target.labeltype === 'name') {
+      metriclabel = '%n';
+    } else if (target.labeltype === 'cardinality') {
+      metriclabel = '%n | %t-{*}';
     }
+    metriclabel = metaInterpolateLabel(metriclabel, result, i);
+    metriclabel = this.templateSrv.replace(metriclabel);
+    result[i]['leaf_data'].metriclabel = metriclabel;
+    result[i]['leaf_data'].check_tags = result[i].check_tags;
     if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
       result[i]['leaf_data'].rolluptype = target.rolluptype;
       result[i]['leaf_data'].metricrollup = target.metricrollup;
     }
     result[i]['leaf_data'].metrictype = result[i]['type'];
+    return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
+  }
+
+  buildAlertFetchStream(target, result, i) {
+    result[i]['leaf_data'] = {
+      target: target,
+    };
+    const metricName = result[i]['metric_name'];
+    const check_uuid = result[i]['uuid'];
+    let check_id = undefined;
+    for (const tag of result[i]['check_tags']) {
+      const ts = splitTags(tag);
+      if (!_.isUndefined(ts['__check_id'])) {
+        check_id = ts['__check_id'];
+        break;
+      }
+    }
+    const active = target.alert_state === 'active';
+    let leafName = '(metric:' + metricName + ')';
+    if (!_.isUndefined(check_id)) {
+      leafName = leafName + '(check_id:' + check_id + ')';
+    }
+    if (active) {
+      leafName = leafName + '(active:1)';
+    }
     return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
   }
 
@@ -737,6 +1153,16 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       });
   }
 
+  buildAlertQueryAsync(cleanOptions, target, start, end) {
+    let rawQuery = this.templateSrv.replace(target['query']);
+    if (target['alert_id'] !== '') {
+      rawQuery = 'alert_id:' + this.templateSrv.replace(target['alert_id']);
+    }
+    cleanOptions['alert']['names'].push(rawQuery);
+    cleanOptions['alert']['local_filters'].push(this.templateSrv.replace(target['local_filter']));
+    cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
+  }
+
   buildIrondbParamsAsync(options) {
     const cleanOptions = {};
     const start = new Date(options.range.from).getTime() / 1000;
@@ -755,9 +1181,17 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
     cleanOptions['caql']['names'] = [];
+    cleanOptions['alert'] = {};
+    cleanOptions['alert']['names'] = [];
+    cleanOptions['alert']['local_filters'] = [];
+    cleanOptions['alert']['local_filter_matches'] = [];
 
     const targets = _.reject(options.targets, target => {
-      return target.hide || !target['query'] || target['query'].length === 0;
+      return (
+        target.hide ||
+        (!target['query'] && !target['alert_id']) ||
+        (target['query'].length === 0 && target['alert_id'].length === 0)
+      );
     });
 
     if (!targets.length) {
@@ -765,7 +1199,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     const promises = targets.map(target => {
-      if (target.isCaql) {
+      if (target.querytype === 'caql') {
         cleanOptions['caql']['names'].push({
           leaf_name: target['query'],
           leaf_data: {
@@ -775,6 +1209,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           },
         });
         return Promise.resolve(cleanOptions);
+      } else if (target.querytype === 'alerts') {
+        return this.buildAlertQueryAsync(cleanOptions, target, start, end);
       } else {
         return this.buildFetchParamsAsync(cleanOptions, target, start, end);
       }
@@ -801,6 +1237,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   convertIrondbDf4DataToGrafana(result, query) {
     const name = query.name;
     const metricLabels = query.metricLabels || {};
+    const check_tags = query.check_tags || [];
     const data = result.data.data;
     const meta = result.data.meta;
     const cleanData = [];
@@ -844,40 +1281,48 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           const dummy = name + ' [' + (si + 1) + ']';
           let lname = meta[si] ? meta[si].label : dummy;
           lname = taglessName(lname);
-          const tags = meta[si].tags;
+          let tags = meta[si].tags;
           const metricLabel = metricLabels[si];
           if (_.isString(metricLabel)) {
             lname = metricLabel;
           }
-          // TODO: parse lname for tags and limit tags to what is in the label
-          // if the label contains tags.
+
+          if (check_tags[si] !== undefined) {
+            if (tags === undefined) {
+              tags = check_tags[si];
+            } else {
+              tags.push.apply(tags, check_tags[si]);
+            }
+          }
           log(() => 'convertIrondbDf4DataToGrafana(table) name: ' + lname + ', tags: ' + tags);
-          for (const tag of tags) {
-            const tagSep = tag.split(/:/g);
-            let tagCat = tagSep.shift();
-            let tagVal = tagSep.join(':');
-            if (!tagCat.startsWith('__')) {
-              tagCat = decodeTag(tagCat);
-              tagVal = decodeTag(tagVal);
-              if (!all_labels[tagCat]) {
-                const lfield = {
-                  name: tagCat,
-                  config: { filterable: true },
-                  type: FieldType.other,
-                  values: new ArrayVector(),
-                };
-                all_labels[tagCat] = lfield;
-                labelFields.add(lfield);
+          if (tags !== undefined) {
+            for (const tag of tags) {
+              const tagSep = tag.split(/:/g);
+              let tagCat = tagSep.shift();
+              let tagVal = tagSep.join(':');
+              if (!tagCat.startsWith('__')) {
+                tagCat = decodeTag(tagCat);
+                tagVal = decodeTag(tagVal);
+                if (!all_labels[tagCat]) {
+                  const lfield = {
+                    name: tagCat,
+                    config: { filterable: false },
+                    type: FieldType.other,
+                    values: new ArrayVector(),
+                  };
+                  all_labels[tagCat] = lfield;
+                  labelFields.add(lfield);
+                }
+                const lfield = all_labels[tagCat];
+                lfield.values.add(tagVal);
               }
-              const lfield = all_labels[tagCat];
-              lfield.values.add(tagVal);
             }
           }
           if (!all_values[lname]) {
             const vfield = {
               name: lname,
               config: {
-                filterable: true,
+                filterable: false,
                 displayName: lname,
               },
               type: FieldType.number,
@@ -887,8 +1332,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             valueFields.add(vfield);
           }
           const vfield = all_values[lname];
-          if (data[si][i].constructor === Number) {
+          if (data[si][i] !== null && data[si][i].constructor === Number) {
             vfield.values.add(data[si][i]);
+          } else {
+            vfield.values.add(null);
           }
         }
       }
@@ -912,7 +1359,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       const dummy = name + ' [' + (si + 1) + ']';
       const tname = meta[si] ? meta[si].label : dummy;
       let lname = taglessName(tname);
-      const tags = meta[si].tags;
+      let tags = meta[si].tags;
       const metricLabel = metricLabels[si];
       if (_.isString(metricLabel)) {
         lname = metricLabel;
@@ -920,14 +1367,24 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       log(() => 'convertIrondbDf4DataToGrafana() tags: ' + tags);
       const labels = {};
 
-      for (const tag of tags) {
-        const tagSep = tag.split(/:/g);
-        let tagCat = tagSep.shift();
-        let tagVal = tagSep.join(':');
-        if (!tagCat.startsWith('__')) {
-          tagCat = decodeTag(tagCat);
-          tagVal = decodeTag(tagVal);
-          labels[tagCat] = tagVal;
+      if (check_tags[si] !== undefined) {
+        if (tags === undefined) {
+          tags = check_tags[si];
+        } else {
+          tags.push.apply(tags, check_tags[si]);
+        }
+      }
+
+      if (tags !== undefined) {
+        for (const tag of tags) {
+          const tagSep = tag.split(/:/g);
+          let tagCat = tagSep.shift();
+          let tagVal = tagSep.join(':');
+          if (!tagCat.startsWith('__')) {
+            tagCat = decodeTag(tagCat);
+            tagVal = decodeTag(tagVal);
+            labels[tagCat] = tagVal;
+          }
         }
       }
 
@@ -985,24 +1442,411 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       data: dataFrames,
     };
   }
+
+  // an alert looks like this:
+
+  //   {
+  //   "_cid": "/alert/48145680",
+  //   "_acknowledgement": null,
+  //   "_alert_url": "https://mlb-infrastructure.circonus.com/fault-detection/alerts/48145680",
+  //   "_broker": "/broker/2761",
+  //   "_check": "/check/283849",
+  //   "_check_name": "AMQ - legacy 02 npd activemq",
+  //   "_cleared_on": null,
+  //   "_cleared_value": null,
+  //   "_maintenance": [
+  //     "/maintenance/169927",
+  //     "/maintenance/167993",
+  //     "/maintenance/167992",
+  //     "/maintenance/167991",
+  //     "/maintenance/167575",
+  //     "/maintenance/167574",
+  //     "/maintenance/167573",
+  //     "/maintenance/166899",
+  //     "/maintenance/166898",
+  //     "/maintenance/166839",
+  //     "/maintenance/166838",
+  //     "/maintenance/171161",
+  //     "/maintenance/161011",
+  //     "/maintenance/161010",
+  //     "/maintenance/160774",
+  //     "/maintenance/160773",
+  //     "/maintenance/159757"
+  //   ],
+  //   "_metric_link": null,
+  //   "_metric_name": "QueueSize",
+  //   "_canonical_metric_name": "QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
+  //   "_signature": "8f6126f5-3be4-4324-9831-ce468bef21e7`QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
+  //   "_metric_notes": "{\"notes\":\"AMQ QueueSize has gotten too large, check subscribers\"}",
+  //   "_occurred_on": 1609958123,
+  //   "_rule_set": "/rule_set/268647",
+  //   "_severity": 1,
+  //   "_tags": [
+  //     "category:partner",
+  //     "env:npd",
+  //     "service:amq"
+  //   ],
+  //   "_value": "1091"
+  // }
+
+  // and the `rule` field will look like:
+
+  // {
+  //   "derive": "average",
+  //   "_cid": "/rule_set/268647",
+  //   "metric_name": "QueueSize",
+  //   "check": "/check/0",
+  //   "metric_type": "numeric",
+  //   "tags": [],
+  //   "_host": null,
+  //   "notes": "AMQ QueueSize has gotten too large, check subscribers",
+  //   "lookup_key": null,
+  //   "name": null,
+  //   "parent": null,
+  //   "rules": [
+  //     {
+  //       "severity": 1,
+  //       "criteria": "max value",
+  //       "wait": 0,
+  //       "windowing_duration": 120,
+  //       "value": "1000",
+  //       "windowing_min_duration": 0,
+  //       "windowing_function": "average"
+  //     }
+  //   ],
+  //   "link": null,
+  //   "filter": "and(service:amq,not(env:prod),not(host:activemq*-internal.sportradar.us-east4.bdatasf-gcp-npd.mlbinfra.net))",
+  //   "contact_groups": {
+  //     "1": [
+  //       "/contact_group/5738"
+  //     ],
+  //     "3": [],
+  //     "5": [],
+  //     "4": [],
+  //     "2": []
+  //   }
+  // }
+
+  convertAlertDataToGrafana(enrich_results) {
+    const cleanData = [];
+
+    if (_.isUndefined(enrich_results) || enrich_results.length === 0) {
+      return { data: cleanData };
+    }
+
+    const dataFrames: DataFrame[] = [];
+
+    for (let si = 0; si < enrich_results.length; si++) {
+      const timeField = getTimeField();
+      const labelFields = new Set<MutableField>();
+      const valueFields = new Set<MutableField>();
+      const all_labels = {};
+      const all_values = {};
+      const fields = {
+        _acknowledgement: getTextField('acknowledgement'),
+        _alert_url: getTextField('circonus_alert_url'),
+        _check_name: getTextField('check_name'),
+        _cleared_on: getTimeField('cleared_timestamp'),
+        _metric_link: getTextField('metric_link'),
+        _severity: getNumberField('severity'),
+        derive: getTextField('derive'),
+        metric_type: getTextField('metric_type'),
+        _value: getOtherField('alert_value'),
+        _cleared_value: getOtherField('cleared_value'),
+        _cid: getTextField('alert_id'),
+      };
+
+      const specialFields = {
+        _signature: getTextField('check_uuid'),
+        _canonical_metric_name: getTextField('metric_name'),
+        _metric_name: 1,
+        _tags: 1,
+      };
+
+      const thresholdFields = {
+        threshold_1: getNumberField('threshold_1'),
+        threshold_2: getNumberField('threshold_2'),
+        threshold_3: getNumberField('threshold_3'),
+        threshold_4: getNumberField('threshold_4'),
+        threshold_5: getNumberField('threshold_5'),
+      };
+
+      const alert = enrich_results[si]['alert'];
+      const rule = enrich_results[si]['rule'];
+      const tags: TagSet = {};
+
+      for (const key in alert) {
+        if (key === '_occurred_on') {
+          const epoch = alert[key];
+          timeField.values.add(epoch * 1000); // to milliseconds
+          // also create a time window 30 minutes before the alert up to 30 mins after the  cleared_on timestamp
+          // if it's not a cleared alert, use an 30 mins after the alert timestamp as the window (or now if it's recent)
+          const before = epoch - 1800;
+          const cleared = alert['_cleared_on'];
+          let after = epoch + 1800;
+          if (cleared !== null && cleared !== undefined) {
+            after = cleared + 1800;
+          }
+          if (after > Math.floor(Date.now() / 1000)) {
+            after = Math.floor(Date.now() / 1000);
+          }
+
+          const window_start = getNumberField('alert_window_start');
+          const window_end = getNumberField('alert_window_end');
+          valueFields.add(window_start);
+          valueFields.add(window_end);
+
+          window_start.values.add(before * 1000);
+          window_end.values.add(after * 1000);
+
+          // special field called 'state' which contains "ALERTING" or "OK"
+          const state = getTextField('state');
+          valueFields.add(state);
+          if (cleared !== null && cleared !== undefined) {
+            state.values.add('OK');
+          } else {
+            state.values.add('ALERTING');
+          }
+        } else if (key === '_cid') {
+          const cid = alert[key];
+          fields[key].values.add(cid.replace('/alert/', ''));
+          valueFields.add(fields[key]);
+        } else if (key === '_cleared_on') {
+          const epoch = alert[key];
+          if (epoch !== null) {
+            fields[key].values.add(epoch * 1000);
+          } else {
+            fields[key].values.add(null);
+          }
+          if (!all_values[key]) {
+            all_values[key] = fields[key];
+            valueFields.add(fields[key]);
+          }
+        } else if (fields[key] !== undefined) {
+          let val = alert[key];
+          if (key === '_cleared_value' && alert[key] === null) {
+            val = '';
+          }
+          if ((key === '_value' && alert[key] === null) || alert[key] === '') {
+            val = '';
+          }
+          fields[key].values.add(val);
+          if (!all_values[key]) {
+            all_values[key] = fields[key];
+            valueFields.add(fields[key]);
+          }
+        } else if (specialFields[key] !== undefined) {
+          if (key === '_signature') {
+            const check_uuid = alert['_signature'].substring(0, alert['_signature'].indexOf('`'));
+            specialFields[key].values.add(check_uuid);
+            if (!all_values[key]) {
+              all_values[key] = specialFields[key];
+              valueFields.add(specialFields[key]);
+            }
+          } else if (key === '_canonical_metric_name') {
+            const cn = alert[key];
+            if (cn !== undefined && cn !== '') {
+              const [n, stream_tags] = taglessNameAndTags(cn);
+              specialFields[key].values.add(n);
+              if (!all_values[key]) {
+                all_values[key] = specialFields[key];
+                valueFields.add(specialFields[key]);
+              }
+
+              const real_cn = getTextField('canonical_metric_name');
+              valueFields.add(real_cn);
+              real_cn.values.add(cn);
+
+              const st = splitTags(stream_tags);
+              mergeTags(tags, st);
+            }
+          } else if (key === '_metric_name' && alert['_canonical_metric_name'] === '') {
+            const name = alert[key];
+            specialFields['_canonical_metric_name'].values.add(name);
+            if (!all_values[key]) {
+              all_values[key] = specialFields['_canonical_metric_name'];
+              valueFields.add(specialFields['_canonical_metric_name']);
+            }
+          } else if (key === '_tags') {
+            for (const tag of alert[key]) {
+              const tagSep = tag.split(/:/g);
+              let tagCat = tagSep.shift();
+              if (!tagCat.startsWith('__') && tagCat !== '') {
+                let tagVal = tagSep.join(':');
+                tagCat = decodeTag(tagCat);
+                tagVal = decodeTag(tagVal);
+                if (tags[tagCat] === undefined) {
+                  tags[tagCat] = [];
+                }
+                tags[tagCat].push(tagVal);
+              }
+            }
+          }
+        }
+      }
+
+      // deal with accumulated tags and make a single comma separated field of tags.
+      const tagField = getTextField('tags');
+      valueFields.add(tagField);
+      let i = 0;
+      let combinedTags = '';
+      for (const tag in tags) {
+        if (i > 0) {
+          combinedTags = combinedTags + '|';
+        }
+        if (tag !== '' && !tag.startsWith('__')) {
+          i++;
+          combinedTags = combinedTags + tag + ':' + tags[tag][0];
+        }
+      }
+      tagField.values.add(combinedTags);
+
+      // add the threshold fields even if there is no ruleset
+      for (let i = 1; i < 6; i++) {
+        const key = 'threshold_' + i;
+        if (!all_values[key]) {
+          all_values[key] = thresholdFields[key];
+          valueFields.add(thresholdFields[key]);
+        }
+      }
+
+      let done_map: any = {};
+      if (!_.isUndefined(rule) && rule !== null && rule['metric_type'] === 'numeric') {
+        // add up to 5 thresholds (one for each severity) based on severity from the `rule` object.
+        let d = rule['derive'];
+        if (d === 'mixed') {
+          // loop to find the first rule with a windowing_function
+          for (const r of rule['rules']) {
+            d = r['windowing_function'];
+            if (d !== undefined && d !== null) {
+              break;
+            }
+          }
+        }
+        const deriveField = getTextField('function');
+        valueFields.add(deriveField);
+        deriveField.values.add(d);
+
+        for (const r of rule['rules']) {
+          const sev = r['severity'];
+          if (sev === 0) {
+            continue; // sev 0 means to clear the alert, ignore it for thresholding purposes.
+          }
+          const key = 'threshold_' + sev;
+          thresholdFields[key].values.add(r['value']);
+          done_map[sev] = 1;
+        }
+      }
+
+      for (let i = 1; i < 6; i++) {
+        if (done_map[i] === undefined) {
+          const key = 'threshold_' + i;
+          thresholdFields[key].values.add(-1);
+        }
+      }
+
+      // add a text based description of the rules that are attached to this alert, separated by pipes
+      //   "rules": [
+      //     {
+      //       "severity": 1,
+      //       "criteria": "max value",
+      //       "wait": 0,
+      //       "windowing_duration": 120,
+      //       "value": "1000",
+      //       "windowing_min_duration": 0,
+      //       "windowing_function": "average"
+      //     }
+      const ruleField = getTextField('rule_text');
+      valueFields.add(ruleField);
+      if (!_.isUndefined(rule) && rule !== null) {
+        let text = '';
+        let i = 0;
+        for (const r of rule['rules']) {
+          let winfunc = r['windowing_function'];
+          let duration = '';
+          if (winfunc === null) {
+            winfunc = 'value';
+          } else {
+            duration = '(over ' + r['windowing_duration'] + ' seconds) ';
+          }
+          let t = 'if the ' + winfunc + ' ' + duration;
+          if (r['criteria'] === 'on absence') {
+            t += 'is absent for ' + r['value'] + ' seconds, ';
+          } else if (r['criteria'] === 'max value') {
+            t += 'is present and >= ' + r['value'] + ', ';
+          } else if (r['criteria'] === 'min value') {
+            t += 'is present and < ' + r['value'] + ', ';
+          } else if (r['criteria'] === 'matches') {
+            t += "is present and matches '" + r['value'] + "', ";
+          } else if (r['criteria'] === 'does not match') {
+            t += "is present and does not match '" + r['value'] + "', ";
+          }
+          if (i > 0) {
+            t += "and prior rules aren't triggered, ";
+          }
+          if (r['severity'] === 0) {
+            t += 'clear the alert.';
+          } else {
+            t += 'trigger a sev ' + r['severity'] + ' alert and wait ' + r['wait'] + ' minutes before notifying.';
+          }
+          if (i > 0) {
+            text += '|';
+          }
+          text += t;
+          i++;
+        }
+
+        ruleField.values.add(text);
+      } else {
+        ruleField.values.add('');
+      }
+
+      dataFrames.push({
+        length: timeField.values.length,
+        fields: [timeField, ...labelFields, ...valueFields],
+      });
+    }
+
+    return {
+      t: 'table',
+      data: dataFrames,
+      state: LoadingState.Done,
+    };
+  }
 }
 
-function getTimeField(): MutableField {
+function getTimeField(name = TIME_SERIES_TIME_FIELD_NAME): MutableField {
   return {
-    name: TIME_SERIES_TIME_FIELD_NAME,
+    name: name,
     type: FieldType.time,
     config: {},
     values: new ArrayVector<number>(),
   };
 }
 
-function getValueField({ valueName = TIME_SERIES_VALUE_FIELD_NAME, displayName }): MutableField {
+function getNumberField(name = TIME_SERIES_VALUE_FIELD_NAME): MutableField {
   return {
-    name: valueName,
+    name: name,
     type: FieldType.number,
-    config: {
-      displayName,
-    },
+    config: {},
     values: new ArrayVector<number>(),
+  };
+}
+
+function getTextField(name): MutableField {
+  return {
+    name: name,
+    type: FieldType.string,
+    config: {},
+    values: new ArrayVector<string>(),
+  };
+}
+
+function getOtherField(name): MutableField {
+  return {
+    name: name,
+    type: FieldType.other,
+    config: {},
+    values: new ArrayVector(),
   };
 }
