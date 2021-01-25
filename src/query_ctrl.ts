@@ -89,7 +89,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.query = this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
-    this.target.querytype = this.target.querytype || 'caql';
+    if (this.target.isCaql !== undefined) {
+      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
+    } else {
+      this.target.querytype = this.target.querytype || 'caql';
+    }
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';
     this.target.local_filter_match = this.target.local_filter_match || 'all';

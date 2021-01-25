@@ -1187,11 +1187,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['alert']['local_filter_matches'] = [];
 
     const targets = _.reject(options.targets, target => {
-      return (
+      const reject =
         target.hide ||
-        (!target['query'] && !target['alert_id']) ||
-        (target['query'].length === 0 && target['alert_id'].length === 0)
-      );
+        (target['query'] === undefined && target['alert_id'] === undefined) ||
+        (target['query'].length === 0 && target['alert_id'].length === 0);
+      return reject;
     });
 
     if (!targets.length) {
@@ -1199,7 +1199,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     const promises = targets.map(target => {
-      if (target.querytype === 'caql') {
+      if (target.isCaql || target.querytype === 'caql') {
         cleanOptions['caql']['names'].push({
           leaf_name: target['query'],
           leaf_data: {
