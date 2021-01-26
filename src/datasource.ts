@@ -1757,8 +1757,24 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       //       "windowing_function": "average"
       //     }
       const ruleField = getTextField('rule_text');
+      const notesField = getTextField('notes');
       valueFields.add(ruleField);
+      valueFields.add(notesField);
       if (!_.isUndefined(rule) && rule !== null) {
+        if (rule['notes'] !== null && rule['notes'].length > 0) {
+          notesField.values.add(rule['notes']);
+        } else {
+          const mn = alert['metric_notes'];
+          if (mn !== undefined && mn.length > 0) {
+            // metric notes from the alert object is an embedded javascript string. eww.
+            try {
+              const notes = JSON.parse(mn);
+              notesField.values.add(notes['notes']);
+            } catch (err) {
+              notesField.values.add('');
+            }
+          }
+        }
         let text = '';
         let i = 0;
         for (const r of rule['rules']) {
@@ -1799,6 +1815,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         ruleField.values.add(text);
       } else {
         ruleField.values.add('');
+        notesField.values.add('');
       }
 
       dataFrames.push({
