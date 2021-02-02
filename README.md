@@ -76,17 +76,25 @@ For this processed data to be displayed on the heatmap panel as the sample above
   
 1. Select the proper data source: `IRONdb`.
   
-1. Under `Query`, enter the metric you wish to use in this variable (without tags).
+1. Under `Query`, enter the metric you wish to use in this variable (without tags), **or** enter the fully formed tag query, ala: `and(__name:foo,or(bar:baz,quux:*))`.  Note that this query can contain references to other variables (see example below)
   
-1. Enable `Include All Option` and enter `*` for `Custom all value`.
+1. If you enable `Include All Option`, enter `*` for the `Custom all value`.
   
 1. Click `Enabled` under `Value groups/tags` to enable tags support.
   
-1. Enter the tag category you wish to use in your variable under `Tag values query`.
+1. Enter the tag category you wish to use in your variable under `Tag values query`.  See example below.
   
 1. If you successfully completed the prior steps, `Preview of values` should now auto-complete the tag values.
   
 1. Finish setup by clicking `Add` and then `Save`.
+
+Example:
+
+![](img/irondb-variable-config.png)
+
+In this example, we are creating a variable called `namespace` using the query `and(__name:used,cluster:$cluster)` which contains a reference to another variable (not pictured).  We are then pulling the values out of a tag also called `namespace` (you can see the preview values).
+
+In this way you can make dependent variables that change in a hierarchy based on prior chosen variables.
   
 Your new template variable should now appear in the query builder!
 

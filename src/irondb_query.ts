@@ -14,11 +14,11 @@ export enum SegmentType {
   TagPlus,
 }
 
-interface TagSet {
+export interface TagSet {
   [tagCat: string]: string[];
 }
 
-function splitTags(tags: string, decode = true): TagSet {
+export function splitTags(tags: string, decode = true): TagSet {
   const outTags: TagSet = {};
   for (const tag of tags.split(/,/g)) {
     const tagSep = tag.split(/:/g);
@@ -37,7 +37,17 @@ function splitTags(tags: string, decode = true): TagSet {
   return outTags;
 }
 
-function taglessNameAndTags(name: string): [string, string] {
+export function mergeTags(dest: TagSet, source: TagSet) {
+  for (const cat in source) {
+    let vals = dest[cat];
+    if (_.isUndefined(vals)) {
+      dest[cat] = vals = [];
+    }
+    vals.push.apply(vals, source[cat]);
+  }
+}
+
+export function taglessNameAndTags(name: string): [string, string] {
   let tags = '';
   const tagStart = name.indexOf('ST[');
   if (tagStart !== -1) {
@@ -60,7 +70,22 @@ function metaTagDiff(meta: any[], tag: string) {
   for (let i = 0; i < meta.length; i++) {
     const [name, tags] = taglessNameAndTags(meta[i].metric_name);
     const tagSet = splitTags(tags);
-    const mtag = tagSet[tag] !== undefined ? tagSet[tag][0] : _privateNil;
+
+    for (const tag of meta[i].check_tags) {
+      const tagSep = tag.split(/:/g);
+      let tagCat = tagSep.shift();
+      if (!tagCat.startsWith('__') && tagCat !== '') {
+        let tagVal = tagSep.join(':');
+        tagCat = decodeTag(tagCat);
+        tagVal = decodeTag(tagVal);
+        if (tagSet[tagCat] === undefined) {
+          tagSet[tagCat] = [];
+        }
+        tagSet[tagCat].push(tagVal);
+      }
+    }
+
+    const mtag = tag !== '' && tagSet[tag] !== undefined ? tagSet[tag][0] : _privateNil;
     if (seen.get(mtag) === undefined) {
       keycnt = keycnt + 1;
     }
@@ -77,17 +102,33 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   label = label.replace(/%n/g, taglessName(meta.metric_name));
   // case %cn
   label = label.replace(/%cn/g, meta.metric_name);
+
+  // allow accessing the check tags
+  const [name, stream_tags] = taglessNameAndTags(meta.metric_name);
+  const tagSet = splitTags(stream_tags);
+  for (const tag of meta.check_tags) {
+    const tagSep = tag.split(/:/g);
+    let tagCat = tagSep.shift();
+    if (!tagCat.startsWith('__') && tagCat !== '') {
+      let tagVal = tagSep.join(':');
+      tagCat = decodeTag(tagCat);
+      tagVal = decodeTag(tagVal);
+      if (tagSet[tagCat] === undefined) {
+        tagSet[tagCat] = [];
+      }
+      tagSet[tagCat].push(tagVal);
+    }
+  }
+
   // case %tv
   label = label.replace(/%tv-?{([^}]*)}/g, x => {
     const elide = x.substring(3, 4);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 5 : 4, x.length - 1);
-    const [name, tags] = taglessNameAndTags(meta.metric_name);
-    const tagSet = splitTags(tags);
     if (tag === '*') {
       const tagCats = [];
       for (const k of _.keys(tagSet)) {
-        if (!k.startsWith('__') && choose(metaIn, k)) {
+        if (!k.startsWith('__') && k !== '' && choose(metaIn, k)) {
           tagCats.push(k);
         }
       }
@@ -95,7 +136,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
       const tagVals = _.map(tagCats, tagCat => tagSet[tagCat][0]);
       return tagVals.join(',');
     }
-    if (tagSet[tag] !== undefined && choose(metaIn, tag)) {
+    if (tagSet[tag] !== undefined && tag !== '' && choose(metaIn, tag)) {
       return tagSet[tag][0];
     }
     return '';
@@ -105,12 +146,10 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
     const elide = x.substring(2, 3);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 4 : 3, x.length - 1);
-    const [name, tags] = taglessNameAndTags(meta.metric_name);
-    const tagSet = splitTags(tags);
     if (tag === '*') {
       const tagCats = [];
       for (const k of _.keys(tagSet)) {
-        if (!k.startsWith('__') && choose(metaIn, k)) {
+        if (!k.startsWith('__') && k !== '' && choose(metaIn, k)) {
           const v = tagSet[k][0];
           tagCats.push(k + ':' + v);
         }
@@ -118,7 +157,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
       tagCats.sort();
       return tagCats.join(',');
     }
-    if (tagSet[tag] !== undefined && choose(metaIn, tag)) {
+    if (tagSet[tag] !== undefined && tag !== '' && choose(metaIn, tag)) {
       return tag + ':' + tagSet[tag][0];
     }
     return '';

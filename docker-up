@@ -25,7 +25,7 @@ elif test -n "$RUNNING"; then
 	echo "; docker rm $NAME"
 	exit 1
 else
-	cmd docker run --net=host -d --name=$NAME $IMAGE
+	cmd docker run -p 3000:3000 -d -e GF_LOG_LEVEL=debug --name=$NAME $IMAGE
 	ID=$(docker ps -q -f name=grafana)
 fi
 

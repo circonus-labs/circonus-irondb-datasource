@@ -1,4 +1,4 @@
-const logEnabled = false;
+const logEnabled = true;
 const now = (): string => new Date().toISOString();
 
 export default function Log(category: string): (message: () => string) => void {

@@ -10,6 +10,7 @@
     "noImplicitThis": false,
     "noUnusedLocals": false,
     "strictNullChecks": false,
-    "pretty": false
+    "pretty": true,
+    "sourceMap": true
   }
 }

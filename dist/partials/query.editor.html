@@ -1,13 +1,53 @@
-<query-editor-row query-ctrl="ctrl" can-collapse="true" has-text-edit-mode="true">
-
+<query-editor-row query-ctrl="ctrl" can-collapse="true" has-text-edit-mode="false">
     <div class="gf-form-inline">
-      <div ng-if="!ctrl.target.isCaql" class="gf-form">
+        <div class="gf-form">
+            <label class="gf-form-label width-6 query-keyword">Query Type</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="querytype" model="ctrl.target.querytype" on-change="ctrl.queryTypeValueChanged()" css-class="gf-size-auto"
+                              get-options="ctrl.queryTypeOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+    </div>
+    <div class="gf-form-inline">
+      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Series</label>
       </div>
-      <div ng-if="ctrl.target.isCaql" class="gf-form gf-form--grow">
-        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="CAQL" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
+      <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
+        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
       </div>
-      <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form-inline">
+      <div ng-if="ctrl.target.querytype === 'alerts'" class="gf-form gf-form--grow">
+          <div class="gf-form-inline">
+            <div class="gf-form">
+                <label class="gf-form-label width-6 query-keyword">Alert ID</label>
+            </div>
+            <div class="gf-form gf-form--grow">
+                <input id="alert_metric_id" class="gf-form-input" type="text" ng-model='ctrl.target.alert_id' ng-blur="ctrl.updateAlertId()" placeholder="123456"></input>
+            </div>
+          </div>
+          <div class="gf-form-inline">
+            <div class="gf-form">
+              <label class="gf-form-label width-6 query-keyword">Alert query</label>
+            </div>
+            <div class="gf-form gf-form--grow">
+              <input id="alert_metric_query" class="gf-form-input" type="text" ng-model='ctrl.target.query' ng-blur="ctrl.updateAlertQuery()" placeholder="(metric:available)(active:1)"></input>
+            </div>
+            <div class="gf-form">
+              <label class="gf-form-label width-6 query-keyword">Local filter</label>
+            </div>
+            <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+              <gf-form-dropdown name="alert_local_filter_match" model="ctrl.target.local_filter_match" on-change="ctrl.localFilterMatchValueChanged()" css-class="gf-size-auto"
+                                get-options="ctrl.localFilterMatchOptions"
+                                lookup-text="true">
+              </gf-form-dropdown>
+            </div>
+            <div class="gf-form gf-form--grow">
+              <input id="alert_local_filter" class="gf-form-input" type="text" ng-model='ctrl.target.local_filter' ng-blur="ctrl.updateAlertLocalFilter()" placeholder="tag:cluster:core-central*,acknowleged:false"></input>
+            </div>
+          </div>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form gf-form-inline">
         <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
           <div ng-switch="segment._typeName">
             <div ng-switch-when="TagPair" class="irondb-tag-pair mash-r mash-l join-r join-l">
@@ -37,11 +77,11 @@
           </div>
         </div>
       </div>
-      <div ng-if="!ctrl.target.isCaql" class="gf-form gf-form--grow ml-1">
+      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form gf-form--grow ml-1">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="!ctrl.target.isCaql&&ctrl.target.paneltype!=='Heatmap'" class="gf-form">
+    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format!=='heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Label</label>
       </div>
@@ -58,7 +98,7 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="!ctrl.target.isCaql&&ctrl.target.paneltype!=='Heatmap'" class="gf-form">
+    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format!=='heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Value Type</label>
       </div>
@@ -89,5 +129,18 @@
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-
+    <div class="gf-form">
+        <div class="gf-form">
+            <label class="gf-form-label width-6 query-keyword">Format</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="format" model="ctrl.target.format" css-class="gf-size-auto"
+                              get-options="ctrl.formatOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+        <div class="gf-form gf-form--grow">
+            <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+    </div>
 </query-editor-row>
