@@ -38,6 +38,7 @@ import {
   AnnotationEvent,
   LoadingState,
   TimeSeries,
+  isTableData,
 } from '@grafana/data';
 
 const log = Log('IrondbDatasource');
@@ -1358,6 +1359,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     for (let si = 0; si < data.length; si++) {
       const dummy = name + ' [' + (si + 1) + ']';
       const tname = meta[si] ? meta[si].label : dummy;
+      const explicitTags = tname.match(/\|ST\[[^\]]*\]/) != null;
       let lname = taglessName(tname);
       let tags = meta[si].tags;
       const metricLabel = metricLabels[si];
@@ -1375,6 +1377,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
       }
 
+      let decoded_tags = [];
       if (tags !== undefined) {
         for (const tag of tags) {
           const tagSep = tag.split(/:/g);
@@ -1384,8 +1387,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             tagCat = decodeTag(tagCat);
             tagVal = decodeTag(tagVal);
             labels[tagCat] = tagVal;
+            decoded_tags.push(tagCat + ":" + tagVal);
           }
         }
+      }
+      let dname = lname;
+      if (decoded_tags.length > 0 && explicitTags) {
+        dname = dname + " { " + decoded_tags.join(", ") + " }";
       }
 
       const timeField = getTimeField();
@@ -1393,7 +1401,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         name: TIME_SERIES_VALUE_FIELD_NAME,
         type: FieldType.number,
         config: {
-          displayName: lname,
+          displayName: dname,
         },
         labels: labels,
         values: new ArrayVector<number>(),
