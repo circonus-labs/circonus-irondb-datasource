@@ -34,6 +34,8 @@ ID=$(docker ps -q -f name=grafana)
 # We use user root here b/c of docker bugs w/ cp.
 # Target files from the last run should be owned by grafana, alas they are not.
 cmd docker exec --user=root -it $ID rm -rf /var/lib/grafana/plugins/circonus-irondb-datasource
-cmd docker cp $SRC/ $ID:/var/lib/grafana/plugins/circonus-irondb-datasource/
+cmd docker exec --user=root -it $ID mkdir /var/lib/grafana/plugins/circonus-irondb-datasource
+cmd docker cp $SRC/package.json $ID:/var/lib/grafana/plugins/circonus-irondb-datasource/package.json
+cmd docker cp $SRC/dist/ $ID:/var/lib/grafana/plugins/circonus-irondb-datasource/dist/
 cmd docker exec --user=root -it $ID rm -rf /var/lib/grafana/plugins/circonus-irondb-datasource/node_modules
 cmd docker restart $ID
