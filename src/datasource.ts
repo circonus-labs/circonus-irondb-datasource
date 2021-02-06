@@ -732,7 +732,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         );
         start -= interval;
         end += interval;
-        const caqlQuery = this.templateSrv.replace(irondbOptions['caql']['names'][i].leaf_name);
+        const caqlQuery = this.templateSrv.replace(
+          irondbOptions['caql']['names'][i].leaf_name,
+          irondbOptions['scopedVars']
+        );
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
         options.url = options.url + '&period=' + interval;
@@ -762,7 +765,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.method = 'GET';
         options.url = options.url + '/alert';
-        const alertQuery = this.templateSrv.replace(irondbOptions['alert']['names'][i]);
+        const alertQuery = this.templateSrv.replace(irondbOptions['alert']['names'][i], irondbOptions['scopedVars']);
         if (alertQuery.startsWith('alert_id:')) {
           options.url = options.url + '/' + alertQuery.split(':')[1];
         } else {
@@ -1074,7 +1077,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     });
   }
 
-  buildFetchStream(target, result, i) {
+  buildFetchStream(target, result, i, scopedVars) {
     result[i]['leaf_data'] = {
       egress_function: 'average',
       uuid: result[i]['uuid'],
@@ -1100,7 +1103,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       metriclabel = '%n | %t-{*}';
     }
     metriclabel = metaInterpolateLabel(metriclabel, result, i);
-    metriclabel = this.templateSrv.replace(metriclabel);
+    metriclabel = this.templateSrv.replace(metriclabel, scopedVars);
     result[i]['leaf_data'].metriclabel = metriclabel;
     result[i]['leaf_data'].check_tags = result[i].check_tags;
     if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
@@ -1137,7 +1140,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
-    const rawQuery = this.templateSrv.replace(target['query']);
+    const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
     return this.metricTagsQuery(rawQuery, false, [start, end])
       .then(result => {
         result.data = this.filterMetricsByType(target, result.data);
@@ -1148,19 +1151,21 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       })
       .then(result => {
         for (let i = 0; i < result.length; i++) {
-          cleanOptions['std']['names'].push(this.buildFetchStream(target, result, i));
+          cleanOptions['std']['names'].push(this.buildFetchStream(target, result, i, cleanOptions['scopedVars']));
         }
         return cleanOptions;
       });
   }
 
   buildAlertQueryAsync(cleanOptions, target, start, end) {
-    let rawQuery = this.templateSrv.replace(target['query']);
+    let rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
     if (target['alert_id'] !== '') {
-      rawQuery = 'alert_id:' + this.templateSrv.replace(target['alert_id']);
+      rawQuery = 'alert_id:' + this.templateSrv.replace(target['alert_id'], cleanOptions['scopedVars']);
     }
     cleanOptions['alert']['names'].push(rawQuery);
-    cleanOptions['alert']['local_filters'].push(this.templateSrv.replace(target['local_filter']));
+    cleanOptions['alert']['local_filters'].push(
+      this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'])
+    );
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
   }
 
@@ -1170,6 +1175,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     const end = new Date(options.range.to).getTime() / 1000;
     const intervalMs = Math.round((options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints);
 
+    cleanOptions['scopedVars'] = options.scopedVars;
     cleanOptions['meta'] = options.meta;
     cleanOptions['refId'] = options.refId;
     cleanOptions['maxDataPoints'] = options.maxDataPoints;
@@ -1387,13 +1393,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             tagCat = decodeTag(tagCat);
             tagVal = decodeTag(tagVal);
             labels[tagCat] = tagVal;
-            decoded_tags.push(tagCat + ":" + tagVal);
+            decoded_tags.push(tagCat + ':' + tagVal);
           }
         }
       }
       let dname = lname;
       if (decoded_tags.length > 0 && explicitTags) {
-        dname = dname + " { " + decoded_tags.join(", ") + " }";
+        dname = dname + ' { ' + decoded_tags.join(', ') + ' }';
       }
 
       const timeField = getTimeField();
