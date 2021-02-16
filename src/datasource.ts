@@ -1711,6 +1711,12 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (tag !== '' && !tag.startsWith('__')) {
           i++;
           combinedTags = combinedTags + tag + ':' + tags[tag][0];
+
+          // also add a dedicated field per tag so people can split them out
+          // if they want to
+          const tf = getTextField(tag);
+          tf.values.add(tags[tag][0]);
+          valueFields.add(tf);
         }
       }
       tagField.values.add(combinedTags);
