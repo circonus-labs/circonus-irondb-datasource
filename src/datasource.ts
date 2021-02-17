@@ -1552,6 +1552,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     for (let si = 0; si < enrich_results.length; si++) {
       const timeField = getTimeField();
+      const alternateTimeField = getTimeField('alert_timestamp');
       const labelFields = new Set<MutableField>();
       const valueFields = new Set<MutableField>();
       const all_labels = {};
@@ -1593,6 +1594,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (key === '_occurred_on') {
           const epoch = alert[key];
           timeField.values.add(epoch * 1000); // to milliseconds
+          alternateTimeField.values.add(epoch * 1000);
           // also create a time window 30 minutes before the alert up to 30 mins after the  cleared_on timestamp
           // if it's not a cleared alert, use an 30 mins after the alert timestamp as the window (or now if it's recent)
           const before = epoch - 1800;
@@ -1840,7 +1842,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
       dataFrames.push({
         length: timeField.values.length,
-        fields: [timeField, ...labelFields, ...valueFields],
+        fields: [timeField, alternateTimeField, ...labelFields, ...valueFields],
       });
     }
 
