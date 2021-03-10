@@ -235,10 +235,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   query(options: DataQueryRequest<IrondbQueryInterface>): Promise<DataQueryResponse> {
     log(() => 'query() options = ' + JSON.stringify(options));
 
-    if (!_.isUndefined(this.queryRange) && !_.isEqual(options.rangeRaw, this.queryRange)) {
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(options.range, this.queryRange)) {
       log(
-        () =>
-          'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.rangeRaw)
+        () => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.range)
       );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
@@ -246,7 +245,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         requestCache.clear();
       }
     }
-    this.queryRange = options.rangeRaw;
+    this.queryRange = options.range;
 
     if (_.isEmpty(options['targets'][0])) {
       return this.$q.when({ data: [] });
@@ -281,7 +280,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     log(() => 'annotationQuery() options = ' + JSON.stringify(query.annotation));
     log(() => 'annotationQuery() range = ' + JSON.stringify(query.range));
 
-    this.queryRange = query.rangeRaw;
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(query.range, this.queryRange)) {
+      log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(query.range));
+      if (this.useCaching) {
+        log(() => 'query() clearing cache');
+        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        requestCache.clear();
+      }
+    }
+    this.queryRange = query.range;
 
     let options: any = {};
     const queries = [];
@@ -474,6 +481,23 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   metricFindQuery(query: string, options: any) {
     const variable = options.variable;
+    const range = options.range;
+    let from = undefined;
+    let to = undefined;
+    if (!_.isUndefined(range)) {
+      from = range.from.valueOf() / 1000;
+      to = range.to.valueOf() / 1000;
+      if (!_.isUndefined(this.queryRange) && !_.isEqual(range, this.queryRange)) {
+        log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(range));
+        if (this.useCaching) {
+          log(() => 'query() clearing cache');
+          const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+          requestCache.clear();
+        }
+      }
+      this.queryRange = range;
+    }
+
     log(() => 'Options: ' + JSON.stringify(options));
     if (query !== '' && variable !== undefined && (variable.regex !== '' || variable.useTags)) {
       log(() => 'metricFindQuery() incoming query = ' + query);
@@ -486,13 +510,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
       if (tagCat !== '') {
-        return this.metricTagValsQuery(metricQuery, tagCat).then(results => {
+        return this.metricTagValsQuery(metricQuery, tagCat, from, to).then(results => {
           return _.map(results.data, result => {
             return { value: result };
           });
         });
       } else {
-        return this.metricTagsQuery(metricQuery).then(results => {
+        return this.metricTagsQuery(metricQuery, false, from, to).then(results => {
           return _.map(results.data, result => {
             return { value: result.metric_name };
           });
@@ -506,30 +530,29 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricTagsQuery(query: string, allowEmptyWildcard = false, activityWindow: [number, number] = null) {
+  metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
     if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
     let queryUrl = '/find' + this.getAccountId() + '/tags?query=';
     queryUrl = queryUrl + query;
-    if (this.activityTracking && !_.isEmpty(activityWindow)) {
-      log(() => 'metricTagsQuery() activityWindow = ' + JSON.stringify(activityWindow));
-      queryUrl += '&activity_start_secs=' + _.toInteger(activityWindow[0]);
-      queryUrl += '&activity_end_secs=' + _.toInteger(activityWindow[1]);
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
     log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
-  metricTagCatsQuery(query: string) {
-    let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=' + query;
-    log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
-    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
-  }
-
-  metricTagValsQuery(metricQuery: string, cat: string) {
+  metricTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + metricQuery;
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
+    }
     log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
@@ -1141,7 +1164,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
-    return this.metricTagsQuery(rawQuery, false, [start, end])
+    return this.metricTagsQuery(rawQuery, false, start, end)
       .then(result => {
         result.data = this.filterMetricsByType(target, result.data);
         for (let i = 0; i < result.data.length; i++) {
