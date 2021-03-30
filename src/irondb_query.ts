@@ -256,6 +256,28 @@ export function decodeTag(tag: string): string {
   return tag;
 }
 
+export function decodeTagsInLabel(label: string): string {
+  let i = 0;
+  let l = label.length;
+  let replaced = label;
+  while (i < l && i !== -1) {
+    i = label.indexOf('b"', i);
+    if (i === -1) {
+      return replaced;
+    } else {
+      const j = label.indexOf('"', i + 2);
+      if (j === -1) {
+        //malformed base64 encoding.
+        return replaced;
+      }
+      const t = decodeTag(label.substring(i, j + 1));
+      replaced = replaced.replace(label.substring(i, j + 1), t);
+      i = j + 1;
+    }
+  }
+  return replaced;
+}
+
 export function decodeNameAndTags(name: string): string {
   const tags = [];
   const [metric, rawTags] = taglessNameAndTags(name);

@@ -14,6 +14,7 @@ import {
   splitTags,
   mergeTags,
   TagSet,
+  decodeTagsInLabel,
 } from './irondb_query';
 
 import {
@@ -1431,6 +1432,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           }
         }
       }
+      lname = decodeTagsInLabel(lname);
       let dname = lname;
       if (decoded_tags.length > 0 && explicitTags) {
         dname = dname + ' { ' + decoded_tags.join(', ') + ' }';
