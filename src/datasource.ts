@@ -313,7 +313,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (alertId !== '') {
         options.url = options.url + '/' + alertId;
       } else {
-        options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+        options.url = options.url + '?search=' + encodeURIComponent(alertQuery) + '&size=500';
       }
       options.headers = headers;
       options.retry = 1;
@@ -804,7 +804,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (alertQuery.startsWith('alert_id:')) {
           options.url = options.url + '/' + alertQuery.split(':')[1];
         } else {
-          options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+          options.url = options.url + '?search=' + encodeURIComponent(alertQuery) + '&size=1000';
         }
         options.headers = headers;
         options.retry = 1;
