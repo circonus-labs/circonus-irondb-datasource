@@ -869,6 +869,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     // alert_id
     // tag
     // acknowledged
+    // severities
     if (pair.key === 'alert_id') {
       if (alert['_cid'].endsWith(pair.value)) {
         return true;
@@ -876,12 +877,16 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return false;
     }
 
-    if (pair.key === 'acknowledge') {
+    if (pair.key === 'acknowledged') {
       if (pair.value === 'true') {
-        return alert['_acknowledge'] !== null;
+        return alert['_acknowledgement'] !== null;
       } else {
-        return alert['_acknowledge'] === null;
+        return alert['_acknowledgement'] === null;
       }
+    }
+
+    if (pair.key === 'severities') {
+      return pair.value.indexOf(alert['_severity']) !== -1;
     }
 
     if (pair.key === 'tag') {
