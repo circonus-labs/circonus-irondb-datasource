@@ -882,6 +882,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return alert['_acknowledgement'] !== null;
       } else if (pair.value === 'false') {
         return alert['_acknowledgement'] === null;
+      } else {
+        return true;
       }
     }
 
