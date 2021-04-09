@@ -25,10 +25,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'caql', text: 'CAQL' },
     { value: 'basic', text: 'Basic' },
     { value: 'alerts', text: 'Alerts' },
+    { value: 'alert_counts', text: 'Alert Counts' },
   ];
   localFilterMatchOptions = [
     { value: 'all', text: 'ALL' },
     { value: 'any', text: 'ANY' },
+  ];
+  alertCountQueryTypeOptions = [
+    { value: 'instant', text: 'instant' },
+    { value: 'range', text: 'range' },
   ];
   labelTypeOptions = [
     { value: 'default', text: 'name and tags' },
@@ -97,6 +102,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';
     this.target.local_filter_match = this.target.local_filter_match || 'all';
+    this.target.alert_count_query_type = this.target.alert_count_query_type || 'instant';
     this.target.alert_id = this.target.alert_id || '';
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
@@ -140,7 +146,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
       this.target.query = caqlQuery;
       this.panelCtrl.refresh();
-    } else if (this.target.querytype === 'alerts') {
+    } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
       this.target.query = '';
       this.panelCtrl.refresh();
     }
@@ -165,6 +171,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   localFilterMatchValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  alertCountQueryTypeValueChanged() {
     this.panelCtrl.refresh();
   }
 

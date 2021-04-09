@@ -808,11 +808,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.headers = headers;
         options.retry = 1;
-        options.start = 0;
-        options.end = 0;
+        options.start = irondbOptions['alert']['start'];
+        options.end = irondbOptions['alert']['end'];
         options.isAlert = true;
+        options.counts_only = irondbOptions['alert']['counts_only'];
         options.local_filter = irondbOptions['alert']['local_filters'][i];
         options.local_filter_match = irondbOptions['alert']['local_filter_matches'][i];
+        options.query_type = irondbOptions['alert']['query_type'];
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
         }
@@ -832,9 +834,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             log(() => 'irondbRequest() query = ' + JSON.stringify(query));
             log(() => 'irondbRequest() result = ' + JSON.stringify(result));
             if (!_.isUndefined(query.isAlert)) {
-              return this.enrichAlertsWithRules(result, query).then((results) => {
-                return this.convertAlertDataToGrafana(results);
-              });
+              if (query.counts_only === false) {
+                return this.enrichAlertsWithRules(result, query).then((results) => {
+                  return this.convertAlertDataToGrafana(results);
+                });
+              } else {
+                return this.countAlerts(result, query);
+              }
             } else {
               return this.convertIrondbDf4DataToGrafana(result, query);
             }
@@ -961,6 +967,96 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return true;
     }
     return true;
+  }
+
+  countAlerts(alerts, query) {
+    const datatemp = alerts.data;
+    let data = [];
+    if (datatemp.constructor === Array) {
+      data = datatemp;
+    } else {
+      data.push(datatemp);
+    }
+    const queries = [];
+
+    const filter_pairs = [];
+    const filter_match = query['local_filter_match'];
+    if (query['local_filter'] !== undefined && query['local_filter'] !== '') {
+      // parse the filter into match pairs
+      // a filter is a series of field:value tokens separated by commas
+      const tokens = query['local_filter'].split(',');
+      for (const t of tokens) {
+        const x = t.trim();
+        const i = x.indexOf(':');
+        if (i === -1) {
+          continue;
+        }
+        const pair: any = {};
+        pair.key = x.slice(0, i);
+        pair.value = x.slice(i + 1);
+        filter_pairs.push(pair);
+      }
+    }
+
+    const countBuckets = {};
+
+    if (query['query_type'] === 'range') {
+      // fill the buckets minutely with zeroes
+      let qs = query.start;
+      qs = qs - (qs % 60);
+      let qe = query.end;
+      qe = qe - (qe % 60);
+      for (let i = qs; i < qe; i += 60) {
+        countBuckets[i.toString()] = 0;
+      }
+    }
+
+    let count = 0;
+    for (let i = 0; i < data.length; i++) {
+      if (this.alertFiltered(filter_pairs, filter_match, data[i])) {
+        continue;
+      }
+      const alert = data[i];
+      let epoch = alert['_occurred_on'];
+
+      if (query['query_type'] === 'range') {
+        // floor the timestamp to its minute so we can bucket counts by minute
+        epoch = epoch - (epoch % 60);
+
+        if (epoch.toString() in countBuckets) {
+          countBuckets[epoch.toString()] = countBuckets[epoch.toString()] + 1;
+        }
+      } else {
+        count = count + 1;
+      }
+    }
+    const timeField = getTimeField();
+    const valueField = getNumberField();
+    const dataFrames: DataFrame[] = [];
+
+    if (query['query_type'] === 'range') {
+      for (let [epoch, count] of Object.entries(countBuckets)) {
+        timeField.values.add(Number(epoch) * 1000);
+        valueField.values.add(count);
+      }
+
+      dataFrames.push({
+        length: timeField.values.length,
+        fields: [timeField, valueField],
+      });
+    } else {
+      valueField.values.add(count);
+      dataFrames.push({
+        length: 1,
+        fields: [valueField],
+      });
+    }
+
+    return {
+      t: 'ts',
+      data: dataFrames,
+      state: LoadingState.Done,
+    };
   }
 
   // this also applies any local filters.
@@ -1209,6 +1305,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'])
     );
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
+    cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
+    cleanOptions['alert']['query_type'] = target['alert_count_query_type'];
   }
 
   buildIrondbParamsAsync(options) {
@@ -1232,6 +1330,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['caql']['names'] = [];
     cleanOptions['alert'] = {};
     cleanOptions['alert']['names'] = [];
+    cleanOptions['alert']['start'] = start;
+    cleanOptions['alert']['end'] = end;
     cleanOptions['alert']['local_filters'] = [];
     cleanOptions['alert']['local_filter_matches'] = [];
 
@@ -1258,7 +1358,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           },
         });
         return Promise.resolve(cleanOptions);
-      } else if (target.querytype === 'alerts') {
+      } else if (target.querytype === 'alerts' || target.querytype === 'alert_counts') {
         return this.buildAlertQueryAsync(cleanOptions, target, start, end);
       } else {
         return this.buildFetchParamsAsync(cleanOptions, target, start, end);
