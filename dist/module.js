@@ -11567,9 +11567,11 @@ function (_super) {
         options.end = irondbOptions['alert']['end'];
         options.isAlert = true;
         options.counts_only = irondbOptions['alert']['counts_only'];
+        options.label = irondbOptions['alert']['labels'][i];
         options.local_filter = irondbOptions['alert']['local_filters'][i];
         options.local_filter_match = irondbOptions['alert']['local_filter_matches'][i];
         options.query_type = irondbOptions['alert']['query_type'];
+        options.target = irondbOptions['alert']['target'];
 
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
@@ -11610,11 +11612,19 @@ function (_super) {
       }).then(function (result) {
         if (result['data'].constructor === Array) {
           for (var i = 0; i < result['data'].length; i++) {
+            if ('target' in result && 'refId' in result['target']) {
+              result['data'][i]['target'] = result['target']['refId'];
+            }
+
             queryResults['data'].push(result['data'][i]);
           }
         }
 
         if (result['data'].constructor === Object) {
+          if ('target' in result && 'refId' in result['target']) {
+            result['data']['target'] = result['target']['refId'];
+          }
+
           queryResults['data'].push(result['data']);
         }
 
@@ -11901,8 +11911,14 @@ function (_super) {
       }
     }
 
+    var label = 'Value';
+
+    if (query['label']) {
+      label = query['label'];
+    }
+
     var timeField = getTimeField();
-    var valueField = getNumberField();
+    var valueField = getNumberField(label);
     var dataFrames = [];
 
     if (query['query_type'] === 'range') {
@@ -11942,6 +11958,7 @@ function (_super) {
     return {
       t: 'ts',
       data: dataFrames,
+      target: query['target'],
       state: _grafana_data__WEBPACK_IMPORTED_MODULE_6__["LoadingState"].Done
     };
   }; // this also applies any local filters.
@@ -12293,6 +12310,8 @@ function (_super) {
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
     cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
     cleanOptions['alert']['query_type'] = target['alert_count_query_type'];
+    cleanOptions['alert']['labels'].push(this.templateSrv.replace(target['metriclabel'], cleanOptions['scopedVars']));
+    cleanOptions['alert']['target'] = target;
   };
 
   IrondbDatasource.prototype.buildIrondbParamsAsync = function (options) {
@@ -12321,6 +12340,7 @@ function (_super) {
     cleanOptions['alert']['end'] = end;
     cleanOptions['alert']['local_filters'] = [];
     cleanOptions['alert']['local_filter_matches'] = [];
+    cleanOptions['alert']['labels'] = [];
 
     var targets = lodash__WEBPACK_IMPORTED_MODULE_1___default.a.reject(options.targets, function (target) {
       var reject = target.hide || target['query'] === undefined && target['alert_id'] === undefined || target['query'].length === 0 && target['alert_id'].length === 0;

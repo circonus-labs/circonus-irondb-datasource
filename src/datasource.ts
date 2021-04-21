@@ -812,9 +812,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         options.end = irondbOptions['alert']['end'];
         options.isAlert = true;
         options.counts_only = irondbOptions['alert']['counts_only'];
+        options.label = irondbOptions['alert']['labels'][i];
         options.local_filter = irondbOptions['alert']['local_filters'][i];
         options.local_filter_match = irondbOptions['alert']['local_filter_matches'][i];
         options.query_type = irondbOptions['alert']['query_type'];
+        options.target = irondbOptions['alert']['target'];
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
         }
@@ -848,10 +850,16 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           .then((result) => {
             if (result['data'].constructor === Array) {
               for (let i = 0; i < result['data'].length; i++) {
+                if ('target' in result && 'refId' in result['target']) {
+                  result['data'][i]['target'] = result['target']['refId'];
+                }
                 queryResults['data'].push(result['data'][i]);
               }
             }
             if (result['data'].constructor === Object) {
+              if ('target' in result && 'refId' in result['target']) {
+                result['data']['target'] = result['target']['refId'];
+              }
               queryResults['data'].push(result['data']);
             }
             queryResults['t'] = result['t'];
@@ -1030,8 +1038,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         count = count + 1;
       }
     }
+
+    let label = 'Value';
+    if (query['label']) {
+      label = query['label'];
+    }
     const timeField = getTimeField();
-    const valueField = getNumberField();
+    const valueField = getNumberField(label);
     const dataFrames: DataFrame[] = [];
 
     if (query['query_type'] === 'range') {
@@ -1055,6 +1068,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return {
       t: 'ts',
       data: dataFrames,
+      target: query['target'],
       state: LoadingState.Done,
     };
   }
@@ -1307,6 +1321,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
     cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
     cleanOptions['alert']['query_type'] = target['alert_count_query_type'];
+    cleanOptions['alert']['labels'].push(this.templateSrv.replace(target['metriclabel'], cleanOptions['scopedVars']));
+    cleanOptions['alert']['target'] = target;
   }
 
   buildIrondbParamsAsync(options) {
@@ -1334,6 +1350,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['alert']['end'] = end;
     cleanOptions['alert']['local_filters'] = [];
     cleanOptions['alert']['local_filter_matches'] = [];
+    cleanOptions['alert']['labels'] = [];
 
     const targets = _.reject(options.targets, (target) => {
       const reject =
