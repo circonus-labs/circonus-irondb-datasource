@@ -304,7 +304,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       options.method = 'GET';
       options.url = options.url + '/alert';
       const alertId = this.templateSrv.replace(query.annotation['alertId']);
-      const alertQuery = this.templateSrv.replace(query.annotation['annotationQueryText']);
+      const alertQuery = this.templateSrv.replace(query.annotation['annotationQueryText'], null, this.interpolateExpr);
       if (alertId !== '') {
         options.url = options.url + '/' + alertId;
       } else {
@@ -462,6 +462,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   interpolateExpr(value: string | string[] = [], variable: any) {
+    if (typeof value === 'string') {
+      value = encodeTag(SegmentType.TagVal, value, false);
+    } else {
+      for (let i in value) {
+        value[i] = encodeTag(SegmentType.TagVal, value[i], false);
+      }
+    }
     // if no multi or include all do not regexEscape
     if (!variable.multi && !variable.includeAll) {
       return value;
@@ -469,6 +476,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     if (typeof value === 'string') {
       return value;
+    } else {
+      return value.join(',');
     }
   }
 
@@ -507,7 +516,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (tagCat !== '') {
         return this.metricFindTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
           return _.map(results.data, (result) => {
-            return { value: result };
+            return { value: decodeTag(result) };
           });
         });
       } else {
@@ -776,7 +785,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         end += interval;
         const caqlQuery = this.templateSrv.replace(
           irondbOptions['caql']['names'][i].leaf_name,
-          irondbOptions['scopedVars']
+          irondbOptions['scopedVars'],
+          this.interpolateExpr
         );
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
@@ -808,7 +818,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.method = 'GET';
         options.url = options.url + '/alert';
-        const alertQuery = this.templateSrv.replace(irondbOptions['alert']['names'][i], irondbOptions['scopedVars']);
+        const alertQuery = this.templateSrv.replace(
+          irondbOptions['alert']['names'][i],
+          irondbOptions['scopedVars'],
+          this.interpolateExpr
+        );
         if (alertQuery.startsWith('alert_id:')) {
           options.url = options.url + '/' + alertQuery.split(':')[1];
         } else {
@@ -1326,13 +1340,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   buildAlertQueryAsync(cleanOptions, target, start, end) {
-    let rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+    let rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars'], this.interpolateExpr);
     if (target['alert_id'] !== '') {
       rawQuery = 'alert_id:' + this.templateSrv.replace(target['alert_id'], cleanOptions['scopedVars']);
     }
     cleanOptions['alert']['names'].push(rawQuery);
     cleanOptions['alert']['local_filters'].push(
-      this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'])
+      this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'], this.interpolateExpr)
     );
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
     cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
