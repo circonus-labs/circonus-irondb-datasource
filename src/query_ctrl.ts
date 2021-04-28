@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import IrondbQuery from './irondb_query';
+// eslint-disable-next-line no-duplicate-imports
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import appEvents from 'grafana/app/core/app_events';
@@ -44,7 +45,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'derive', text: 'rate of change (derive)' },
     { value: 'derive_stddev', text: 'rate of change σ (derive_stddev)' },
     { value: 'counter', text: 'rate of positive change (counter)' },
-    { value: 'counter_stddev', text: 'rate of positive change σ (counter_stddev)' },
+    {
+      value: 'counter_stddev',
+      text: 'rate of positive change σ (counter_stddev)',
+    },
   ];
   rollupTypeOptions = [
     { value: 'automatic', text: 'automatic' },
@@ -267,14 +271,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       return this.datasource
         .metricTagsQuery('and(__name:' + query + ')', true)
-        .then(results => {
-          let metricnames = _.map(results.data, result => {
+        .then((results) => {
+          let metricnames = _.map(results.data, (result) => {
             return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
           log(() => 'getSegments() metricnames = ' + JSON.stringify(metricnames));
 
-          const allSegments = _.map(metricnames, segment => {
+          const allSegments = _.map(metricnames, (segment) => {
             return this.newSegment(SegmentType.MetricName, {
               value: segment,
               expandable: true,
@@ -282,7 +286,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           });
           return allSegments;
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err.toString());
           return [];
         });
@@ -291,7 +295,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'getSegments() tags for ' + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
-        .then(segments => {
+        .then((segments) => {
           if (segments.data && segments.data.length > 0) {
             const tagCats = segments.data;
             const tagSegments = [];
@@ -312,7 +316,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return tagSegments;
           }
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err);
           return [];
         });
@@ -333,7 +337,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'getSegments() tag vals for ' + metricName + ', ' + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
-        .then(segments => {
+        .then((segments) => {
           if (segments.data && segments.data.length > 0) {
             const tagVals = segments.data;
             const tagSegments = [];
@@ -343,7 +347,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 expandable: true,
               })
             );
-            _.eachRight(this.templateSrv.variables, variable => {
+            _.eachRight(this.templateSrv.variables, (variable) => {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {
                   type: 'template',
@@ -363,7 +367,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return tagSegments;
           }
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err);
           return [];
         });
@@ -406,7 +410,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   buildSegments() {
-    this.segments = _.map(this.queryModel.segments, s => this.mapSegment(s));
+    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
     log(() => 'buildSegments()');
 
     const checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
@@ -505,7 +509,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
           segmentIndex + 1,
           0,
           this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-          this.mapSegment({ type: SegmentType.TagCat, value: 'select tag', fake: true }),
+          this.mapSegment({
+            type: SegmentType.TagCat,
+            value: 'select tag',
+            fake: true,
+          }),
           this.mapSegment({ type: SegmentType.TagPair }),
           this.newSelectTagValSegment(),
           this.buildSelectTagPlusSegment(),

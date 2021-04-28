@@ -121,7 +121,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   }
 
   // case %tv
-  label = label.replace(/%tv-?{([^}]*)}/g, x => {
+  label = label.replace(/%tv-?{([^}]*)}/g, (x) => {
     const elide = x.substring(3, 4);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 5 : 4, x.length - 1);
@@ -133,7 +133,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
         }
       }
       tagCats.sort();
-      const tagVals = _.map(tagCats, tagCat => tagSet[tagCat][0]);
+      const tagVals = _.map(tagCats, (tagCat) => tagSet[tagCat][0]);
       return tagVals.join(',');
     }
     if (tagSet[tag] !== undefined && tag !== '' && choose(metaIn, tag)) {
@@ -142,7 +142,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
     return '';
   });
   // case %t
-  label = label.replace(/%t-?{([^}]*)}/g, x => {
+  label = label.replace(/%t-?{([^}]*)}/g, (x) => {
     const elide = x.substring(2, 3);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 4 : 3, x.length - 1);
@@ -306,7 +306,10 @@ export default class IrondbQuery {
     metricName = metricName.slice(11, -1) || '*';
     const tags = metricName.split(',');
     metricName = tags.shift();
-    this.segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
+    this.segments.push({
+      type: SegmentType.MetricName,
+      value: decodeTag(metricName),
+    });
 
     let first = true;
     for (let tag of tags) {
@@ -327,17 +330,26 @@ export default class IrondbQuery {
         tagIndex = 3;
       }
       if (tagOp) {
-        this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
+        this.segments.push({
+          type: SegmentType.TagOp,
+          value: tagCat.slice(0, tagIndex),
+        });
         tagCat = tagCat.slice(tagIndex);
       }
-      this.segments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
+      this.segments.push({
+        type: SegmentType.TagCat,
+        value: decodeTag(tagCat),
+      });
       this.segments.push({ type: SegmentType.TagPair });
       let end = 0;
       while (tagVal.endsWith(')')) {
         tagVal = tagVal.slice(0, -1);
         end++;
       }
-      this.segments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
+      this.segments.push({
+        type: SegmentType.TagVal,
+        value: decodeTag(tagVal),
+      });
       for (let i = 0; i < end; i++) {
         this.segments.push({ type: SegmentType.TagPlus });
         this.segments.push({ type: SegmentType.TagEnd });
@@ -347,7 +359,7 @@ export default class IrondbQuery {
       this.segments.push({ type: SegmentType.TagPlus });
     }
 
-    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, s => SegmentType[s.type])));
+    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
   updateSegmentValue(segment, index) {
