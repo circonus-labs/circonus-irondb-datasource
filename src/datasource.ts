@@ -3,29 +3,27 @@ import Log from './log';
 
 import micromatch from 'micromatch';
 import memoize from 'memoizee';
+// eslint-disable-next-line no-duplicate-imports
 import { Memoized } from 'memoizee';
 import {
   metaInterpolateLabel,
-  decodeNameAndTags,
   isStatsdCounter,
   taglessName,
   taglessNameAndTags,
   decodeTag,
+  encodeTag,
   splitTags,
   mergeTags,
   TagSet,
   decodeTagsInLabel,
+  SegmentType,
 } from './irondb_query';
 
 import {
   ArrayVector,
   DataFrame,
-  Field,
   FieldType,
-  formatLabels,
-  Labels,
   MutableField,
-  ScopedVars,
   TIME_SERIES_TIME_FIELD_NAME,
   TIME_SERIES_VALUE_FIELD_NAME,
   DataSourceApi,
@@ -38,14 +36,10 @@ import {
   AnnotationQueryRequest,
   AnnotationEvent,
   LoadingState,
-  TimeSeries,
-  isTableData,
 } from '@grafana/data';
 import * as Mustache from 'mustache';
 
 const log = Log('IrondbDatasource');
-
-import { map } from 'rxjs/operators';
 
 const DURATION_UNITS_DEFAULT = 's';
 const DURATION_UNITS = {
@@ -484,20 +478,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     } else {
       return value.join(',');
     }
-
-    if (value.length === 1) {
-      return value[0];
-    }
-
-    let q = '';
-    for (let i = 0; i < value.length; i++) {
-      if (i > 0) {
-        q = q + ',';
-      }
-      q = q + value[i];
-      i = i + 1;
-    }
-    return q;
   }
 
   metricFindQuery(query: string, options: any) {
@@ -1308,7 +1288,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars'], this.interpolateExpr);
     return this.metricTagsQuery(rawQuery, false, [start, end])
-      .then(result => {
+      .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
         for (let i = 0; i < result.data.length; i++) {
           result.data[i]['target'] = target;
@@ -1607,7 +1587,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             vstr = v.toString();
             const tsstr = ts.toString();
             if (_.isUndefined(lookaside[vstr])) {
-              lookaside[vstr] = { target: vstr, title: vstr, tags: labels, datapoints: [], _ts: {} };
+              lookaside[vstr] = {
+                target: vstr,
+                title: vstr,
+                tags: labels,
+                datapoints: [],
+                _ts: {},
+              };
               dataFrames.push(lookaside[vstr]);
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
