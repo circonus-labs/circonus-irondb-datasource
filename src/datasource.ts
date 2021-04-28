@@ -14,6 +14,7 @@ import {
   splitTags,
   mergeTags,
   TagSet,
+  decodeTagsInLabel,
 } from './irondb_query';
 
 import {
@@ -40,6 +41,7 @@ import {
   TimeSeries,
   isTableData,
 } from '@grafana/data';
+import * as Mustache from 'mustache';
 
 const log = Log('IrondbDatasource');
 
@@ -70,8 +72,8 @@ function parseDurationMs(duration: string): number {
 
 const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
 const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
-const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map(a => a * 60);
-const _d = [24, 12, 8, 6, 4, 3, 2, 1].map(a => a * 60 * 60);
+const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map((a) => a * 60);
+const _d = [24, 12, 8, 6, 4, 3, 2, 1].map((a) => a * 60 * 60);
 const _matchset = [_s, _m, _h, _d];
 
 function nudgeInterval(input, dir) {
@@ -166,9 +168,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   static stripActivityWindow(url) {
     return _.split(url, '&')
-      .map(p => p.split('='))
-      .filter(p => !p[0].startsWith('activity_'))
-      .map(p => p.join('='))
+      .map((p) => p.split('='))
+      .filter((p) => !p[0].startsWith('activity_'))
+      .map((p) => p.join('='))
       .join('&');
   }
 
@@ -183,7 +185,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   static setupCache(useCaching, backendSrv) {
-    const doRequest = options => {
+    const doRequest = (options) => {
       return backendSrv.datasourceRequest(options);
     };
     if (!useCaching) {
@@ -194,7 +196,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       max: IrondbDatasource.DEFAULT_CACHE_ENTRIES,
       maxAge: IrondbDatasource.DEFAULT_CACHE_TIME_MS,
       promise: true,
-      normalizer: args => {
+      normalizer: (args) => {
         const requestOptions = args[0];
         const cacheKey = IrondbDatasource.requestCacheKey(requestOptions);
         log(() => 'normalizer() cache lookup key = ' + cacheKey);
@@ -202,7 +204,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       },
     };
     log(() => 'setupCache() caching enabled');
-    return memoize(options => {
+    return memoize((options) => {
       log(() => 'doRequest() cache miss key = ' + IrondbDatasource.requestCacheKey(options));
       return doRequest(options);
     }, cacheOpts);
@@ -235,10 +237,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   query(options: DataQueryRequest<IrondbQueryInterface>): Promise<DataQueryResponse> {
     log(() => 'query() options = ' + JSON.stringify(options));
 
-    if (!_.isUndefined(this.queryRange) && !_.isEqual(options.rangeRaw, this.queryRange)) {
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(options.range, this.queryRange)) {
       log(
-        () =>
-          'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.rangeRaw)
+        () => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(options.range)
       );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
@@ -246,20 +247,20 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         requestCache.clear();
       }
     }
-    this.queryRange = options.rangeRaw;
+    this.queryRange = options.range;
 
     if (_.isEmpty(options['targets'][0])) {
       return this.$q.when({ data: [] });
     }
 
     return Promise.all([this.buildIrondbParams(options)])
-      .then(irondbOptions => {
+      .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
         return this.irondbRequest(irondbOptions[0]);
       })
-      .then(queryResults => {
+      .then((queryResults) => {
         if (queryResults.t === 'ts') {
           if (queryResults['data'].constructor === Array) {
             queryResults['data'].sort((a, b): number => {
@@ -270,7 +271,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
       })
-      .catch(err => {
+      .catch((err) => {
         if (err.status !== 0 || err.status >= 300) {
           this.throwerr(err);
         }
@@ -281,7 +282,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     log(() => 'annotationQuery() options = ' + JSON.stringify(query.annotation));
     log(() => 'annotationQuery() range = ' + JSON.stringify(query.range));
 
-    this.queryRange = query.rangeRaw;
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(query.range, this.queryRange)) {
+      log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(query.range));
+      if (this.useCaching) {
+        log(() => 'query() clearing cache');
+        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        requestCache.clear();
+      }
+    }
+    this.queryRange = query.range;
 
     let options: any = {};
     const queries = [];
@@ -304,7 +313,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (alertId !== '') {
         options.url = options.url + '/' + alertId;
       } else {
-        options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+        options.url = options.url + '?search=' + encodeURIComponent(alertQuery) + '&size=500';
       }
       options.headers = headers;
       options.retry = 1;
@@ -325,16 +334,16 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     return Promise.all(
-      queries.map(query =>
+      queries.map((query) =>
         this.datasourceRequest(query)
-          .then(result => {
+          .then((result) => {
             log(() => 'annotationQuery() query = ' + JSON.stringify(query));
             log(() => 'annotationQuery() result = ' + JSON.stringify(result));
             if (!_.isUndefined(query.isAlert)) {
               return this.enrichAlertsWithRules(result, query);
             }
           })
-          .then(results => {
+          .then((results) => {
             // this is a list of objects with "alert" and "rule" fields.
             const events: AnnotationEvent[] = [];
             for (const a of results) {
@@ -382,14 +391,19 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               data.evalMatches = [];
               data.evalMatches.push(alert_match);
 
+              let notes =
+                rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                  ? rule['notes']
+                  : 'Oh no!';
+
+              notes = Mustache.render(notes, tags);
+
               const event: any = {
                 time: alert['_occurred_on'] * 1000,
                 title: 'ALERTING',
                 text:
                   '<br />' +
-                  (rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
-                    ? rule['notes']
-                    : 'Oh no!') +
+                  notes +
                   '<br />' +
                   'Sev: ' +
                   alert['_severity'] +
@@ -406,6 +420,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
               events.push(event);
 
+              notes =
+                rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                  ? rule['notes']
+                  : 'Yay!';
+
+              notes = Mustache.render(notes, tags);
+
               // clear if it's cleared:
               if (alert['_cleared_on'] !== null) {
                 const alert_match: any = {};
@@ -420,9 +441,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                   title: 'OK',
                   text:
                     '<br />' +
-                    (rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
-                      ? rule['notes']
-                      : 'Yay!') +
+                    notes +
                     '<br />' +
                     'Sev: ' +
                     alert['_severity'] +
@@ -442,7 +461,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             return events;
           })
       )
-    ).then(results => {
+    ).then((results) => {
       return results;
     });
   }
@@ -474,6 +493,23 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   metricFindQuery(query: string, options: any) {
     const variable = options.variable;
+    const range = options.range;
+    let from = undefined;
+    let to = undefined;
+    if (!_.isUndefined(range)) {
+      from = range.from.valueOf() / 1000;
+      to = range.to.valueOf() / 1000;
+      if (!_.isUndefined(this.queryRange) && !_.isEqual(range, this.queryRange)) {
+        log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(range));
+        if (this.useCaching) {
+          log(() => 'query() clearing cache');
+          const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+          requestCache.clear();
+        }
+      }
+      this.queryRange = range;
+    }
+
     log(() => 'Options: ' + JSON.stringify(options));
     if (query !== '' && variable !== undefined && (variable.regex !== '' || variable.useTags)) {
       log(() => 'metricFindQuery() incoming query = ' + query);
@@ -486,14 +522,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
       if (tagCat !== '') {
-        return this.metricTagValsQuery(metricQuery, tagCat).then(results => {
-          return _.map(results.data, result => {
+        return this.metricTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
+          return _.map(results.data, (result) => {
             return { value: result };
           });
         });
       } else {
-        return this.metricTagsQuery(metricQuery).then(results => {
-          return _.map(results.data, result => {
+        return this.metricTagsQuery(metricQuery, false, from, to).then((results) => {
+          return _.map(results.data, (result) => {
             return { value: result.metric_name };
           });
         });
@@ -506,37 +542,36 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricTagsQuery(query: string, allowEmptyWildcard = false, activityWindow: [number, number] = null) {
+  metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
     if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
     let queryUrl = '/find' + this.getAccountId() + '/tags?query=';
     queryUrl = queryUrl + query;
-    if (this.activityTracking && !_.isEmpty(activityWindow)) {
-      log(() => 'metricTagsQuery() activityWindow = ' + JSON.stringify(activityWindow));
-      queryUrl += '&activity_start_secs=' + _.toInteger(activityWindow[0]);
-      queryUrl += '&activity_end_secs=' + _.toInteger(activityWindow[1]);
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
     log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
-  metricTagCatsQuery(query: string) {
-    let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=' + query;
-    log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
-    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
-  }
-
-  metricTagValsQuery(metricQuery: string, cat: string) {
+  metricTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + metricQuery;
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
+    }
     log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
   testDatasource() {
     return this.metricTagsQuery('and(__name:ametric)')
-      .then(res => {
+      .then((res) => {
         const error = _.get(res, 'results[0].error');
         if (error) {
           return {
@@ -551,7 +586,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           title: 'Success',
         };
       })
-      .catch(err => {
+      .catch((err) => {
         let message = (err.data || {}).message;
         if (message === undefined) {
           message = 'Error ' + (err.status || '') + ' ' + (err.statusText || '');
@@ -769,15 +804,19 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (alertQuery.startsWith('alert_id:')) {
           options.url = options.url + '/' + alertQuery.split(':')[1];
         } else {
-          options.url = options.url + '?search=' + encodeURIComponent(alertQuery);
+          options.url = options.url + '?search=' + encodeURIComponent(alertQuery) + '&size=1000';
         }
         options.headers = headers;
         options.retry = 1;
-        options.start = 0;
-        options.end = 0;
+        options.start = irondbOptions['alert']['start'];
+        options.end = irondbOptions['alert']['end'];
         options.isAlert = true;
+        options.counts_only = irondbOptions['alert']['counts_only'];
+        options.label = irondbOptions['alert']['labels'][i];
         options.local_filter = irondbOptions['alert']['local_filters'][i];
         options.local_filter_match = irondbOptions['alert']['local_filter_matches'][i];
+        options.query_type = irondbOptions['alert']['query_type'];
+        options.target = irondbOptions['alert']['target'];
         if (this.basicAuth || this.withCredentials) {
           options.withCredentials = true;
         }
@@ -791,26 +830,36 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
     return Promise.all(
-      queries.map(query =>
+      queries.map((query) =>
         this.datasourceRequest(query)
-          .then(result => {
+          .then((result) => {
             log(() => 'irondbRequest() query = ' + JSON.stringify(query));
             log(() => 'irondbRequest() result = ' + JSON.stringify(result));
             if (!_.isUndefined(query.isAlert)) {
-              return this.enrichAlertsWithRules(result, query).then(results => {
-                return this.convertAlertDataToGrafana(results);
-              });
+              if (query.counts_only === false) {
+                return this.enrichAlertsWithRules(result, query).then((results) => {
+                  return this.convertAlertDataToGrafana(results);
+                });
+              } else {
+                return this.countAlerts(result, query);
+              }
             } else {
               return this.convertIrondbDf4DataToGrafana(result, query);
             }
           })
-          .then(result => {
+          .then((result) => {
             if (result['data'].constructor === Array) {
               for (let i = 0; i < result['data'].length; i++) {
+                if ('target' in result && 'refId' in result['target']) {
+                  result['data'][i]['target'] = result['target']['refId'];
+                }
                 queryResults['data'].push(result['data'][i]);
               }
             }
             if (result['data'].constructor === Object) {
+              if ('target' in result && 'refId' in result['target']) {
+                result['data']['target'] = result['target']['refId'];
+              }
               queryResults['data'].push(result['data']);
             }
             queryResults['t'] = result['t'];
@@ -818,10 +867,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           })
       )
     )
-      .then(result => {
+      .then((result) => {
         return queryResults;
       })
-      .catch(err => {
+      .catch((err) => {
         if (err.status !== 0 || err.status >= 300) {
           this.throwerr(err);
         }
@@ -834,6 +883,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     // alert_id
     // tag
     // acknowledged
+    // severities
     if (pair.key === 'alert_id') {
       if (alert['_cid'].endsWith(pair.value)) {
         return true;
@@ -841,12 +891,18 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return false;
     }
 
-    if (pair.key === 'acknowledge') {
+    if (pair.key === 'acknowledged') {
       if (pair.value === 'true') {
-        return alert['_acknowledge'] !== null;
+        return alert['_acknowledgement'] !== null;
+      } else if (pair.value === 'false') {
+        return alert['_acknowledgement'] === null;
       } else {
-        return alert['_acknowledge'] === null;
+        return true;
       }
+    }
+
+    if (pair.key === 'severities') {
+      return pair.value.indexOf(alert['_severity']) !== -1;
     }
 
     if (pair.key === 'tag') {
@@ -921,6 +977,102 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return true;
   }
 
+  countAlerts(alerts, query) {
+    const datatemp = alerts.data;
+    let data = [];
+    if (datatemp.constructor === Array) {
+      data = datatemp;
+    } else {
+      data.push(datatemp);
+    }
+    const queries = [];
+
+    const filter_pairs = [];
+    const filter_match = query['local_filter_match'];
+    if (query['local_filter'] !== undefined && query['local_filter'] !== '') {
+      // parse the filter into match pairs
+      // a filter is a series of field:value tokens separated by commas
+      const tokens = query['local_filter'].split(',');
+      for (const t of tokens) {
+        const x = t.trim();
+        const i = x.indexOf(':');
+        if (i === -1) {
+          continue;
+        }
+        const pair: any = {};
+        pair.key = x.slice(0, i);
+        pair.value = x.slice(i + 1);
+        filter_pairs.push(pair);
+      }
+    }
+
+    const countBuckets = {};
+
+    if (query['query_type'] === 'range') {
+      // fill the buckets minutely with zeroes
+      let qs = query.start;
+      qs = qs - (qs % 60);
+      let qe = query.end;
+      qe = qe - (qe % 60);
+      for (let i = qs; i < qe; i += 60) {
+        countBuckets[i.toString()] = 0;
+      }
+    }
+
+    let count = 0;
+    for (let i = 0; i < data.length; i++) {
+      if (this.alertFiltered(filter_pairs, filter_match, data[i])) {
+        continue;
+      }
+      const alert = data[i];
+      let epoch = alert['_occurred_on'];
+
+      if (query['query_type'] === 'range') {
+        // floor the timestamp to its minute so we can bucket counts by minute
+        epoch = epoch - (epoch % 60);
+
+        if (epoch.toString() in countBuckets) {
+          countBuckets[epoch.toString()] = countBuckets[epoch.toString()] + 1;
+        }
+      } else {
+        count = count + 1;
+      }
+    }
+
+    let label = 'Value';
+    if (query['label']) {
+      label = query['label'];
+    }
+    const timeField = getTimeField();
+    const valueField = getNumberField(label);
+    const dataFrames: DataFrame[] = [];
+
+    if (query['query_type'] === 'range') {
+      for (let [epoch, count] of Object.entries(countBuckets)) {
+        timeField.values.add(Number(epoch) * 1000);
+        valueField.values.add(count);
+      }
+
+      dataFrames.push({
+        length: timeField.values.length,
+        fields: [timeField, valueField],
+      });
+    } else {
+      valueField.values.add(count);
+      dataFrames.push({
+        length: 1,
+        fields: [valueField],
+      });
+    }
+
+    return {
+      t: 'ts',
+      data: dataFrames,
+      target: query['target'],
+      state: LoadingState.Done,
+    };
+  }
+
   // this also applies any local filters.
   enrichAlertsWithRules(alerts, query) {
     const datatemp = alerts.data;
@@ -985,9 +1137,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       queries.push(options);
     }
     return Promise.all(
-      queries.map(query =>
+      queries.map((query) =>
         this.datasourceRequest(query)
-          .then(result => {
+          .then((result) => {
             log(() => 'enrichAlertsWithRules() query = ' + JSON.stringify(query));
             log(() => 'enrichAlertsWithRules() result = ' + JSON.stringify(result));
             return {
@@ -995,7 +1147,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               rule: result.data,
             };
           })
-          .catch(failed => {
+          .catch((failed) => {
             // TODO: skipping ruleset groups for now, this would be hard to implement
             return {
               alert: query.alert_data,
@@ -1003,7 +1155,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             };
           })
       )
-    ).then(results => {
+    ).then((results) => {
       return results;
     });
   }
@@ -1012,7 +1164,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   static readonly MAX_EXACT_DATAPOINTS_THRESHOLD = 1.5;
   static readonly MIN_DURATION_MS_FETCH = 1;
   static readonly MIN_DURATION_MS_CAQL = 60 * 1000;
-  static readonly ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], x => x * 1000);
+  static readonly ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], (x) => x * 1000);
   static readonly ROLLUP_ALIGN_MS_1DAY = 86400 * 1000;
 
   static checkRollupAligned(rollupMs) {
@@ -1071,7 +1223,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   filterMetricsByType(target, data) {
     // Don't mix text metrics with numeric and histogram results
     const metricFilter = 'text';
-    return _.filter(data, metric => {
+    return _.filter(data, (metric) => {
       const metricTypes = metric.type.split(',');
       return !_.includes(metricTypes, metricFilter);
     });
@@ -1141,15 +1293,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
-    return this.metricTagsQuery(rawQuery, false, [start, end])
-      .then(result => {
+    return this.metricTagsQuery(rawQuery, false, start, end)
+      .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
         for (let i = 0; i < result.data.length; i++) {
           result.data[i]['target'] = target;
         }
         return result.data;
       })
-      .then(result => {
+      .then((result) => {
         for (let i = 0; i < result.length; i++) {
           cleanOptions['std']['names'].push(this.buildFetchStream(target, result, i, cleanOptions['scopedVars']));
         }
@@ -1167,6 +1319,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'])
     );
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
+    cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
+    cleanOptions['alert']['query_type'] = target['alert_count_query_type'];
+    cleanOptions['alert']['labels'].push(this.templateSrv.replace(target['metriclabel'], cleanOptions['scopedVars']));
+    cleanOptions['alert']['target'] = target;
   }
 
   buildIrondbParamsAsync(options) {
@@ -1190,10 +1346,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['caql']['names'] = [];
     cleanOptions['alert'] = {};
     cleanOptions['alert']['names'] = [];
+    cleanOptions['alert']['start'] = start;
+    cleanOptions['alert']['end'] = end;
     cleanOptions['alert']['local_filters'] = [];
     cleanOptions['alert']['local_filter_matches'] = [];
+    cleanOptions['alert']['labels'] = [];
 
-    const targets = _.reject(options.targets, target => {
+    const targets = _.reject(options.targets, (target) => {
       const reject =
         target.hide ||
         (target['query'] === undefined && target['alert_id'] === undefined) ||
@@ -1205,7 +1364,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return {};
     }
 
-    const promises = targets.map(target => {
+    const promises = targets.map((target) => {
       if (target.isCaql || target.querytype === 'caql') {
         cleanOptions['caql']['names'].push({
           leaf_name: target['query'],
@@ -1216,7 +1375,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           },
         });
         return Promise.resolve(cleanOptions);
-      } else if (target.querytype === 'alerts') {
+      } else if (target.querytype === 'alerts' || target.querytype === 'alert_counts') {
         return this.buildAlertQueryAsync(cleanOptions, target, start, end);
       } else {
         return this.buildFetchParamsAsync(cleanOptions, target, start, end);
@@ -1224,10 +1383,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     });
 
     return Promise.all(promises)
-      .then(result => {
+      .then((result) => {
         return cleanOptions;
       })
-      .catch(err => {
+      .catch((err) => {
         log(() => 'buildIrondbParams() err = ' + JSON.stringify(err));
         if (err.status !== 0 || err.status >= 300) {
         }
@@ -1397,6 +1556,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           }
         }
       }
+      lname = decodeTagsInLabel(lname);
       let dname = lname;
       if (decoded_tags.length > 0 && explicitTags) {
         dname = dname + ' { ' + decoded_tags.join(', ') + ' }';
@@ -1552,6 +1712,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     for (let si = 0; si < enrich_results.length; si++) {
       const timeField = getTimeField();
+      const alternateTimeField = getTimeField('alert_timestamp');
       const labelFields = new Set<MutableField>();
       const valueFields = new Set<MutableField>();
       const all_labels = {};
@@ -1593,6 +1754,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (key === '_occurred_on') {
           const epoch = alert[key];
           timeField.values.add(epoch * 1000); // to milliseconds
+          alternateTimeField.values.add(epoch * 1000);
           // also create a time window 30 minutes before the alert up to 30 mins after the  cleared_on timestamp
           // if it's not a cleared alert, use an 30 mins after the alert timestamp as the window (or now if it's recent)
           const before = epoch - 1800;
@@ -1840,7 +2002,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
       dataFrames.push({
         length: timeField.values.length,
-        fields: [timeField, ...labelFields, ...valueFields],
+        fields: [timeField, alternateTimeField, ...labelFields, ...valueFields],
       });
     }
 

@@ -121,7 +121,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   }
 
   // case %tv
-  label = label.replace(/%tv-?{([^}]*)}/g, x => {
+  label = label.replace(/%tv-?{([^}]*)}/g, (x) => {
     const elide = x.substring(3, 4);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 5 : 4, x.length - 1);
@@ -133,7 +133,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
         }
       }
       tagCats.sort();
-      const tagVals = _.map(tagCats, tagCat => tagSet[tagCat][0]);
+      const tagVals = _.map(tagCats, (tagCat) => tagSet[tagCat][0]);
       return tagVals.join(',');
     }
     if (tagSet[tag] !== undefined && tag !== '' && choose(metaIn, tag)) {
@@ -142,7 +142,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
     return '';
   });
   // case %t
-  label = label.replace(/%t-?{([^}]*)}/g, x => {
+  label = label.replace(/%t-?{([^}]*)}/g, (x) => {
     const elide = x.substring(2, 3);
     const choose = elide === '-' ? metaTagDiff : () => true;
     const tag = x.substring(elide === '-' ? 4 : 3, x.length - 1);
@@ -256,6 +256,28 @@ export function decodeTag(tag: string): string {
   return tag;
 }
 
+export function decodeTagsInLabel(label: string): string {
+  let i = 0;
+  let l = label.length;
+  let replaced = label;
+  while (i < l && i !== -1) {
+    i = label.indexOf('b"', i);
+    if (i === -1) {
+      return replaced;
+    } else {
+      const j = label.indexOf('"', i + 2);
+      if (j === -1) {
+        //malformed base64 encoding.
+        return replaced;
+      }
+      const t = decodeTag(label.substring(i, j + 1));
+      replaced = replaced.replace(label.substring(i, j + 1), t);
+      i = j + 1;
+    }
+  }
+  return replaced;
+}
+
 export function decodeNameAndTags(name: string): string {
   const tags = [];
   const [metric, rawTags] = taglessNameAndTags(name);
@@ -347,7 +369,7 @@ export default class IrondbQuery {
       this.segments.push({ type: SegmentType.TagPlus });
     }
 
-    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, s => SegmentType[s.type])));
+    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
   updateSegmentValue(segment, index) {

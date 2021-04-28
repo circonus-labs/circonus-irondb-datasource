@@ -18,6 +18,8 @@
     "@grafana/toolkit": "^7.2.0",
     "@grafana/ui": "^7.2.0",
     "@types/grafana": "github:CorpGlory/types-grafana.git",
-    "@types/memoizee": "^0.4.2"
+    "@types/memoizee": "^0.4.2",
+    "@types/mustache": "latest",
+    "mustache": "latest"
   }
 }

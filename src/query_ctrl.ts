@@ -25,10 +25,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'caql', text: 'CAQL' },
     { value: 'basic', text: 'Basic' },
     { value: 'alerts', text: 'Alerts' },
+    { value: 'alert_counts', text: 'Alert Counts' },
   ];
   localFilterMatchOptions = [
     { value: 'all', text: 'ALL' },
     { value: 'any', text: 'ANY' },
+  ];
+  alertCountQueryTypeOptions = [
+    { value: 'instant', text: 'instant' },
+    { value: 'range', text: 'range' },
   ];
   labelTypeOptions = [
     { value: 'default', text: 'name and tags' },
@@ -97,6 +102,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';
     this.target.local_filter_match = this.target.local_filter_match || 'all';
+    this.target.alert_count_query_type = this.target.alert_count_query_type || 'instant';
     this.target.alert_id = this.target.alert_id || '';
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
@@ -140,7 +146,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
       this.target.query = caqlQuery;
       this.panelCtrl.refresh();
-    } else if (this.target.querytype === 'alerts') {
+    } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
       this.target.query = '';
       this.panelCtrl.refresh();
     }
@@ -165,6 +171,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   localFilterMatchValueChanged() {
+    this.panelCtrl.refresh();
+  }
+
+  alertCountQueryTypeValueChanged() {
     this.panelCtrl.refresh();
   }
 
@@ -267,14 +277,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       return this.datasource
         .metricTagsQuery('and(__name:' + query + ')', true)
-        .then(results => {
-          let metricnames = _.map(results.data, result => {
+        .then((results) => {
+          let metricnames = _.map(results.data, (result) => {
             return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
           log(() => 'getSegments() metricnames = ' + JSON.stringify(metricnames));
 
-          const allSegments = _.map(metricnames, segment => {
+          const allSegments = _.map(metricnames, (segment) => {
             return this.newSegment(SegmentType.MetricName, {
               value: segment,
               expandable: true,
@@ -282,7 +292,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           });
           return allSegments;
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err.toString());
           return [];
         });
@@ -291,7 +301,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'getSegments() tags for ' + metricName);
       return this.datasource
         .metricTagCatsQuery(metricName)
-        .then(segments => {
+        .then((segments) => {
           if (segments.data && segments.data.length > 0) {
             const tagCats = segments.data;
             const tagSegments = [];
@@ -312,7 +322,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return tagSegments;
           }
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err);
           return [];
         });
@@ -333,7 +343,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       log(() => 'getSegments() tag vals for ' + metricName + ', ' + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
-        .then(segments => {
+        .then((segments) => {
           if (segments.data && segments.data.length > 0) {
             const tagVals = segments.data;
             const tagSegments = [];
@@ -343,7 +353,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 expandable: true,
               })
             );
-            _.eachRight(this.templateSrv.variables, variable => {
+            _.eachRight(this.templateSrv.variables, (variable) => {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {
                   type: 'template',
@@ -363,7 +373,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return tagSegments;
           }
         })
-        .catch(err => {
+        .catch((err) => {
           log(() => 'getSegments() err = ' + err);
           return [];
         });
@@ -406,7 +416,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   buildSegments() {
-    this.segments = _.map(this.queryModel.segments, s => this.mapSegment(s));
+    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
     log(() => 'buildSegments()');
 
     const checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;

@@ -17,7 +17,7 @@
       <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
         <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.refresh()"></textarea>
       </div>
-      <div ng-if="ctrl.target.querytype === 'alerts'" class="gf-form gf-form--grow">
+      <div ng-if="ctrl.target.querytype === 'alerts' || ctrl.target.querytype === 'alert_counts'" class="gf-form gf-form--grow">
           <div class="gf-form-inline">
             <div class="gf-form">
                 <label class="gf-form-label width-6 query-keyword">Alert ID</label>
@@ -45,6 +45,17 @@
             <div class="gf-form gf-form--grow">
               <input id="alert_local_filter" class="gf-form-input" type="text" ng-model='ctrl.target.local_filter' ng-blur="ctrl.updateAlertLocalFilter()" placeholder="tag:cluster:core-central*,acknowleged:false"></input>
             </div>
+          </div>
+          <div class="gf-form-inline" ng-if="ctrl.target.querytype === 'alert_counts'">
+              <div class="gf-form">
+                  <label class="gf-form-label width-6 query-keyword">Query Type</label>
+              </div>
+              <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+                  <gf-form-dropdown name="alert_count_query_type" model="ctrl.target.alert_count_query_type" on-change="ctrl.alertCountQueryTypeValueChanged()" css-class="gf-size-auto"
+                                    get-options="ctrl.alertCountQueryTypeOptions"
+                                    lookup-text="true">
+                  </gf-form-dropdown>
+              </div>
           </div>
       </div>
       <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form gf-form-inline">
@@ -97,6 +108,12 @@
       <div class="gf-form gf-form--grow">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
+    </div>
+    <div ng-if="ctrl.target.querytype==='alert_counts'" class="gf-form gf-form--grow">
+        <div class="gf-form">
+            <label class="gf-form-label width-6 query-keyword">Label</label>
+        </div>
+        <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
     </div>
     <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format!=='heatmap'" class="gf-form">
       <div class="gf-form">
