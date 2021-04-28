@@ -328,7 +328,10 @@ export default class IrondbQuery {
     metricName = metricName.slice(11, -1) || '*';
     const tags = metricName.split(',');
     metricName = tags.shift();
-    this.segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
+    this.segments.push({
+      type: SegmentType.MetricName,
+      value: decodeTag(metricName),
+    });
 
     let first = true;
     for (let tag of tags) {
@@ -349,17 +352,26 @@ export default class IrondbQuery {
         tagIndex = 3;
       }
       if (tagOp) {
-        this.segments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, tagIndex) });
+        this.segments.push({
+          type: SegmentType.TagOp,
+          value: tagCat.slice(0, tagIndex),
+        });
         tagCat = tagCat.slice(tagIndex);
       }
-      this.segments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
+      this.segments.push({
+        type: SegmentType.TagCat,
+        value: decodeTag(tagCat),
+      });
       this.segments.push({ type: SegmentType.TagPair });
       let end = 0;
       while (tagVal.endsWith(')')) {
         tagVal = tagVal.slice(0, -1);
         end++;
       }
-      this.segments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
+      this.segments.push({
+        type: SegmentType.TagVal,
+        value: decodeTag(tagVal),
+      });
       for (let i = 0; i < end; i++) {
         this.segments.push({ type: SegmentType.TagPlus });
         this.segments.push({ type: SegmentType.TagEnd });

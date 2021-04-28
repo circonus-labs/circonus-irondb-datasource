@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import IrondbQuery from './irondb_query';
-/* eslint-disable-next-line no-duplicate-imports */
+// eslint-disable-next-line no-duplicate-imports
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import appEvents from 'grafana/app/core/app_events';
@@ -50,7 +50,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     { value: 'derive', text: 'rate of change (derive)' },
     { value: 'derive_stddev', text: 'rate of change σ (derive_stddev)' },
     { value: 'counter', text: 'rate of positive change (counter)' },
-    { value: 'counter_stddev', text: 'rate of positive change σ (counter_stddev)' },
+    {
+      value: 'counter_stddev',
+      text: 'rate of positive change σ (counter_stddev)',
+    },
   ];
   rollupTypeOptions = [
     { value: 'automatic', text: 'automatic' },
@@ -520,7 +523,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
           segmentIndex + 1,
           0,
           this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-          this.mapSegment({ type: SegmentType.TagCat, value: 'select tag', fake: true }),
+          this.mapSegment({
+            type: SegmentType.TagCat,
+            value: 'select tag',
+            fake: true,
+          }),
           this.mapSegment({ type: SegmentType.TagPair }),
           this.newSelectTagValSegment(),
           this.buildSelectTagPlusSegment(),
