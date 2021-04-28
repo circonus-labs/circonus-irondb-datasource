@@ -11,7 +11,8 @@
   "author": "Circonus",
   "license": "BSD-3-clause",
   "dependencies": {
-    "memoizee": "^0.4.14"
+    "memoizee": "^0.4.14",
+    "tslib": "^2.2.0"
   },
   "devDependencies": {
     "@grafana/data": "^7.2.0",
