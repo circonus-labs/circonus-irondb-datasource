@@ -511,7 +511,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
       if (tagCat !== '') {
-        return this.metricTagValsQuery(metricQuery, tagCat).then((results) => {
+        return this.metricTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: decodeTag(result) };
           });
@@ -531,7 +531,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
+  metricTagsQuery(query: string, allowEmptyWildcard = false, from: number = null, to: number = null) {
     if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
@@ -546,7 +546,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
-  metricTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
+  metricTagValsQuery(metricQuery: string, cat: string, from: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + metricQuery;
     if (this.activityTracking && from && to) {
@@ -1287,7 +1287,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars'], this.interpolateExpr);
-    return this.metricTagsQuery(rawQuery, false, [start, end])
+    return this.metricTagsQuery(rawQuery, false, start, end)
       .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
         for (let i = 0; i < result.data.length; i++) {
