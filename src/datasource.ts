@@ -389,7 +389,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               let notes =
                 rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
                   ? rule['notes']
-                  : 'Oh no!';
+                  : '';
 
               notes = Mustache.render(notes, tags);
 
