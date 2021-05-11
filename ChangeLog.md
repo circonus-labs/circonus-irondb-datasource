@@ -1,4 +1,9 @@
 
+## 0.9.5
+
+* Fix base64 encoding and decoding of tag values in variables
+* Made returned tag values respect activity windows
+
 ## 0.9.4
 
  * Fix labels for untagged metrics

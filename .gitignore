@@ -3,3 +3,6 @@ npm-debug.log
 .DS_Store
 *.swp
 package-lock.json
+yarn.lock
+coverage
+jest*

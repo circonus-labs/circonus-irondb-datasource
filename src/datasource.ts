@@ -3,29 +3,27 @@ import Log from './log';
 
 import micromatch from 'micromatch';
 import memoize from 'memoizee';
+// eslint-disable-next-line no-duplicate-imports
 import { Memoized } from 'memoizee';
 import {
   metaInterpolateLabel,
-  decodeNameAndTags,
   isStatsdCounter,
   taglessName,
   taglessNameAndTags,
   decodeTag,
+  encodeTag,
   splitTags,
   mergeTags,
   TagSet,
   decodeTagsInLabel,
+  SegmentType,
 } from './irondb_query';
 
 import {
   ArrayVector,
   DataFrame,
-  Field,
   FieldType,
-  formatLabels,
-  Labels,
   MutableField,
-  ScopedVars,
   TIME_SERIES_TIME_FIELD_NAME,
   TIME_SERIES_VALUE_FIELD_NAME,
   DataSourceApi,
@@ -38,14 +36,10 @@ import {
   AnnotationQueryRequest,
   AnnotationEvent,
   LoadingState,
-  TimeSeries,
-  isTableData,
 } from '@grafana/data';
 import * as Mustache from 'mustache';
 
 const log = Log('IrondbDatasource');
-
-import { map } from 'rxjs/operators';
 
 const DURATION_UNITS_DEFAULT = 's';
 const DURATION_UNITS = {
@@ -309,7 +303,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       options.method = 'GET';
       options.url = options.url + '/alert';
       const alertId = this.templateSrv.replace(query.annotation['alertId']);
-      const alertQuery = this.templateSrv.replace(query.annotation['annotationQueryText']);
+      const alertQuery = this.templateSrv.replace(query.annotation['annotationQueryText'], null, this.interpolateExpr);
       if (alertId !== '') {
         options.url = options.url + '/' + alertId;
       } else {
@@ -394,7 +388,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               let notes =
                 rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
                   ? rule['notes']
-                  : 'Oh no!';
+                  : '';
 
               notes = Mustache.render(notes, tags);
 
@@ -467,6 +461,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   interpolateExpr(value: string | string[] = [], variable: any) {
+    if (typeof value === 'string') {
+      value = encodeTag(SegmentType.TagVal, value, false);
+    } else {
+      for (let i in value) {
+        value[i] = encodeTag(SegmentType.TagVal, value[i], false);
+      }
+    }
     // if no multi or include all do not regexEscape
     if (!variable.multi && !variable.includeAll) {
       return value;
@@ -474,21 +475,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     if (typeof value === 'string') {
       return value;
+    } else {
+      return value.join(',');
     }
-
-    if (value.length === 1) {
-      return value[0];
-    }
-
-    let q = '';
-    for (let i = 0; i < value.length; i++) {
-      if (i > 0) {
-        q = q + ',';
-      }
-      q = q + value[i];
-      i = i + 1;
-    }
-    return q;
   }
 
   metricFindQuery(query: string, options: any) {
@@ -524,7 +513,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (tagCat !== '') {
         return this.metricTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
           return _.map(results.data, (result) => {
-            return { value: result };
+            return { value: decodeTag(result) };
           });
         });
       } else {
@@ -542,7 +531,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
+  metricTagsQuery(query: string, allowEmptyWildcard = false, from: number = null, to: number = null) {
     if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
@@ -557,7 +546,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
-  metricTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
+  metricTagValsQuery(metricQuery: string, cat: string, from: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
     queryUrl = queryUrl + metricQuery;
     if (this.activityTracking && from && to) {
@@ -769,7 +758,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         end += interval;
         const caqlQuery = this.templateSrv.replace(
           irondbOptions['caql']['names'][i].leaf_name,
-          irondbOptions['scopedVars']
+          irondbOptions['scopedVars'],
+          this.interpolateExpr
         );
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
@@ -800,7 +790,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.method = 'GET';
         options.url = options.url + '/alert';
-        const alertQuery = this.templateSrv.replace(irondbOptions['alert']['names'][i], irondbOptions['scopedVars']);
+        const alertQuery = this.templateSrv.replace(
+          irondbOptions['alert']['names'][i],
+          irondbOptions['scopedVars'],
+          this.interpolateExpr
+        );
         if (alertQuery.startsWith('alert_id:')) {
           options.url = options.url + '/' + alertQuery.split(':')[1];
         } else {
@@ -1292,7 +1286,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
-    const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+    const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars'], this.interpolateExpr);
     return this.metricTagsQuery(rawQuery, false, start, end)
       .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
@@ -1310,13 +1304,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   buildAlertQueryAsync(cleanOptions, target, start, end) {
-    let rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+    let rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars'], this.interpolateExpr);
     if (target['alert_id'] !== '') {
       rawQuery = 'alert_id:' + this.templateSrv.replace(target['alert_id'], cleanOptions['scopedVars']);
     }
     cleanOptions['alert']['names'].push(rawQuery);
     cleanOptions['alert']['local_filters'].push(
-      this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'])
+      this.templateSrv.replace(target['local_filter'], cleanOptions['scopedVars'], this.interpolateExpr)
     );
     cleanOptions['alert']['local_filter_matches'].push(target['local_filter_match']);
     cleanOptions['alert']['counts_only'] = target.querytype === 'alert_counts';
@@ -1593,7 +1587,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             vstr = v.toString();
             const tsstr = ts.toString();
             if (_.isUndefined(lookaside[vstr])) {
-              lookaside[vstr] = { target: vstr, title: vstr, tags: labels, datapoints: [], _ts: {} };
+              lookaside[vstr] = {
+                target: vstr,
+                title: vstr,
+                tags: labels,
+                datapoints: [],
+                _ts: {},
+              };
               dataFrames.push(lookaside[vstr]);
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
