@@ -21,6 +21,10 @@ Read more about IRONdb here:
 
 2. Restart Grafana.
 
+### Alerts & Plugin Signing
+
+To use Grafana's alerting functionality, additional build & configuration steps are required. Read more [here](ALERTING.md).
+
 ## Configuration
 
 1. Create a new datasource and select IRONdb from the `Type` drop down.
