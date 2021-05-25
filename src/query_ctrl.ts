@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import IrondbQuery from './irondb_query';
-// eslint-disable-next-line no-duplicate-imports
+/* eslint-disable-next-line no-duplicate-imports */
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import appEvents from 'grafana/app/core/app_events';
@@ -389,7 +389,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   setSegmentType(segment: any, type: SegmentType) {
     segment._type = type;
-    segment._typeName = SegmentType[type];
+    segment._typeName = typeof SegmentType[type];
     return segment;
   }
 
