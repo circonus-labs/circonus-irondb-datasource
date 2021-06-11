@@ -28,6 +28,7 @@ These three keys tell Grafana 1) `"backend": true` that this plugin contains a b
 The frontend needs to be rebuilt to incorporate these new changes as well:
 
 ```
+$ npm install -g @grafana/toolkit
 $ yarn build
 ```
 
@@ -63,7 +64,6 @@ These steps use the signing tool provided by a globally-installed `@grafana/tool
 $ export GRAFANA_PLUGINS=/var/lib/grafana/plugins
 $ cd "$GRAFANA_PLUGINS/circonus-irondb-datasource"
 $ export GRAFANA_API_KEY=424242424242424242424242424242424242424242424242
-$ npm install -g @grafana/toolkit
 $ export GRAFANA_TOOLKIT=$(find $(npm root -g) -type f -iname "grafana-toolkit.js")
 $ node $GRAFANA_TOOLKIT plugin:sign --rootUrls http://localhost:3000/
 ```
