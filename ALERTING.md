@@ -4,6 +4,10 @@ To activate Grafana's Alerting features, a "backend" plugin is required. Since v
 
 ## Building the Backend
 
+Unless otherwise noted, the commands below should be run from your git checkout or unzipped plugin directory.
+
+The steps below will build the Circonus IronDB Datasource plugin and load it into a local Docker container.
+
 ### Metadata
 
 There are a few things to modify and install before we're ready to build. The first is `src/plugin.json`, which contains plugin metadata in JSON format for Grafana. We need to add three top-level keys, as shown below:
@@ -32,6 +36,12 @@ $ npm install -g @grafana/toolkit
 $ yarn build
 ```
 
+The shortcut to build everything and sign for local testing is:
+
+```
+$ docker/build-local.sh
+```
+
 ### The Build
 
 Building the backend component is done using a tool called [mage](https://github.com/magefile/mage#readme). Once you've followed the installation instructions, run the following command, which should show very similar output:
@@ -50,9 +60,11 @@ exec: go build -o dist/irondb-backend_linux_arm64 -ldflags -w -s -extldflags "-s
 exec: go build -o dist/irondb-backend_windows_amd64.exe -ldflags -w -s -extldflags "-static" ./pkg
 ```
 
-The backend component, which currently uses a mocked data source returning static data, is now ready to use.
+The backend component is now ready to use.
 
 ## Plugin Signing
+
+Follow either this step or the next one (Allow Unsigned Plugins), not both.
 
 We'll be using "private" signing here, which is the default. This means we need to specify a list of one or more domains where this build is valid for use. The example below uses `localhost`, for simplicity. This should contain the base url your users will load to use the plugin.
 
@@ -61,7 +73,6 @@ The first step is to [create a grafana.com account and api key](https://grafana.
 These steps use the signing tool provided by a globally-installed `@grafana/toolkit`.
 
 ```
-$ export GRAFANA_PLUGINS=/var/lib/grafana/plugins
 $ cd "$GRAFANA_PLUGINS/circonus-irondb-datasource"
 $ export GRAFANA_API_KEY=424242424242424242424242424242424242424242424242
 $ export GRAFANA_TOOLKIT=$(find $(npm root -g) -type f -iname "grafana-toolkit.js")
@@ -69,6 +80,8 @@ $ node $GRAFANA_TOOLKIT plugin:sign --rootUrls http://localhost:3000/
 ```
 
 ## Allow Unsigned Plugins
+
+Follow either this step or the previous one (Plugin Signing), not both.
 
 This option requires a Grafana config change. Find your [config location](https://grafana.com/docs/grafana/latest/administration/configuration/), and make sure your config contains the following:
 
@@ -79,13 +92,10 @@ allow_loading_unsigned_plugins = circonus-irondb-datasource
 
 ## Alerting Test
 
-Let's load the plugin we've configured & built into Grafana running in Docker:
+Let's load the plugin we've configured & built into Grafana running in Docker. This requires a CIRCONUS_API_KEY to be set in your environment, and assumes the account that key provides access to has 1+ metrics named `duration`.
 
 ```
-(cd $GRAFANA_PLUGINS; docker run --detach --rm --publish 3000:3000 \
-  -v "$(pwd)":/var/lib/grafana/plugins --name grafana-plugin grafana/grafana:7.3.7)
+$ docker/run-local.sh
 ```
 
-Now we can hit http://localhost:3000, login with the default `admin`/`admin`, and click `skip` to avoid changing the password. Next click the gear (for Configuration), Data Sources, and Add Data Source. Scroll down to the very bottom, and select IRONdb. Leave all the default values, and click Save & Test.
-
-Click the `+`, then Dashboard, then Add new panel.
+Now we can hit http://localhost:3000, and check out the preconfigured `irondb test` dashboard, which should start alerting immediately if the `duration` metric's value is 200 or more.
