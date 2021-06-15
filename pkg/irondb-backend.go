@@ -130,7 +130,6 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		}, "_data", "[0]", "[1]")
 		rv.Responses[q.RefID] = response
 	}
-	log.DefaultLogger.Info("QueryData", "response", rv)
 	return rv, nil
 }
 
