@@ -2,16 +2,23 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
+	jsonp "github.com/buger/jsonparser"
+	circ "github.com/circonus-labs/go-apiclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/pkg/errors"
 )
 
 // newDatasource returns datasource.ServeOpts.
@@ -45,20 +52,86 @@ type SampleDatasource struct {
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	log.DefaultLogger.Info("QueryData", "request", req)
-
-	// create response struct
-	response := backend.NewQueryDataResponse()
-
-	// loop over queries and execute them individually.
-	for _, q := range req.Queries {
-		res := td.query(ctx, q)
-
-		// save the response in a hashmap
-		// based on with RefID as identifier
-		response.Responses[q.RefID] = res
+	cfg := req.PluginContext.DataSourceInstanceSettings.JSONData
+	dbType, err := jsonp.GetString(cfg, "irondbType")
+	if err != nil {
+		return nil, err
 	}
 
-	return response, nil
+	if dbType != "hosted" {
+		return nil, errors.New("only `hosted` is currently supported")
+	}
+
+	key, err := jsonp.GetString(cfg, "apiToken")
+	if err != nil {
+		return nil, err
+	}
+	client, err := circ.New(&circ.Config{TokenKey: key})
+	if err != nil {
+		return nil, err
+	}
+
+	rv := backend.NewQueryDataResponse()
+	for _, q := range req.Queries {
+		query, err := jsonp.GetString(q.JSON, "query")
+		if err != nil {
+			return nil, err
+		}
+		log.DefaultLogger.Info("QueryData", "query", query)
+
+		// https://docs.circonus.com/circonus/api/#/CAQL
+		qp := url.Values{}
+		qp.Set("query", query)
+		path := url.URL{
+			Path:     "/v2/caql",
+			RawQuery: qp.Encode(),
+		}
+		// base64-encoded json response body
+		jsonBytes, err := client.Get(path.String())
+		if err != nil {
+			return nil, err
+		}
+		jsonStr := string(jsonBytes)
+		if !strings.HasPrefix(jsonStr, "{") {
+			// if it's not a json object, it's base64 encoded
+			jsonStr := strings.TrimSpace(jsonStr)
+			jsonStr, err = strconv.Unquote(jsonStr)
+			if err != nil {
+				return nil, err
+			}
+			jsonBytes, err = base64.StdEncoding.DecodeString(jsonStr)
+			if err != nil {
+				return nil, err
+			}
+			jsonStr = string(jsonBytes)
+		}
+
+		response := backend.DataResponse{}
+		/*
+			{"_data":[
+					[1623706800,[255.83333333333,8,299]]
+				],
+				"_end":1623706860,
+				"_period":60,
+				"_query":"find('duration')",
+				"_start":1623706800
+			}
+		*/
+		jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
+			f, err := strconv.ParseFloat(string(value), 64)
+			if err != nil {
+				return
+			}
+			frame := data.NewFrame("response")
+			frame.Fields = append(frame.Fields,
+				data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
+				data.NewField("values", nil, []float64{f, f}))
+			response.Frames = append(response.Frames, frame)
+		}, "_data", "[0]", "[1]")
+		rv.Responses[q.RefID] = response
+	}
+	log.DefaultLogger.Info("QueryData", "response", rv)
+	return rv, nil
 }
 
 type queryModel struct {
