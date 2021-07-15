@@ -1,12 +1,12 @@
 # Alerts & Plugin Signing
 
-To activate Grafana's Alerting features, a "backend" plugin is required. Since v7.0, "Grafana now [requires backend plugins to be signed](https://grafana.com/docs/grafana/latest/installation/upgrading/#backend-plugins)." Or you can [turn off signature checks](https://grafana.com/docs/grafana/latest/plugins/plugin-signatures/#allow-unsigned-plugins). If you aren't sure which option is right for you, ask your security department. If you think you don't have one of those, congratulations, *you* are the security department. Read through the information linked above (I'll wait) and choose the relevant section below.
+To activate Grafana's Alerting features, a "backend" plugin is required. Since v7.0, "Grafana now [requires backend plugins to be signed](https://grafana.com/docs/grafana/latest/installation/upgrading/#backend-plugins)." Or you can [turn off signature checks](https://grafana.com/docs/grafana/latest/plugins/plugin-signatures/#allow-unsigned-plugins). If you aren't sure which option is right for you, ask your security department. If you think you don't have one of those, congratulations, *you* are the security department. Read through the information linked above and choose the relevant section below.
 
 ## Building the Backend
 
 Unless otherwise noted, the commands below should be run from your git checkout or unzipped plugin directory.
 
-The steps below will build the Circonus IronDB Datasource plugin and load it into a local Docker container.
+These steps will build the Circonus IronDB Datasource plugin and load it into Grafana running in a local Docker container.
 
 ### Metadata
 
@@ -36,7 +36,7 @@ $ npm install -g @grafana/toolkit
 $ yarn build
 ```
 
-The shortcut to build everything and sign for local testing is:
+The "easy button" to build everything and sign for local testing is:
 
 ```
 $ docker/build-local.sh
@@ -44,7 +44,7 @@ $ docker/build-local.sh
 
 ### The Build
 
-Building the backend component is done using a tool called [mage](https://github.com/magefile/mage#readme). Once you've followed the installation instructions, run the following command, which should show very similar output:
+Building the backend component is done by `docker/build-local.sh`, or you can do it yourself using a tool called [mage](https://github.com/magefile/mage#readme). Once you've followed the installation instructions, run the following command, which should show very similar output:
 
 ```
 $ mage -v
@@ -64,7 +64,7 @@ The backend component is now ready to use.
 
 ## Plugin Signing
 
-Follow either this step or the next one (Allow Unsigned Plugins), not both.
+Follow either this step or the next one (Allow Unsigned Plugins), not both. The `docker/build-local.sh` script signs the plugin it builds to be used at `http://localhost:3000` - update this to fit your use case.
 
 We'll be using "private" signing here, which is the default. This means we need to specify a list of one or more domains where this build is valid for use. The example below uses `localhost`, for simplicity. This should contain the base url your users will load to use the plugin.
 
