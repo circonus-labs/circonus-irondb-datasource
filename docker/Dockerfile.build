@@ -1,0 +1,23 @@
+FROM grafana/grafana:7.3.7
+
+# need to be able to install things
+USER root
+
+# install dependencies available via alpine's apk
+RUN apk add --update npm=12.22.1-r0
+RUN apk add go=1.13.15-r0
+
+# install dependencies available via node's npm
+RUN npm install --global yarn@1.22.10
+RUN npm install -g @grafana/toolkit@8.0.5
+
+# install mage - used to build the backend plugin
+RUN cd /var/tmp
+RUN wget https://github.com/magefile/mage/releases/download/v1.11.0/mage_1.11.0_Linux-64bit.tar.gz
+RUN tar --exclude 'L*' -xvzf mage_1.11.0_Linux-64bit.tar.gz -C /usr/local/bin
+RUN rm mage_1.11.0_Linux-64bit.tar.gz
+
+# reset entrypoint set by grafana image; we have other things to do
+ENTRYPOINT []
+# run our build script from the location it's mapped into the container by build-local.sh
+CMD ["bash", "/usr/share/grafana/irondb-plugin-build/docker/plugin-build.sh"]
