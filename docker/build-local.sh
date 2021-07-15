@@ -5,10 +5,11 @@ if [[ -z $GRAFANA_API_KEY ]] ; then
   exit 1
 fi
 
+(cd docker; docker build -f Dockerfile.build --tag circonus-irondb-build .)
 export CIRC_CHECKOUT="$(cd $(dirname $0)/..; pwd)"
-export GRAFANA_TOOLKIT=$(find $(npm root -g) -type f -iname "grafana-toolkit.js")
-(cd $CIRC_CHECKOUT;
-  yarn build;
-  mage -v;
-  node $GRAFANA_TOOLKIT plugin:sign --rootUrls http://localhost:3000/
-)
+docker run --rm -it --name plugin-build \
+  --env "CIRCONUS_API_KEY=$CIRCONUS_API_KEY" \
+  --env "GRAFANA_API_KEY=$GRAFANA_API_KEY" \
+  --volume $CIRC_CHECKOUT:/usr/share/grafana/irondb-plugin-build \
+  circonus-irondb-build
+
