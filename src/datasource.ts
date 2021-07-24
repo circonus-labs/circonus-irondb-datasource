@@ -252,11 +252,27 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return this.$q.when({ data: [] });
     }
 
+    let composites = {},
+      results = {};
+    // remove any composites from targets; we'll deal with them later
+    // iterate in reverse so we don't skip elements after removing
+    for (let idx = options.targets.length - 1; idx >= 0; idx--) {
+      let t = options.targets[idx];
+      if (t['querytype'] === 'composite') {
+        composites[idx] = options.targets.splice(idx, 1)[0];
+        //throw new Error('found composite query: ' + JSON.stringify(composites));
+      }
+    }
+    if (options.targets[0]['refId'] !== 'A') {
+      throw new Error('dumping targets: ' + JSON.stringify(options.targets));
+    }
+
     return Promise.all([this.buildIrondbParams(options)])
       .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
+        //throw new Error(`dumping options: ${JSON.stringify(irondbOptions[0])}`);
         return this.irondbRequest(irondbOptions[0]);
       })
       .then((queryResults) => {
@@ -267,8 +283,30 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             });
           }
         }
+
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
+      })
+      .then((qres) => {
+        if (Object.keys(composites).length === 0) {
+          return qres;
+        }
+
+        if (qres['data'][0]['refId'] !== 'B') {
+          throw new Error(`qres: ${JSON.stringify(qres)}`);
+        }
+        // we have a composite query
+        for (const [key, val] of Object.entries(composites)) {
+          let pat = /^\s*#([a-z])\s*([+-])\s*#([a-z])\s*$/i;
+          let mat = val['query'].match(pat);
+          //throw new Error(`processing composite query ${val['refId']} [${val['query']}] ${JSON.stringify(mat)}`);
+          if (mat === null || mat.length !== 3) {
+            // unsupported expression, silently skip evaluation
+            continue;
+          }
+        }
+        // TODO: calculate the composite results, and insert at the right spot
+        return qres;
       })
       .catch((err) => {
         if (err.status !== 0 || err.status >= 300) {
@@ -517,10 +555,12 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       const tagCat = variable.tagValuesQuery;
       log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
       log(() => 'metricFindQuery() tagCat = ' + tagCat);
+
       if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
       if (tagCat !== '') {
+        throw new Error(`metricFindQuery`);
         return this.metricTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: result };
@@ -740,6 +780,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
         options.isCaql = false;
         options.retry = 1;
+        options.refId = irondbOptions['refId'];
         queries.push(options);
       }
     }
@@ -787,6 +828,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.isCaql = true;
         options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
+        options['refId'] = irondbOptions['refId'];
+        //throw new Error(`building cacl options ${JSON.stringify(options)} ${JSON.stringify(irondbOptions)}`);
         queries.push(options);
       }
     }
@@ -823,11 +866,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           options.headers.Authorization = this.basicAuth;
         }
         options.isCaql = false;
+        options.refId = irondbOptions['refId'];
         queries.push(options);
       }
     }
     log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
+    //throw new Error(`queries ${JSON.stringify(queries)}`);
     return Promise.all(
       queries.map((query) =>
         this.datasourceRequest(query)
@@ -847,10 +892,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             }
           })
           .then((result) => {
+            //throw new Error(`converted ${JSON.stringify(result)}`);
             if (result['data'].constructor === Array) {
               for (let i = 0; i < result['data'].length; i++) {
                 if ('target' in result && 'refId' in result['target']) {
                   result['data'][i]['target'] = result['target']['refId'];
+                } else {
+                  result['data'][i]['target'] = query.refId;
                 }
                 queryResults['data'].push(result['data'][i]);
               }
@@ -858,10 +906,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             if (result['data'].constructor === Object) {
               if ('target' in result && 'refId' in result['target']) {
                 result['data']['target'] = result['target']['refId'];
+              } else {
+                result['data']['target'] = query.refId;
               }
               queryResults['data'].push(result['data']);
             }
             queryResults['t'] = result['t'];
+            //throw new Error(`queryResults ${JSON.stringify(queryResults)}`);
             return queryResults;
           })
       )
@@ -1292,6 +1343,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+
     return this.metricTagsQuery(rawQuery, false, start, end)
       .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
@@ -1373,6 +1425,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             format: target.format,
           },
         });
+        cleanOptions['refId'] = target.refId;
         return Promise.resolve(cleanOptions);
       } else if (target.querytype === 'alerts' || target.querytype === 'alert_counts') {
         return this.buildAlertQueryAsync(cleanOptions, target, start, end);
@@ -1509,6 +1562,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         t: 'table',
         data: {
           length: timeField.values.length,
+          refId: query.refId,
           fields: [timeField, ...labelFields, ...valueFields],
         },
         state: LoadingState.Done,
@@ -1607,6 +1661,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (numericValueField.values.length > 0) {
         dataFrames.push({
           length: timeField.values.length,
+          refId: query.refId,
           fields: [timeField, numericValueField],
         });
       }
