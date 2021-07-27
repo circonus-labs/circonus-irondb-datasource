@@ -315,18 +315,18 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           // references in the composite query exist
 
           // build the new dataframe
-          let time = [...data[mat[1]]['fields'][0]['values']];
-          let values = [...data[mat[1]]['fields'][1]['values']];
+          let time = [...data[mat[1]]['fields'][0]['values'].filter((e) => e != null)];
+          let values = [...data[mat[1]]['fields'][1]['values'].filter((e) => e != null)];
           // need a copy of this or everything's undefined
-          let rhs = [...data[mat[3]]['fields'][1]['values']];
+          let rhs = [...data[mat[3]]['fields'][1]['values'].filter((e) => e != null)];
           switch (mat[2]) {
             case '-':
-              for (let idx of values) {
+              for (let idx in values) {
                 values[idx] -= rhs[idx];
               }
               break;
             case '+':
-              for (let idx of values) {
+              for (let idx in values) {
                 values[idx] += rhs[idx];
               }
               break;
