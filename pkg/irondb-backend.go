@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -43,7 +42,8 @@ type SampleDatasource struct {
 	// The instance manager can help with lifecycle management
 	// of datasource instances in plugins. It's not a requirements
 	// but a best practice that we recommend that you follow.
-	im instancemgmt.InstanceManager
+	im   instancemgmt.InstanceManager
+	circ *circ.API
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -52,124 +52,111 @@ type SampleDatasource struct {
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	log.DefaultLogger.Info("QueryData", "request", req)
-	cfg := req.PluginContext.DataSourceInstanceSettings.JSONData
-	dbType, err := jsonp.GetString(cfg, "irondbType")
-	if err != nil {
-		return nil, err
-	}
 
-	if dbType != "hosted" {
-		return nil, errors.New("only `hosted` is currently supported")
-	}
+	if td.circ == nil {
+		cfg := req.PluginContext.DataSourceInstanceSettings.JSONData
+		dbType, err := jsonp.GetString(cfg, "irondbType")
+		if err != nil {
+			return nil, err
+		}
 
-	key, err := jsonp.GetString(cfg, "apiToken")
-	if err != nil {
-		return nil, err
-	}
-	client, err := circ.New(&circ.Config{TokenKey: key})
-	if err != nil {
-		return nil, err
+		if dbType != "hosted" {
+			return nil, errors.New("only `hosted` is currently supported")
+		}
+
+		key, err := jsonp.GetString(cfg, "apiToken")
+		if err != nil {
+			return nil, err
+		}
+		td.circ, err = circ.New(&circ.Config{TokenKey: key})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rv := backend.NewQueryDataResponse()
 	for _, q := range req.Queries {
-		query, err := jsonp.GetString(q.JSON, "query")
+		qtype, err := jsonp.GetString(q.JSON, "querytype")
 		if err != nil {
 			return nil, err
 		}
-		log.DefaultLogger.Info("QueryData", "query", query)
 
-		// https://docs.circonus.com/circonus/api/#/CAQL
-		qp := url.Values{}
-		qp.Set("query", query)
-		path := url.URL{
-			Path:     "/v2/caql",
-			RawQuery: qp.Encode(),
-		}
-		// base64-encoded json response body
-		jsonBytes, err := client.Get(path.String())
-		if err != nil {
-			return nil, err
-		}
-		jsonStr := string(jsonBytes)
-		if !strings.HasPrefix(jsonStr, "{") {
-			// if it's not a json object, it's base64 encoded
-			jsonStr := strings.TrimSpace(jsonStr)
-			jsonStr, err = strconv.Unquote(jsonStr)
+		var response *backend.DataResponse
+		if qtype == "caql" {
+			response, err = td.caqlQuery(context.Background(), q)
 			if err != nil {
 				return nil, err
 			}
-			jsonBytes, err = base64.StdEncoding.DecodeString(jsonStr)
-			if err != nil {
-				return nil, err
-			}
-			jsonStr = string(jsonBytes)
 		}
-
-		response := backend.DataResponse{}
-		/*
-			{"_data":[
-					[1623706800,[255.83333333333,8,299]]
-				],
-				"_end":1623706860,
-				"_period":60,
-				"_query":"find('duration')",
-				"_start":1623706800
-			}
-		*/
-		jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
-			f, err := strconv.ParseFloat(string(value), 64)
-			if err != nil {
-				return
-			}
-			frame := data.NewFrame("response")
-			frame.Fields = append(frame.Fields,
-				data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-				data.NewField("values", nil, []float64{f, f}))
-			response.Frames = append(response.Frames, frame)
-		}, "_data", "[0]", "[1]")
-		rv.Responses[q.RefID] = response
+		rv.Responses[q.RefID] = *response
 	}
 	return rv, nil
 }
 
-type queryModel struct {
-	Format string `json:"format"`
+func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse {
+	return backend.DataResponse{}
 }
 
-func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse {
-	// Unmarshal the json into our queryModel
-	var qm queryModel
+func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
+	query, err := jsonp.GetString(q.JSON, "query")
+	if err != nil {
+		return nil, err
+	}
+	log.DefaultLogger.Info("QueryData", "caql", query)
 
-	response := backend.DataResponse{}
-
-	response.Error = json.Unmarshal(query.JSON, &qm)
-	if response.Error != nil {
-		return response
+	// https://docs.circonus.com/circonus/api/#/CAQL
+	qp := url.Values{}
+	qp.Set("query", query)
+	path := url.URL{
+		Path:     "/v2/caql",
+		RawQuery: qp.Encode(),
 	}
 
-	// Log a warning if `Format` is empty.
-	if qm.Format == "" {
-		log.DefaultLogger.Warn("format is empty. defaulting to time series")
+	jsonBytes, err := td.circ.Get(path.String())
+	if err != nil {
+		return nil, err
+	}
+	jsonStr := string(jsonBytes)
+
+	// base64-encoded json response body, sometimes
+	if !strings.HasPrefix(jsonStr, "{") {
+		// if it's not a json object, it's base64 encoded
+		jsonStr := strings.TrimSpace(jsonStr)
+		jsonStr, err = strconv.Unquote(jsonStr)
+		if err != nil {
+			return nil, err
+		}
+		jsonBytes, err = base64.StdEncoding.DecodeString(jsonStr)
+		if err != nil {
+			return nil, err
+		}
+		jsonStr = string(jsonBytes)
 	}
 
-	// create data frame response
-	frame := data.NewFrame("response")
+	response := &backend.DataResponse{}
+	/*
+		{"_data":[
+				[1623706800,[255.83333333333,8,299]]
+			],
+			"_end":1623706860,
+			"_period":60,
+			"_query":"find('duration')",
+			"_start":1623706800
+		}
+	*/
+	jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
+		f, err := strconv.ParseFloat(string(value), 64)
+		if err != nil {
+			return
+		}
+		frame := data.NewFrame("response")
+		frame.Fields = append(frame.Fields,
+			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
+			data.NewField("values", nil, []float64{f, f}))
+		response.Frames = append(response.Frames, frame)
+	}, "_data", "[0]", "[1]")
 
-	// add the time dimension
-	frame.Fields = append(frame.Fields,
-		data.NewField("time", nil, []time.Time{query.TimeRange.From, query.TimeRange.To}),
-	)
-
-	// add values
-	frame.Fields = append(frame.Fields,
-		data.NewField("values", nil, []int64{10, 20}),
-	)
-
-	// add the frames to the response
-	response.Frames = append(response.Frames, frame)
-
-	return response
+	return response, nil
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
