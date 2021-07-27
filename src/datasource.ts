@@ -262,17 +262,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       let t = options.targets[idx];
       if (t['querytype'] === 'composite') {
         composites[idx] = options.targets.splice(idx, 1)[0];
-        //throw new Error('found composite query: ' + JSON.stringify(composites));
       }
     }
-    //throw new Error('dumping targets: ' + JSON.stringify(options));
 
     return Promise.all([this.buildIrondbParams(options)])
       .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        //throw new Error(`dumping options: ${JSON.stringify(irondbOptions)}`);
         return this.irondbRequest(irondbOptions);
       })
       .then((queryResults) => {
@@ -283,7 +280,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             });
           }
         }
-        //throw new Error(`dumping query results: ${JSON.stringify(queryResults)}`);
 
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
@@ -300,7 +296,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             data[target] = qres['data'][idx];
           }
         }
-        //throw new Error(`refId map: ${JSON.stringify(data)}`);
 
         // we have a composite query, parse it
         for (const [key, val] of Object.entries(composites)) {
@@ -309,7 +304,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           }
           let pat = /^\s*#([a-z])\s*([+-])\s*#([a-z])\s*$/i;
           let mat = val['query'].match(pat);
-          //throw new Error(`processing composite query ${val['refId']} [${val['query']}] ${JSON.stringify(mat)}`);
 
           if (mat === null || mat.length !== 4) {
             throw new Error(`unsupported expression [${val['query']}]`);
@@ -321,8 +315,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             throw new Error(`unknown composite query component ${mat[3]} in [${val['query']}]`);
           }
           // references in the composite query exist
-
-          //throw new Error(`target? ${JSON.stringify(data[mat[1]])}`);
 
           // build the new dataframe
           let time = [...data[mat[1]]['fields'][0]['values']];
@@ -359,25 +351,12 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             }
           }
 
-          //const frame = toDataFrame({
-          //  name: val['query'],
-          //  fields: [
-          //    { name: 'Time', type: FieldType.time, values: time },
-          //    { name: 'Value', type: FieldType.number, values: values },
-          //  ],
-          //  // can't set a target this way?
-          //  target: val['refId'],
-          //});
-          //// or this way?
-          //frame['target'] = val['refId'];
-
           const frame = {
             length: values.length,
             fields: [timeF, valuesF],
             target: val['refId'],
           };
           data[val['refId']] = frame; // allow composites of composites
-          //throw new Error(`composite dataframe for ${val['refId']}: ${JSON.stringify(frame)}`);
 
           qres['data'].push(frame);
         }
@@ -926,7 +905,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.isCaql = true;
         options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
-        //throw new Error(`building cacl options ${JSON.stringify(options)} ${JSON.stringify(irondbOptions)}`);
         options.refId = irondbOptions['caql']['names'][i]['leaf_data']['refId'];
         queries.push(options);
       }
@@ -970,7 +948,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
     log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
-    //throw new Error(`queries ${JSON.stringify(queries)}`);
     return Promise.all(
       queries.map((query, i, queries) =>
         this.datasourceRequest(query)
@@ -990,20 +967,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             }
           })
           .then((result) => {
-            //throw new Error(`result ${JSON.stringify(result)}`);
             if (result['data'].constructor === Array) {
-              //throw new Error(`query refId:${query['refId']} ${JSON.stringify(query)}`);
               for (let i = 0; i < result['data'].length; i++) {
                 if ('target' in result && 'refId' in result['target']) {
                   result['data'][i]['target'] = result['target']['refId'];
                 } else {
                   result['data'][i]['target'] = query.refId;
                 }
-                //if (result['data'][i]['target'] !== 'A') {
-                //  throw new Error(
-                //    `result['data'][i] (${i}/${result['data'][i]['target']}): ${JSON.stringify(result['data'][i])}`
-                //  );
-                //}
                 queryResults['data'].push(result['data'][i]);
               }
             }
@@ -1016,7 +986,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               queryResults['data'].push(result['data']);
             }
             queryResults['t'] = result['t'];
-            //throw new Error(`irondbRequest ${JSON.stringify(queryResults)}`);
             return queryResults;
           })
       )
