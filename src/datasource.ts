@@ -263,17 +263,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         //throw new Error('found composite query: ' + JSON.stringify(composites));
       }
     }
-    if (options.targets[0]['refId'] !== 'A') {
-      throw new Error('dumping targets: ' + JSON.stringify(options.targets));
-    }
+    //throw new Error('dumping targets: ' + JSON.stringify(options));
 
     return Promise.all([this.buildIrondbParams(options)])
       .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        //throw new Error(`dumping options: ${JSON.stringify(irondbOptions[0])}`);
-        return this.irondbRequest(irondbOptions[0]);
+        //throw new Error(`dumping options: ${JSON.stringify(irondbOptions)}`);
+        return this.irondbRequest(irondbOptions);
       })
       .then((queryResults) => {
         if (queryResults.t === 'ts') {
@@ -283,6 +281,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             });
           }
         }
+        //throw new Error(`dumping query results: ${JSON.stringify(queryResults)}`);
 
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
@@ -292,20 +291,94 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           return qres;
         }
 
-        if (qres['data'][0]['refId'] !== 'B') {
-          throw new Error(`qres: ${JSON.stringify(qres)}`);
+        let data = {}; // map between refIds and results
+        for (let idx in qres['data']) {
+          let target = qres['data'][idx]['target'];
+          if (target) {
+            data[target] = qres['data'][idx];
+          }
         }
-        // we have a composite query
+        //throw new Error(`refId map: ${JSON.stringify(data)}`);
+
+        // we have a composite query, parse it
         for (const [key, val] of Object.entries(composites)) {
+          if (!val['query']) {
+            continue;
+          }
           let pat = /^\s*#([a-z])\s*([+-])\s*#([a-z])\s*$/i;
           let mat = val['query'].match(pat);
           //throw new Error(`processing composite query ${val['refId']} [${val['query']}] ${JSON.stringify(mat)}`);
-          if (mat === null || mat.length !== 3) {
-            // unsupported expression, silently skip evaluation
-            continue;
+
+          if (mat === null || mat.length !== 4) {
+            throw new Error(`unsupported expression [${val['query']}]`);
           }
+          if (mat[1] && !data[mat[1]]) {
+            throw new Error(`unknown composite query component ${mat[1]} in [${val['query']}]`);
+          }
+          if (mat[3] && !data[mat[3]]) {
+            throw new Error(`unknown composite query component ${mat[3]} in [${val['query']}]`);
+          }
+          // references in the composite query exist
+
+          //throw new Error(`target? ${JSON.stringify(data[mat[1]])}`);
+
+          // build the new dataframe
+          let time = [...data[mat[1]]['fields'][0]['values']];
+          let values = [...data[mat[1]]['fields'][1]['values']];
+          // need a copy of this or everything's undefined
+          let rhs = [...data[mat[3]]['fields'][1]['values']];
+          switch (mat[2]) {
+            case '-':
+              for (let idx of values) {
+                values[idx] -= rhs[idx];
+              }
+              break;
+            case '+':
+              for (let idx of values) {
+                values[idx] += rhs[idx];
+              }
+              break;
+            default:
+              throw new Error(`unsupported composite query operator ${mat[2]}, try (+, -)`);
+          }
+
+          const timeF = getTimeField();
+          timeF['refId'] = val['refId'];
+          for (let t of time) {
+            if (t !== null && t !== undefined) {
+              timeF.values.add(t);
+            }
+          }
+          const valuesF = getNumberField(val['query']);
+          valuesF['refId'] = val['refId'];
+          for (let v of values) {
+            if (v !== null && v !== undefined) {
+              valuesF.values.add(v);
+            }
+          }
+
+          //const frame = toDataFrame({
+          //  name: val['query'],
+          //  fields: [
+          //    { name: 'Time', type: FieldType.time, values: time },
+          //    { name: 'Value', type: FieldType.number, values: values },
+          //  ],
+          //  // can't set a target this way?
+          //  target: val['refId'],
+          //});
+          //// or this way?
+          //frame['target'] = val['refId'];
+
+          const frame = {
+            length: values.length,
+            fields: [timeF, valuesF],
+            target: val['refId'],
+          };
+          data[val['refId']] = frame; // allow composites of composites
+          //throw new Error(`composite dataframe for ${val['refId']}: ${JSON.stringify(frame)}`);
+
+          qres['data'].push(frame);
         }
-        // TODO: calculate the composite results, and insert at the right spot
         return qres;
       })
       .catch((err) => {
@@ -694,7 +767,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.datasourceRequest(options);
   }
 
-  irondbRequest(irondbOptions, isLimited = true) {
+  irondbRequest(optionsAll, isLimited = true) {
+    const irondbOptions = optionsAll[0];
     log(() => 'irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
     const headers = { 'Content-Type': 'application/json' };
     let options: any = {};
@@ -780,7 +854,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
         options.isCaql = false;
         options.retry = 1;
-        options.refId = irondbOptions['refId'];
         queries.push(options);
       }
     }
@@ -828,8 +901,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.isCaql = true;
         options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
-        options['refId'] = irondbOptions['refId'];
         //throw new Error(`building cacl options ${JSON.stringify(options)} ${JSON.stringify(irondbOptions)}`);
+        options.refId = irondbOptions['caql']['names'][i]['leaf_data']['refId'];
         queries.push(options);
       }
     }
@@ -874,7 +947,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     //throw new Error(`queries ${JSON.stringify(queries)}`);
     return Promise.all(
-      queries.map((query) =>
+      queries.map((query, i, queries) =>
         this.datasourceRequest(query)
           .then((result) => {
             log(() => 'irondbRequest() query = ' + JSON.stringify(query));
@@ -892,14 +965,20 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             }
           })
           .then((result) => {
-            //throw new Error(`converted ${JSON.stringify(result)}`);
+            //throw new Error(`result ${JSON.stringify(result)}`);
             if (result['data'].constructor === Array) {
+              //throw new Error(`query refId:${query['refId']} ${JSON.stringify(query)}`);
               for (let i = 0; i < result['data'].length; i++) {
                 if ('target' in result && 'refId' in result['target']) {
                   result['data'][i]['target'] = result['target']['refId'];
                 } else {
                   result['data'][i]['target'] = query.refId;
                 }
+                //if (result['data'][i]['target'] !== 'A') {
+                //  throw new Error(
+                //    `result['data'][i] (${i}/${result['data'][i]['target']}): ${JSON.stringify(result['data'][i])}`
+                //  );
+                //}
                 queryResults['data'].push(result['data'][i]);
               }
             }
@@ -912,7 +991,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               queryResults['data'].push(result['data']);
             }
             queryResults['t'] = result['t'];
-            //throw new Error(`queryResults ${JSON.stringify(queryResults)}`);
+            //throw new Error(`irondbRequest ${JSON.stringify(queryResults)}`);
             return queryResults;
           })
       )
@@ -1094,6 +1173,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       label = query['label'];
     }
     const timeField = getTimeField();
+    timeField['refId'] = query['refId'];
     const valueField = getNumberField(label);
     const dataFrames: DataFrame[] = [];
 
@@ -1186,6 +1266,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       }
       queries.push(options);
     }
+
     return Promise.all(
       queries.map((query) =>
         this.datasourceRequest(query)
@@ -1423,6 +1504,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             rolluptype: target.rolluptype,
             metricrollup: target.metricrollup,
             format: target.format,
+            refId: target.refId,
           },
         });
         cleanOptions['refId'] = target.refId;
@@ -1479,6 +1561,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       // because we are guaranteed to have the same number of records
       // across all the results due to how irondb works.
       const timeField = getTimeField();
+      timeField['refId'] = query['refId'];
       const labelFields = new Set<MutableField>();
       const valueFields = new Set<MutableField>();
       const all_labels = {};
@@ -1526,6 +1609,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     name: tagCat,
                     config: { filterable: false },
                     type: FieldType.other,
+                    refId: query.refId,
                     values: new ArrayVector(),
                   };
                   all_labels[tagCat] = lfield;
@@ -1543,6 +1627,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 filterable: false,
                 displayName: lname,
               },
+              refId: query.refId,
               type: FieldType.number,
               values: new ArrayVector(),
             };
@@ -1562,7 +1647,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         t: 'table',
         data: {
           length: timeField.values.length,
-          refId: query.refId,
           fields: [timeField, ...labelFields, ...valueFields],
         },
         state: LoadingState.Done,
@@ -1615,13 +1699,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         dname = dname + ' { ' + decoded_tags.join(', ') + ' }';
       }
 
-      const timeField = getTimeField();
+      let timeField = getTimeField();
+      timeField['refId'] = query.refId;
       const numericValueField = {
         name: TIME_SERIES_VALUE_FIELD_NAME,
         type: FieldType.number,
         config: {
           displayName: dname,
         },
+        refId: query.refId,
         labels: labels,
         values: new ArrayVector<number>(),
       };
@@ -1661,7 +1747,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (numericValueField.values.length > 0) {
         dataFrames.push({
           length: timeField.values.length,
-          refId: query.refId,
           fields: [timeField, numericValueField],
         });
       }
