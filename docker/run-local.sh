@@ -15,6 +15,7 @@ docker run --rm --publish 3000:3000 \
     -v $PWD/docker/dashboards:/var/lib/grafana/dashboards:z \
     -v $PWD:/var/lib/grafana/plugins/circonus-irondb-datasource:z \
     -v $PWD/docker/provisioning:/var/lib/grafana/provisioning:z \
+    -v $PWD/docker/etc:/etc/grafana:z \
     -e "GF_PATHS_PROVISIONING=/var/lib/grafana/provisioning" \
     -e "GF_SECURITY_ADMIN_PASSWORD=admin" \
     --name grafana-plugin \
