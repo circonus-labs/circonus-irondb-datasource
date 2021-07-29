@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,7 @@ type SampleDatasource struct {
 	// but a best practice that we recommend that you follow.
 	im   instancemgmt.InstanceManager
 	circ *circ.API
+	qrs  map[string]backend.DataResponse
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -51,8 +53,7 @@ type SampleDatasource struct {
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	log.DefaultLogger.Info("QueryData", "request", req)
-
+	// init client once
 	if td.circ == nil {
 		cfg := req.PluginContext.DataSourceInstanceSettings.JSONData
 		dbType, err := jsonp.GetString(cfg, "irondbType")
@@ -73,6 +74,9 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			return nil, err
 		}
 	}
+	if td.qrs == nil {
+		td.qrs = make(map[string]backend.DataResponse)
+	}
 
 	rv := backend.NewQueryDataResponse()
 	for _, q := range req.Queries {
@@ -87,8 +91,17 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			if err != nil {
 				return nil, err
 			}
+		} else if qtype == "composite" {
+			// FIXME: when alerting on a composite query, how do we get the data points to combine?
+			response, err = td.compositeQuery(context.Background(), q)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, errors.Errorf("Unsupported query type %s, try (caql, composite)", qtype)
 		}
 		rv.Responses[q.RefID] = *response
+		td.qrs[q.RefID] = *response
 	}
 	return rv, nil
 }
@@ -97,12 +110,58 @@ func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) 
 	return backend.DataResponse{}
 }
 
+var compositeExpression = regexp.MustCompile(`^\s*#([a-zA-Z])\s*([+-])\s*#([a-zA-Z])\s*$`)
+
+func (td *SampleDatasource) compositeQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
+	query, err := jsonp.GetString(q.JSON, "query")
+	if err != nil {
+		return nil, err
+	}
+	f := compositeExpression.FindStringSubmatch(query)
+	if f == nil || len(f) != 4 {
+		return nil, errors.Errorf(`couldn't parse composite query [%s]`, query)
+	}
+
+	var lhs, rhs backend.DataResponse
+	var ok bool
+	if lhs, ok = td.qrs[f[1]]; !ok {
+		return nil, errors.Errorf(`alert not defined for composite lhs #%s`, f[1])
+	}
+	if rhs, ok = td.qrs[f[3]]; !ok {
+		return nil, errors.Errorf(`alert not defined for composite rhs #%s`, f[3])
+	}
+
+	response := &backend.DataResponse{}
+	frame := data.NewFrame("response")
+	ltmp, _ := lhs.Frames[0].Fields[1].FloatAt(0)
+	rtmp, _ := rhs.Frames[0].Fields[1].FloatAt(0)
+	switch f[2] {
+	case "+":
+		log.DefaultLogger.Info(`composite values`, "ltmp", ltmp, "rtmp", rtmp, "l+r", ltmp+rtmp)
+		frame.Fields = append(frame.Fields,
+			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
+			data.NewField("values", nil, []float64{ltmp + rtmp, ltmp + rtmp}))
+		break
+	case "-":
+		log.DefaultLogger.Info(`composite values`, "ltmp", ltmp, "rtmp", rtmp, "l-r", ltmp-rtmp)
+		frame.Fields = append(frame.Fields,
+			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
+			data.NewField("values", nil, []float64{ltmp - rtmp, ltmp - rtmp}))
+		break
+	default:
+		return nil, errors.Errorf(`unsupported composite operator %s`, f[2])
+	}
+	response.Frames = append(response.Frames, frame)
+
+	return response, nil
+}
+
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
 	query, err := jsonp.GetString(q.JSON, "query")
 	if err != nil {
 		return nil, err
 	}
-	log.DefaultLogger.Info("QueryData", "caql", query)
+	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
