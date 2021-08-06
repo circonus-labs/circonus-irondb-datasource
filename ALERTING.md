@@ -68,7 +68,10 @@ Follow either this step or the next one (Allow Unsigned Plugins), not both. The 
 
 We'll be using "private" signing here, which is the default. This means we need to specify a list of one or more domains where this build is valid for use. The example below uses `localhost`, for simplicity. This should contain the base url your users will load to use the plugin.
 
-The first step is to [create a grafana.com account and api key](https://grafana.com/docs/grafana/latest/developers/plugins/sign-a-plugin/) and set it in your environment.
+To get started:
+- [Create a Grafana Cloud account](https://grafana.com/auth/sign-up/create-user)
+- Update plugin.json. Ensure the first part of the plugin ID matches the slug of your Grafana Cloud account. For example, if your account slug is acmecorp, you need to prefix the plugin ID with acmecorp-.
+- Create a [Grafana Cloud API key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/) with the PluginPublisher role.
 
 These steps use the signing tool provided by a globally-installed `@grafana/toolkit`.
 

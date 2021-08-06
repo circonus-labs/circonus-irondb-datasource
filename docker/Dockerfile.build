@@ -4,7 +4,7 @@ FROM grafana/grafana:7.3.7
 USER root
 
 # install dependencies available via alpine's apk
-RUN apk add --update npm=12.22.1-r0
+RUN apk add --update npm=12.22.4-r0
 RUN apk add go=1.13.15-r0
 
 # install dependencies available via node's npm
