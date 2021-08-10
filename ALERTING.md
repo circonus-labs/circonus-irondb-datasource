@@ -7,21 +7,20 @@ To activate Grafana's Alerting features, a "backend" plugin is required. Since v
 These instructions will build and run a Docker container with a Grafana instance on port 3000. There will be a pre-configured data source connected to the hosted Circonus API with a  graph and alert.
 
 1. [Install Docker](https://docs.docker.com/get-docker/)
-2. [Install NPM](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-3. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
-4. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
-5. From your OS shell using a privileged account:
+2. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
+3. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
+4. From your OS shell using a privileged account:
 
    ```shell
-   export CIRCONUS_API_KEY=<From step 3>
-   export GRAFANA_API_KEY=<From step 4>
+   export CIRCONUS_API_KEY=<From step 2>
+   export GRAFANA_API_KEY=<From step 3>
    git clone https://github.com/yargevad/circonus-irondb-datasource.git --branch alerts-phase1 --single-branch
    sed -i '/"id": "circonus-irondb-datasource",/a \  \"backend": true,\n  "executable": "irondb-backend",\n  "alerting": true,' circonus-irondb-datasource/src/plugin.json
    circonus-irondb-datasource/docker/build-local.sh
    circonus-irondb-datasource/docker/run-local.sh
    ```
 
-6. Login to the Grafana UI at <http://localhost:3000/> to validate functionality.
+5. Login to the Grafana UI at <http://localhost:3000/> to validate functionality.
 
 ## Building the Backend
 
