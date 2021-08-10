@@ -14,8 +14,8 @@ These instructions will build and run a Docker container with a Grafana instance
    ```shell
    export CIRCONUS_API_KEY=<From step 2>
    export GRAFANA_API_KEY=<From step 3>
-   cd circonus-irondb-datasource/
    git clone https://github.com/yargevad/circonus-irondb-datasource.git --branch alerts-phase1 --single-branch
+   cd circonus-irondb-datasource/
    sed -i '/"id": "circonus-irondb-datasource",/a \  \"backend": true,\n  "executable": "irondb-backend",\n  "alerting": true,' src/plugin.json
    docker/build-local.sh
    docker/run-local.sh
