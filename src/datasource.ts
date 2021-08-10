@@ -3,6 +3,7 @@ import Log from './log';
 
 import micromatch from 'micromatch';
 import memoize from 'memoizee';
+// eslint-disable-next-line no-duplicate-imports
 import { Memoized } from 'memoizee';
 import {
   metaInterpolateLabel,
@@ -243,7 +244,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -286,7 +287,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(query.range));
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -504,7 +505,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(range));
         if (this.useCaching) {
           log(() => 'query() clearing cache');
-          const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+          const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
           requestCache.clear();
         }
       }

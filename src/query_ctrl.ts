@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import IrondbQuery from './irondb_query';
+// eslint-disable-next-line no-duplicate-imports
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import appEvents from 'grafana/app/core/app_events';
