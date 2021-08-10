@@ -562,11 +562,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   metricFindTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=' + metricQuery;
     if (this.activityTracking && from && to) {
-      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      log(() => 'metricFindTagsQuery() activityWindow = [' + from + ',' + to + ']');
       queryUrl += '&activity_start_secs=' + _.toInteger(from);
       queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
-    log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
+    log(() => 'metricFindTagValsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
@@ -574,7 +574,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     let queryUrl =
       '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=and(__name:' + encodedMetricName + ')';
     if (this.activityTracking && from && to) {
-      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      log(() => 'metricTagsValsQuery() activityWindow = [' + from + ',' + to + ']');
       queryUrl += '&activity_start_secs=' + _.toInteger(from);
       queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
@@ -585,7 +585,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   metricTagCatsQuery(encodedMetricName: string, from?: number = null, to: number = null) {
     let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=and(__name:' + encodedMetricName + ')&query=';
     if (this.activityTracking && from && to) {
-      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      log(() => 'metricTagsCatsQuery() activityWindow = [' + from + ',' + to + ']');
       queryUrl += '&activity_start_secs=' + _.toInteger(from);
       queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
