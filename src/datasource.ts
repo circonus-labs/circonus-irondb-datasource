@@ -3,6 +3,7 @@ import Log from './log';
 
 import micromatch from 'micromatch';
 import memoize from 'memoizee';
+// eslint-disable-next-line no-duplicate-imports
 import { Memoized } from 'memoizee';
 import {
   metaInterpolateLabel,
@@ -243,7 +244,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -286,7 +287,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(query.range));
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -491,6 +492,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return q;
   }
 
+  // This is used by the Dashboard Admin Variable Setup function
   metricFindQuery(query: string, options: any) {
     const variable = options.variable;
     const range = options.range;
@@ -503,7 +505,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(range));
         if (this.useCaching) {
           log(() => 'query() clearing cache');
-          const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+          const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
           requestCache.clear();
         }
       }
@@ -522,7 +524,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
       if (tagCat !== '') {
-        return this.metricTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
+        return this.metricFindTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: result };
           });
@@ -557,15 +559,38 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbSimpleRequest('GET', queryUrl, false, true);
   }
 
-  metricTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
-    let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=';
-    queryUrl = queryUrl + metricQuery;
+  // Used by metricFindQuery
+  metricFindTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
+    let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=' + metricQuery;
     if (this.activityTracking && from && to) {
-      log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      log(() => 'metricFindTagsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
+    }
+    log(() => 'metricFindTagValsQuery() queryUrl = ' + queryUrl);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
+  }
+
+  metricTagValsQuery(encodedMetricName: string, cat: string, from?: number = null, to: number = null) {
+    let queryUrl =
+      '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=and(__name:' + encodedMetricName + ')';
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsValsQuery() activityWindow = [' + from + ',' + to + ']');
       queryUrl += '&activity_start_secs=' + _.toInteger(from);
       queryUrl += '&activity_end_secs=' + _.toInteger(to);
     }
     log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
+  }
+
+  metricTagCatsQuery(encodedMetricName: string, from?: number = null, to: number = null) {
+    let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=and(__name:' + encodedMetricName + ')&query=';
+    if (this.activityTracking && from && to) {
+      log(() => 'metricTagsCatsQuery() activityWindow = [' + from + ',' + to + ']');
+      queryUrl += '&activity_start_secs=' + _.toInteger(from);
+      queryUrl += '&activity_end_secs=' + _.toInteger(to);
+    }
+    log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
     return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
   }
 
