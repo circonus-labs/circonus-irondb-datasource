@@ -2,6 +2,7 @@
   "type": "datasource",
   "name": "IRONdb",
   "id": "circonus-irondb-datasource",
+  "executable":"circonus-irondb-datasource",
 
   "info": {
     "description": "Datasource plugin to pull data from an IRONdb installation.",
