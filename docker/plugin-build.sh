@@ -7,6 +7,8 @@ GRAFANA_TOOLKIT=$(find $(npm root -g) -type f -iname "grafana-toolkit.js")
 
 # host volume containing plugin
 cd irondb-plugin-build
+# download and install dependencies
+yarn install
 # build the typescript bits
 yarn build
 # build the backend plugin
