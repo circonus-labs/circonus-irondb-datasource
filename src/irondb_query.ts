@@ -383,4 +383,73 @@ export default class IrondbQuery {
   addSelectMetricSegment() {
     this.segments.push({ value: 'select metric' });
   }
+
+  updateModelTarget(targets: any) {
+    this.updateRenderedTarget(this.target, targets);
+
+    // loop through other queries and update targetFull as needed
+    for (let target of targets || []) {
+      if (target.refId !== this.target.refId) {
+        this.updateRenderedTarget(target, targets);
+      }
+    }
+  }
+
+  updateRenderedTarget(target: { refId: string | number; query: any; targetFull: any }, targets: any) {
+    // render nested query
+    const targetsByRefId = _.keyBy(targets, 'refId');
+
+    // no references to self
+    delete targetsByRefId[target.refId];
+
+    const nestedSeriesRefRegex = /\#([A-Z])/g;
+    let targetWithNestedQueries = `${target.query}`;
+
+    // Use ref count to track circular references
+    function countTargetRefs(targetsByRefId: any, refId: string) {
+      let refCount = 0;
+      _.each(targetsByRefId, (t, id) => {
+        if (id !== refId) {
+          const match = nestedSeriesRefRegex.exec(t.query);
+          const count = match && match.length ? match.length - 1 : 0;
+          refCount += count;
+        }
+      });
+      targetsByRefId[refId].refCount = refCount;
+    }
+    _.each(targetsByRefId, (t, id) => {
+      countTargetRefs(targetsByRefId, id);
+    });
+
+    // Keep interpolating until there are no query references
+    // The reason for the loop is that the referenced query might contain another reference to another query
+    while (targetWithNestedQueries.match(nestedSeriesRefRegex) !== null) {
+      const updated = targetWithNestedQueries.replace(nestedSeriesRefRegex, (match: string, g1: string) => {
+        const t = targetsByRefId[g1];
+        if (!t) {
+          return match;
+        }
+
+        // no circular references
+        if (t.refCount === 0) {
+          delete targetsByRefId[g1];
+        }
+        t.refCount--;
+
+        return t.query;
+      });
+
+      if (updated === targetWithNestedQueries) {
+        break;
+      }
+
+      targetWithNestedQueries = updated;
+    }
+
+    delete target.targetFull;
+    if (target.query !== targetWithNestedQueries) {
+      // TODO: prefer targetFull over target.query when sending to API, if it exists
+      target.query = target.targetFull = targetWithNestedQueries;
+    }
+  }
 }

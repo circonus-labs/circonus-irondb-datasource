@@ -703,9 +703,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   updateModelTarget() {
-    const streamTags = this.segmentsToStreamTags();
-    log(() => 'updateModelTarget() streamTags = ' + streamTags);
-    this.queryModel.target.query = streamTags;
+    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
   }
 
   targetChanged() {
