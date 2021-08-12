@@ -94,6 +94,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.labeltype = this.target.labeltype || 'default';
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
+    this.target.queryDisplay = this.target.query;
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
     if (this.target.isCaql !== undefined) {
@@ -114,6 +115,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   resetQueryTarget() {
     log(() => 'resetQueryTarget()');
     this.target.query = '';
+    this.target.queryDisplay = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
@@ -355,6 +357,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 expandable: true,
               })
             );
+
             _.eachRight(this.templateSrv.variables, (variable) => {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {

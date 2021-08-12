@@ -395,7 +395,10 @@ export default class IrondbQuery {
     }
   }
 
-  updateRenderedTarget(target: { refId: string | number; query: any; targetFull: any }, targets: any) {
+  updateRenderedTarget(
+    target: { refId: string | number; query: any; queryDisplay: string; targetFull: any },
+    targets: any
+  ) {
     // render nested query
     const targetsByRefId = _.keyBy(targets, 'refId');
 
@@ -403,7 +406,7 @@ export default class IrondbQuery {
     delete targetsByRefId[target.refId];
 
     const nestedSeriesRefRegex = /\#([A-Z])/g;
-    let targetWithNestedQueries = `${target.query}`;
+    let targetWithNestedQueries = `${target.queryDisplay}`;
 
     // Use ref count to track circular references
     function countTargetRefs(targetsByRefId: any, refId: string) {
