@@ -91,14 +91,13 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			if err != nil {
 				return nil, err
 			}
-		} else if qtype == "composite" {
-			// FIXME: when alerting on a composite query, how do we get the data points to combine?
-			response, err = td.compositeQuery(context.Background(), q)
+		} else if qtype == "basic" {
+			response, err = td.basicQuery(context.Background(), q)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			return nil, errors.Errorf("Unsupported query type %s, try (caql, composite)", qtype)
+			return nil, errors.Errorf("Unsupported query type %s, try (caql, basic)", qtype)
 		}
 		rv.Responses[q.RefID] = *response
 		td.qrs[q.RefID] = *response
@@ -110,50 +109,14 @@ func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) 
 	return backend.DataResponse{}
 }
 
-var compositeExpression = regexp.MustCompile(`^\s*#([a-zA-Z])\s*([+-])\s*#([a-zA-Z])\s*$`)
-
-func (td *SampleDatasource) compositeQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
+func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
 	query, err := jsonp.GetString(q.JSON, "query")
 	if err != nil {
 		return nil, err
 	}
-	f := compositeExpression.FindStringSubmatch(query)
-	if f == nil || len(f) != 4 {
-		return nil, errors.Errorf(`couldn't parse composite query [%s]`, query)
-	}
 
-	var lhs, rhs backend.DataResponse
-	var ok bool
-	if lhs, ok = td.qrs[f[1]]; !ok {
-		return nil, errors.Errorf(`alert not defined for composite lhs #%s`, f[1])
-	}
-	if rhs, ok = td.qrs[f[3]]; !ok {
-		return nil, errors.Errorf(`alert not defined for composite rhs #%s`, f[3])
-	}
-
-	response := &backend.DataResponse{}
-	frame := data.NewFrame("response")
-	ltmp, _ := lhs.Frames[0].Fields[1].FloatAt(0)
-	rtmp, _ := rhs.Frames[0].Fields[1].FloatAt(0)
-	switch f[2] {
-	case "+":
-		log.DefaultLogger.Info(`composite values`, "ltmp", ltmp, "rtmp", rtmp, "l+r", ltmp+rtmp)
-		frame.Fields = append(frame.Fields,
-			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-			data.NewField("values", nil, []float64{ltmp + rtmp, ltmp + rtmp}))
-		break
-	case "-":
-		log.DefaultLogger.Info(`composite values`, "ltmp", ltmp, "rtmp", rtmp, "l-r", ltmp-rtmp)
-		frame.Fields = append(frame.Fields,
-			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-			data.NewField("values", nil, []float64{ltmp - rtmp, ltmp - rtmp}))
-		break
-	default:
-		return nil, errors.Errorf(`unsupported composite operator %s`, f[2])
-	}
-	response.Frames = append(response.Frames, frame)
-
-	return response, nil
+	log.DefaultLogger.Info("basicQuery", "query", query)
+	return nil, nil
 }
 
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {

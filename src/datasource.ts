@@ -254,17 +254,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return this.$q.when({ data: [] });
     }
 
-    let composites = {},
-      results = {};
-    // remove any composites from targets; we'll deal with them later
-    // iterate in reverse so we don't skip elements after removing
-    for (let idx = options.targets.length - 1; idx >= 0; idx--) {
-      let t = options.targets[idx];
-      if (t['querytype'] === 'composite') {
-        composites[idx] = options.targets.splice(idx, 1)[0];
-      }
-    }
-
     return Promise.all([this.buildIrondbParams(options)])
       .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
@@ -283,84 +272,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
-      })
-      .then((qres) => {
-        if (Object.keys(composites).length === 0) {
-          return qres;
-        }
-
-        let data = {}; // map between refIds and results
-        for (let idx in qres['data']) {
-          let target = qres['data'][idx]['target'];
-          if (target) {
-            data[target] = qres['data'][idx];
-          }
-        }
-
-        // we have a composite query, parse it
-        for (const [key, val] of Object.entries(composites)) {
-          if (!val['query']) {
-            continue;
-          }
-          let pat = /^\s*#([a-z])\s*([+-])\s*#([a-z])\s*$/i;
-          let mat = val['query'].match(pat);
-
-          if (mat === null || mat.length !== 4) {
-            throw new Error(`unsupported expression [${val['query']}]`);
-          }
-          if (mat[1] && !data[mat[1]]) {
-            throw new Error(`unknown composite query component ${mat[1]} in [${val['query']}]`);
-          }
-          if (mat[3] && !data[mat[3]]) {
-            throw new Error(`unknown composite query component ${mat[3]} in [${val['query']}]`);
-          }
-          // references in the composite query exist
-
-          // build the new dataframe
-          let time = [...data[mat[1]]['fields'][0]['values'].filter((e) => e != null)];
-          let values = [...data[mat[1]]['fields'][1]['values'].filter((e) => e != null)];
-          // need a copy of this or everything's undefined
-          let rhs = [...data[mat[3]]['fields'][1]['values'].filter((e) => e != null)];
-          switch (mat[2]) {
-            case '-':
-              for (let idx in values) {
-                values[idx] -= rhs[idx];
-              }
-              break;
-            case '+':
-              for (let idx in values) {
-                values[idx] += rhs[idx];
-              }
-              break;
-            default:
-              throw new Error(`unsupported composite query operator ${mat[2]}, try (+, -)`);
-          }
-
-          const timeF = getTimeField();
-          timeF['refId'] = val['refId'];
-          for (let t of time) {
-            if (t !== null && t !== undefined) {
-              timeF.values.add(t);
-            }
-          }
-          const valuesF = getNumberField(val['query']);
-          valuesF['refId'] = val['refId'];
-          for (let v of values) {
-            if (v !== null && v !== undefined) {
-              valuesF.values.add(v);
-            }
-          }
-
-          const frame = {
-            length: values.length,
-            fields: [timeF, valuesF],
-            target: val['refId'],
-          };
-          data[val['refId']] = frame; // allow composites of composites
-
-          qres['data'].push(frame);
-        }
-        return qres;
       })
       .catch((err) => {
         if (err.status !== 0 || err.status >= 300) {

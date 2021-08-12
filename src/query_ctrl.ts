@@ -25,7 +25,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   queryTypeOptions = [
     { value: 'caql', text: 'CAQL' },
     { value: 'basic', text: 'Basic' },
-    { value: 'composite', text: 'Composite' },
     { value: 'alerts', text: 'Alerts' },
     { value: 'alert_counts', text: 'Alert Counts' },
   ];
@@ -367,6 +366,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 })
               );
             });
+
             for (const tagVal of tagVals) {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {
