@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -110,13 +109,22 @@ func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) 
 }
 
 func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
-	query, err := jsonp.GetString(q.JSON, "query")
+	basic, err := jsonp.GetString(q.JSON, "query")
 	if err != nil {
 		return nil, err
 	}
 
-	log.DefaultLogger.Info("basicQuery", "query", query)
-	return nil, nil
+	iq := IrondbQuery{Basic: basic}
+	err = iq.ParseBasic()
+	if err != nil {
+		return nil, err
+	}
+	query, err := iq.ToCaql()
+	if err != nil {
+		return nil, err
+	}
+
+	return td.caqlApi(ctx, q, query)
 }
 
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
@@ -126,6 +134,10 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	}
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
+	return td.caqlApi(ctx, q, query)
+}
+
+func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
