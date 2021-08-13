@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ -z $CIRCONUS_API_KEY ]] ; then
   >&2 echo "FATAL: CIRCONUS_API_KEY not set in environment"

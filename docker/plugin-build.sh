@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # This build script is intended to be run inside the
 # grafana docker image, which runs alpine. This exists
 # so that local build tools don't result in odd errors.

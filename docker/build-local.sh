@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ -z $GRAFANA_API_KEY ]] ; then
   >&2 echo "FATAL: GRAFANA_API_KEY not set in environment, needed for 'public signing'"
