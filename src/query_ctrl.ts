@@ -96,10 +96,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.queryDisplay = this.target.query;
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
-    if (this.target.isCaql !== undefined) {
-      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
-    } else {
+    if (this.target.isCaql === undefined) {
       this.target.querytype = this.target.querytype || 'caql';
+    } else {
+      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
     }
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';

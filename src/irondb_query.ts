@@ -451,7 +451,6 @@ export default class IrondbQuery {
 
     delete target.targetFull;
     if (target.query !== targetWithNestedQueries) {
-      // TODO: prefer targetFull over target.query when sending to API, if it exists
       target.query = target.targetFull = targetWithNestedQueries;
     }
   }
