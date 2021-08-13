@@ -93,7 +93,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.labeltype = this.target.labeltype || 'default';
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
-    this.target.queryDisplay = this.target.query;
+    this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
     if (this.target.isCaql === undefined) {
