@@ -13,21 +13,21 @@ cmd() {
 		exit $?
 	fi
 }
-IMAGE="grafana/grafana$VERSION"
-ID=$(docker ps -q -f name=grafana)
-RUNNING=$(docker ps --filter name=$NAME --format '{{.Image}}')
-if test "$RUNNING" = "$IMAGE"; then
-	echo "Image $NAME already running at $ID"
-elif test -n "$RUNNING"; then
-	echo "Image $NAME running w/ $RUNNING, you need delete it first."
-	echo "Run:"
-	echo "; docker stop $NAME"
-	echo "; docker rm $NAME"
-	exit 1
-else
-	cmd docker run -p 3000:3000 -d -e GF_LOG_LEVEL=debug --name=$NAME $IMAGE
-	ID=$(docker ps -q -f name=grafana)
-fi
+# IMAGE="grafana/grafana$VERSION"
+# ID=$(docker ps -q -f name=grafana)
+# RUNNING=$(docker ps --filter name=$NAME --format '{{.Image}}')
+# if test "$RUNNING" = "$IMAGE"; then
+# 	echo "Image $NAME already running at $ID"
+# elif test -n "$RUNNING"; then
+# 	echo "Image $NAME running w/ $RUNNING, you need delete it first."
+# 	echo "Run:"
+# 	echo "; docker stop $NAME"
+# 	echo "; docker rm $NAME"
+# 	exit 1
+# else
+# 	cmd docker run -p 3000:3000 -d -e GF_LOG_LEVEL=debug --name=$NAME $IMAGE
+# 	ID=$(docker ps -q -f name=grafana)
+# fi
 
 SRC=$(dirname $0)
 ID=$(docker ps -q -f name=grafana)

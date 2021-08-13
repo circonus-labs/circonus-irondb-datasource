@@ -18,6 +18,8 @@ import {
   decodeTagsInLabel,
 } from './irondb_query';
 
+import { IronDBVariableQuery } from './types';
+
 import {
   ArrayVector,
   DataFrame,
@@ -244,7 +246,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       );
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
+        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -287,7 +289,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(query.range));
       if (this.useCaching) {
         log(() => 'query() clearing cache');
-        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
+        const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
         requestCache.clear();
       }
     }
@@ -493,11 +495,25 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   // This is used by the Dashboard Admin Variable Setup function
-  metricFindQuery(query: string, options: any) {
+  // It relies on types/IronDBVariableQuery
+  //
+  // Older versions of grafana had support for an experimental
+  // tag extraction feature which the older version of this
+  // datasource relied on.  That experimental code was removed in Grafana 8.
+  //
+  // In order to support extraction of tag values we need to implement
+  // our own variable query.
+  //
+  // There is code here (called out below) that attempts to migrate
+  // the prior setup (that relied on the experimental feature) into
+  // the new IronDBVariableQuery structure.
+  metricFindQuery(query: IronDBVariableQuery, options: any) {
     const variable = options.variable;
     const range = options.range;
     let from = undefined;
     let to = undefined;
+
+    // setup time range for query
     if (!_.isUndefined(range)) {
       from = range.from.valueOf() / 1000;
       to = range.to.valueOf() / 1000;
@@ -505,26 +521,30 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         log(() => 'query() time range changed ' + JSON.stringify(this.queryRange) + ' -> ' + JSON.stringify(range));
         if (this.useCaching) {
           log(() => 'query() clearing cache');
-          const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
+          const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
           requestCache.clear();
         }
       }
       this.queryRange = range;
     }
 
+    // attempt to translate variable.useTags into the new IronDBVariableQuery structure
+    if (variable !== undefined && variable.useTags) {
+      query.tagCategory = variable.tagValuesQuery;
+    }
+
     log(() => 'Options: ' + JSON.stringify(options));
-    if (query !== '' && variable !== undefined && (variable.regex !== '' || variable.useTags)) {
-      log(() => 'metricFindQuery() incoming query = ' + query);
+    if (query !== undefined) {
+      log(() => 'metricFindQuery() incoming query = ' + query.metricFindQuery);
       log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
-      let metricQuery = this.templateSrv.replace(query, null, this.interpolateExpr);
-      const tagCat = variable.tagValuesQuery;
+      let metricQuery = this.templateSrv.replace(query.metricFindQuery, null, this.interpolateExpr);
       log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
-      log(() => 'metricFindQuery() tagCat = ' + tagCat);
+      log(() => 'metricFindQuery() tagCat = ' + query.tagCategory);
       if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
-      if (tagCat !== '') {
-        return this.metricFindTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
+      if (query.tagCategory !== '') {
+        return this.metricFindTagValsQuery(metricQuery, query.tagCategory, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: result };
           });
