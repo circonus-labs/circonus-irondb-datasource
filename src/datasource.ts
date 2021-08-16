@@ -19,6 +19,7 @@ import {
 } from './irondb_query';
 
 import { IronDBVariableQuery } from './types';
+import { VariableQueryEditor as IronDBVariableQueryEditor } from './VariableQueryEditor';
 
 import {
   ArrayVector,
@@ -507,7 +508,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   // There is code here (called out below) that attempts to migrate
   // the prior setup (that relied on the experimental feature) into
   // the new IronDBVariableQuery structure.
-  metricFindQuery(query: IronDBVariableQuery, options: any) {
+  metricFindQuery(query: IronDBVariableQuery | string, options: any) {
     const variable = options.variable;
     const range = options.range;
     let from = undefined;
@@ -528,23 +529,29 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       this.queryRange = range;
     }
 
-    // attempt to translate variable.useTags into the new IronDBVariableQuery structure
-    if (variable !== undefined && variable.useTags) {
-      query.tagCategory = variable.tagValuesQuery;
+    let q: IronDBVariableQuery = null;
+    if (typeof query === 'string') {
+      // attempt to translate variable.useTags into the new IronDBVariableQuery structure
+      q = {
+        metricFindQuery: query,
+        tagCategory: variable !== undefined && variable.useTags ? variable.tagValuesQuery : '',
+      };
+    } else {
+      q = query;
     }
 
     log(() => 'Options: ' + JSON.stringify(options));
-    if (query !== undefined) {
-      log(() => 'metricFindQuery() incoming query = ' + query.metricFindQuery);
+    if (q !== undefined) {
+      log(() => 'metricFindQuery() incoming query = ' + q.metricFindQuery);
       log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
-      let metricQuery = this.templateSrv.replace(query.metricFindQuery, null, this.interpolateExpr);
+      let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, this.interpolateExpr);
       log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
-      log(() => 'metricFindQuery() tagCat = ' + query.tagCategory);
+      log(() => 'metricFindQuery() tagCat = ' + q.tagCategory);
       if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
-      if (query.tagCategory !== '') {
-        return this.metricFindTagValsQuery(metricQuery, query.tagCategory, from, to).then((results) => {
+      if (q.tagCategory !== '') {
+        return this.metricFindTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: result };
           });
