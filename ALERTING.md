@@ -10,16 +10,16 @@ These instructions will build and run a Docker container with a Grafana instance
 2. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
 3. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
 4. From your OS shell using a privileged account:
-
+   >Note for macOS users: By default the /Users, /Volume, /private, /tmp and /var/folders directory are shared. If your project is outside this directory then it must be added to the list. Otherwise you may get Mounts denied or cannot start service errors at runtime. See the File Sharing section of https://docs.docker.com/desktop/mac/ for more details.
    ```shell
    export CIRCONUS_API_KEY=<From step 2>
    export GRAFANA_API_KEY=<From step 3>
    git clone https://github.com/yargevad/circonus-irondb-datasource.git --branch alerts-phase1 --single-branch
    cd circonus-irondb-datasource/
-   sed -i '/"id": "circonus-irondb-datasource",/a \  \"backend": true,\n  "executable": "irondb-backend",\n  "alerting": true,' src/plugin.json
    docker/build-local.sh
    docker/run-local.sh
    ```
+
 
 5. Login to the Grafana UI at <http://localhost:3000/> to validate functionality.
 
