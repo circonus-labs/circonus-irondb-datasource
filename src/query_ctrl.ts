@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import Log from './log';
 import IrondbQuery from './irondb_query';
-// eslint-disable-next-line no-duplicate-imports
+/* eslint-disable-next-line no-duplicate-imports */
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 import appEvents from 'grafana/app/core/app_events';
@@ -93,12 +93,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.labeltype = this.target.labeltype || 'default';
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
+    this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.format = this.target.format || 'ts';
-    if (this.target.isCaql !== undefined) {
-      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
-    } else {
+    if (this.target.isCaql === undefined) {
       this.target.querytype = this.target.querytype || 'caql';
+    } else {
+      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
     }
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';
@@ -113,6 +114,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   resetQueryTarget() {
     log(() => 'resetQueryTarget()');
     this.target.query = '';
+    this.target.queryDisplay = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
@@ -354,6 +356,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 expandable: true,
               })
             );
+
             _.eachRight(this.templateSrv.variables, (variable) => {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {
@@ -363,6 +366,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 })
               );
             });
+
             for (const tagVal of tagVals) {
               tagSegments.push(
                 this.newSegment(SegmentType.TagVal, {
@@ -389,7 +393,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   setSegmentType(segment: any, type: SegmentType) {
     segment._type = type;
-    segment._typeName = SegmentType[type];
+    segment._typeName = typeof SegmentType[type];
     return segment;
   }
 
@@ -702,9 +706,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   updateModelTarget() {
-    const streamTags = this.segmentsToStreamTags();
-    log(() => 'updateModelTarget() streamTags = ' + streamTags);
-    this.queryModel.target.query = streamTags;
+    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    if (!this.queryModel.target.query) {
+      const streamTags = this.segmentsToStreamTags();
+      log(() => 'updateModelTarget() streamTags = ' + streamTags);
+      this.queryModel.target.query = streamTags;
+    }
   }
 
   targetChanged() {
