@@ -259,7 +259,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        return this.irondbRequest(irondbOptions[0]);
+        return this.irondbRequest(irondbOptions);
       })
       .then((queryResults) => {
         if (queryResults.t === 'ts') {
@@ -269,6 +269,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             });
           }
         }
+
         log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
       })
@@ -520,6 +521,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       const tagCat = variable.tagValuesQuery;
       log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
       log(() => 'metricFindQuery() tagCat = ' + tagCat);
+
       if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
@@ -680,7 +682,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.datasourceRequest(options);
   }
 
-  irondbRequest(irondbOptions, isLimited = true) {
+  irondbRequest(optionsAll, isLimited = true) {
+    const irondbOptions = optionsAll[0];
     log(() => 'irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
     const headers = { 'Content-Type': 'application/json' };
     let options: any = {};
@@ -813,6 +816,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
         options.isCaql = true;
         options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
+        options.refId = irondbOptions['caql']['names'][i]['leaf_data']['refId'];
         queries.push(options);
       }
     }
@@ -849,13 +853,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           options.headers.Authorization = this.basicAuth;
         }
         options.isCaql = false;
+        options.refId = irondbOptions['refId'];
         queries.push(options);
       }
     }
     log(() => 'irondbRequest() queries = ' + JSON.stringify(queries));
 
     return Promise.all(
-      queries.map((query) =>
+      queries.map((query, i, queries) =>
         this.datasourceRequest(query)
           .then((result) => {
             log(() => 'irondbRequest() query = ' + JSON.stringify(query));
@@ -877,6 +882,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
               for (let i = 0; i < result['data'].length; i++) {
                 if ('target' in result && 'refId' in result['target']) {
                   result['data'][i]['target'] = result['target']['refId'];
+                } else {
+                  result['data'][i]['target'] = query.refId;
                 }
                 queryResults['data'].push(result['data'][i]);
               }
@@ -884,6 +891,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             if (result['data'].constructor === Object) {
               if ('target' in result && 'refId' in result['target']) {
                 result['data']['target'] = result['target']['refId'];
+              } else {
+                result['data']['target'] = query.refId;
               }
               queryResults['data'].push(result['data']);
             }
@@ -1069,6 +1078,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       label = query['label'];
     }
     const timeField = getTimeField();
+    timeField['refId'] = query['refId'];
     const valueField = getNumberField(label);
     const dataFrames: DataFrame[] = [];
 
@@ -1161,6 +1171,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       }
       queries.push(options);
     }
+
     return Promise.all(
       queries.map((query) =>
         this.datasourceRequest(query)
@@ -1318,6 +1329,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+
     return this.metricTagsQuery(rawQuery, false, start, end)
       .then((result) => {
         result.data = this.filterMetricsByType(target, result.data);
@@ -1397,8 +1409,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             rolluptype: target.rolluptype,
             metricrollup: target.metricrollup,
             format: target.format,
+            refId: target.refId,
           },
         });
+        cleanOptions['refId'] = target.refId;
         return Promise.resolve(cleanOptions);
       } else if (target.querytype === 'alerts' || target.querytype === 'alert_counts') {
         return this.buildAlertQueryAsync(cleanOptions, target, start, end);
@@ -1452,6 +1466,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       // because we are guaranteed to have the same number of records
       // across all the results due to how irondb works.
       const timeField = getTimeField();
+      timeField['refId'] = query['refId'];
       const labelFields = new Set<MutableField>();
       const valueFields = new Set<MutableField>();
       const all_labels = {};
@@ -1499,6 +1514,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     name: tagCat,
                     config: { filterable: false },
                     type: FieldType.other,
+                    refId: query.refId,
                     values: new ArrayVector(),
                   };
                   all_labels[tagCat] = lfield;
@@ -1516,6 +1532,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 filterable: false,
                 displayName: lname,
               },
+              refId: query.refId,
               type: FieldType.number,
               values: new ArrayVector(),
             };
@@ -1587,13 +1604,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         dname = dname + ' { ' + decoded_tags.join(', ') + ' }';
       }
 
-      const timeField = getTimeField();
+      let timeField = getTimeField();
+      timeField['refId'] = query.refId;
       const numericValueField = {
         name: TIME_SERIES_VALUE_FIELD_NAME,
         type: FieldType.number,
         config: {
           displayName: dname,
         },
+        refId: query.refId,
         labels: labels,
         values: new ArrayVector<number>(),
       };
