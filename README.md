@@ -48,6 +48,12 @@ These instructions will build and run a Docker container with a Grafana instance
    ```
 
 ### From GitHub
+1. Please install the following prerequisites:
+   *    [Node.js](https://nodejs.org/en/download/) > 12.22.4-r0
+   *    [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
+   *    [Go](https://golang.org/doc/install) > 1.13.15-r0
+   *    [Mage](https://github.com/magefile/mage) > 1.11.0
+2. Run the following from a priveledged shell:
    ```shell
    cd /var/lib/grafana/plugins # or the location of your Grafana plugins directory
    git clone https://github.com/circonus-labs/circonus-irondb-datasource/ --single-branch
@@ -55,6 +61,7 @@ These instructions will build and run a Docker container with a Grafana instance
    npm install --global yarn
    yarn install
    yarn build
+   mage -v
    export GRAFANA_API_KEY=<Obtained from: https://grafana.com/docs/grafana-cloud/reference/create-api-key/>
    export GRAFANA_TOOLKIT=$(find . -type f -iname "grafana-toolkit.js")
    node $GRAFANA_TOOLKIT plugin:sign --rootUrls http://localhost:3000/ # Change to match the URL of your Grafana install
