@@ -6,63 +6,70 @@
 <div class="gf-form-group">
   <div class="gf-form-inline">
     <div class="gf-form">
-      <span class="gf-form-label width-10">IRONdb Type
+      <span class="gf-form-label width-13">IRONdb Type
         <info-popover mode="right-normal">
           <p>This option determines whether a standalone or hosted IRONdb instance is the target of this datasource.</p>
           <p>Standalone = An IRONdb cluster accessible directly.</p>
           <p>Hosted = An IRONdb instance hosted by Circonus, requires entry of API tokens.</p>
         </info-popover></span>
       <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
-        <select class="gf-form-input width-30" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType'></select>
+        <select class="gf-form-input width-20" ng-model='ctrl.current.jsonData.irondbType' ng-options="irondbType for irondbType in ['standalone', 'hosted']" ng-init='ctrl.current.jsonData.irondbType'></select>
       </div>
     </div>
   </div>
   <div class="gf-form-inline">
     <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'standalone'">
-      <span class="gf-form-label width-10">Account ID
+      <span class="gf-form-label width-13">Account ID
         <info-popover mode="right-normal">
             <p>The Account ID associated with the account to pull metrics from. This can be found on your user profile page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "My Accounts" section.</p>
         </info-popover></span>
-      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.accountId' placeholder="enter account id"></input>
+      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.accountId' placeholder="enter account id"></input>
     </div>
     <div class="gf-form" ng-show="ctrl.current.jsonData.irondbType === 'hosted'">
-      <span class="gf-form-label width-10">API Token
+      <span class="gf-form-label width-13">API Token
         <info-popover mode="right-normal">
             <p>The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at <a href="https://www.circonus.com/">https://www.circonus.com/</a> in the "User Profile" section.</p>
         </info-popover></span>
-      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.apiToken' placeholder="enter API token"></input>
+      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.apiToken' placeholder="enter API token"></input>
     </div>
   </div>
   <div class="gf-form-inline">
     <div class="gf-form">
-      <span class="gf-form-label width-10">Results Limit
+      <span class="gf-form-label width-13">Results Limit
         <info-popover mode="right-normal">
           <p>Limit number of search results items fetched.</p>
           <p>Setting it to -1 or "none" removes the limit.</p>
         </info-popover></span>
-      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
+      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
     </div>
   </div>
   <div class="gf-form-inline">
     <div class="gf-form">
-      <span class="gf-form-label width-10">CAQL Min Period
+      <span class="gf-form-label width-13">CAQL Min Period
         <info-popover mode="right-normal">
           <p>By default CAQL works on 60 second data. For data ingested at higher frequency, you can add a different default period here to use in your queries (enter the period of your data in seconds).</p>
           <p>You may override the default in individual queries by prefixing them with the #min_period directive. See <a href="https://docs.circonus.com/caql/reference/#directives" target="_blank">the docs</a> for more info.</p>
         </info-popover></span>
-      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.caqlMinPeriod' ng-init="ctrl.current.jsonData.caqlMinPeriod"></input>
+      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.caqlMinPeriod' ng-init="ctrl.current.jsonData.caqlMinPeriod"></input>
     </div>
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
-      label-class="width-10" switch-class="width-5"
+      label-class="width-13" switch-class="width-5"
+      label="Truncate Last 'Now' Values" checked="ctrl.current.jsonData.truncateNow"
+      tooltip="When viewing a time range ending in 'now,' truncate the last value.">
+    </gf-form-switch>
+  </div>
+  <div class="gf-form-inline">
+    <gf-form-switch class="gf-form"
+      label-class="width-13" switch-class="width-5"
       label="Cache Results" checked="ctrl.current.jsonData.useCaching"
       tooltip="Use client-side caching of database requests. Cache size defaults to one minute and 128 entries.">
     </gf-form-switch>
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
-      label-class="width-10" switch-class="width-5"
+      label-class="width-13" switch-class="width-5"
       label="Activity Tracking" checked="ctrl.current.jsonData.activityTracking"
       tooltip="IRONdb supports tracking of metric activity without the expense of reading all known time series data to find active ranges.">
     </gf-form-switch>

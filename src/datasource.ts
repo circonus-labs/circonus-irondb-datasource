@@ -142,6 +142,7 @@ export interface IrondbOptions extends DataSourceJsonData {
   resultsLimit: string;
   caqlMinPeriod: string;
   apiToken?: string;
+  truncateNow?: boolean;
   useCaching?: boolean;
   activityTracking?: boolean;
 }
@@ -154,6 +155,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   irondbType: string;
   resultsLimit: string;
   caqlMinPeriod: string;
+  truncateNow: boolean;
   useCaching: boolean;
   activityTracking: boolean;
   url: any;
@@ -230,6 +232,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     this.caqlMinPeriod = instanceSettings.jsonData.caqlMinPeriod;
     this.apiToken = instanceSettings.jsonData.apiToken;
     this.useCaching = instanceSettings.jsonData.useCaching;
+    this.truncateNow = instanceSettings.jsonData.truncateNow;
     this.activityTracking = instanceSettings.jsonData.activityTracking;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
@@ -726,7 +729,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         );
         let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
-        end = ends_now ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
+        end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
         const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
         const streams = [];
         const data = { streams: streams };
@@ -799,7 +802,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         );
         let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
-        end = ends_now ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
+        end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
         const caqlQuery = this.templateSrv.replace(
           irondbOptions['caql']['names'][i].leaf_name,
           irondbOptions['scopedVars']
