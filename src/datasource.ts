@@ -724,8 +724,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           false,
           irondbOptions['std']['names'][i]['leaf_data']
         );
+        let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
-        end += interval;
+        end = ends_now ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
         const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
         const streams = [];
         const data = { streams: streams };
@@ -796,8 +797,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           true,
           irondbOptions['caql']['names'][i].leaf_data
         );
+        let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
-        end += interval;
+        end = ends_now ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
         const caqlQuery = this.templateSrv.replace(
           irondbOptions['caql']['names'][i].leaf_name,
           irondbOptions['scopedVars']
