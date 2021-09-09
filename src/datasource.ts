@@ -140,6 +140,7 @@ export interface IrondbOptions extends DataSourceJsonData {
   accountId?: number;
   irondbType: string;
   resultsLimit: string;
+  caqlMinPeriod: string;
   apiToken?: string;
   useCaching?: boolean;
   activityTracking?: boolean;
@@ -152,6 +153,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   accountId: number;
   irondbType: string;
   resultsLimit: string;
+  caqlMinPeriod: string;
   useCaching: boolean;
   activityTracking: boolean;
   url: any;
@@ -225,6 +227,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     this.accountId = instanceSettings.jsonData.accountId;
     this.irondbType = instanceSettings.jsonData.irondbType;
     this.resultsLimit = instanceSettings.jsonData.resultsLimit;
+    this.caqlMinPeriod = instanceSettings.jsonData.caqlMinPeriod;
     this.apiToken = instanceSettings.jsonData.apiToken;
     this.useCaching = instanceSettings.jsonData.useCaching;
     this.activityTracking = instanceSettings.jsonData.activityTracking;
@@ -799,10 +802,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           irondbOptions['caql']['names'][i].leaf_name,
           irondbOptions['scopedVars']
         );
+        // prefix with min_period if needed
+        const minPeriod = (irondbOptions['caql']['names'][i].leaf_data || {}).min_period;
+        const caqlQueryMP =
+          (minPeriod && !/^#min_period=/.test(caqlQuery) ? '#min_period=' + minPeriod + ' ' : '') + caqlQuery;
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
         options.url = options.url + '&period=' + interval;
-        options.url = options.url + '&q=' + encodeURIComponent(caqlQuery);
+        options.url = options.url + '&q=' + encodeURIComponent(caqlQueryMP);
         options.name = irondbOptions['caql']['names'][i];
         options.headers = headers;
         options.start = start;
@@ -1410,6 +1417,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             metricrollup: target.metricrollup,
             format: target.format,
             refId: target.refId,
+            min_period: target.min_period || this.caqlMinPeriod,
           },
         });
         cleanOptions['refId'] = target.refId;

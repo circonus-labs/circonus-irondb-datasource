@@ -44,6 +44,16 @@
     </div>
   </div>
   <div class="gf-form-inline">
+    <div class="gf-form">
+      <span class="gf-form-label width-10">CAQL Min Period
+        <info-popover mode="right-normal">
+          <p>By default CAQL works on 60 second data. For data ingested at higher frequency, you can add a different default period here to use in your queries (enter the period of your data in seconds).</p>
+          <p>You may override the default in individual queries by prefixing them with the #min_period directive. See <a href="https://docs.circonus.com/caql/reference/#directives" target="_blank">the docs</a> for more info.</p>
+        </info-popover></span>
+      <input class="gf-form-input width-30" type="text" ng-model='ctrl.current.jsonData.caqlMinPeriod' ng-init="ctrl.current.jsonData.caqlMinPeriod"></input>
+    </div>
+  </div>
+  <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
       label-class="width-10" switch-class="width-5"
       label="Cache Results" checked="ctrl.current.jsonData.useCaching"
