@@ -106,6 +106,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.local_filter_match = this.target.local_filter_match || 'all';
     this.target.alert_count_query_type = this.target.alert_count_query_type || 'instant';
     this.target.alert_id = this.target.alert_id || '';
+    this.target.min_period = this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
     this.buildSegments();
     this.updateMetricLabelValue(false);
@@ -248,6 +249,29 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (refresh) {
       this.panelCtrl.refresh();
     }
+  }
+
+  minPeriodKeyUp(event) {
+    const self = this;
+    const element = event.currentTarget;
+    if (event.keyCode === 13) {
+      setTimeout(() => {
+        self.target.min_period = element.value;
+        self.updateMinPeriodValue(event);
+      }, 0);
+    }
+  }
+
+  updateMinPeriodValue(event) {
+    const element = event.currentTarget;
+    if (this.target.min_period === '' || isNaN(parseInt(this.target.min_period, 10))) {
+      element.value = this.target.min_period = this.datasource.caqlMinPeriod;
+    }
+    this.panelCtrl.refresh();
+  }
+
+  hasCAQLMinPeriod() {
+    return _.isString(this.datasource.caqlMinPeriod) && !isNaN(parseInt(this.datasource.caqlMinPeriod, 10));
   }
 
   egressValueChanged() {
