@@ -9,6 +9,7 @@ export class IrondbConfigCtrl {
     this.current.jsonData.irondbType = this.current.jsonData.irondbType || 'standalone';
     this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
     this.current.jsonData.caqlMinPeriod = this.current.jsonData.caqlMinPeriod || '';
+    this.current.jsonData.truncateNow = _.defaultTo(this.current.jsonData.truncateNow, false);
     this.current.jsonData.useCaching = _.defaultTo(this.current.jsonData.useCaching, true);
     this.current.jsonData.activityTracking = _.defaultTo(this.current.jsonData.activityTracking, true);
   }
