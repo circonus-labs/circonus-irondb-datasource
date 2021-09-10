@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -146,72 +144,135 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	return td.caqlApi(ctx, q, query)
 }
 
+type DF4Response struct {
+	Data    [][]float64 `json:"data"`
+	Meta    []DF4Meta   `json:"meta"`
+	Head    DF4Head     `json:"head"`
+	Version string      `json:"version"`
+}
+
+type DF4Head struct {
+	Count  uint64 `json:"count"`
+	Period uint64 `json:"period"`
+	Start  uint64 `json:"start"`
+}
+
+type DF4Meta struct {
+	Kind  string   `json:"kind"`
+	Label string   `json:"label"`
+	Tags  []string `json:"tags"`
+}
+
 func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
 	qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Unix()))
 	qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Unix()))
-	qp.Set("period", fmt.Sprintf("%d", int(q.Interval.Seconds())))
+	qp.Set("period", "60") // because q.Interval is 0 fmt.Sprintf("%d", int(q.Interval.Seconds())))
+	qp.Set("format", "DF4")
 	path := url.URL{
 		Path:     "/v2/caql",
 		RawQuery: qp.Encode(),
 	}
 
-	log.DefaultLogger.Info("caql api", "path", path.String())
+	// log.DefaultLogger.Info("caql api", "path", path.String())
 
-	jsonBytes, err := td.circ.Get(path.String())
+	respdata, err := td.circ.Get(path.String())
 	if err != nil {
 		return nil, err
 	}
-	jsonStr := string(jsonBytes)
 
-	// base64-encoded json response body, sometimes
-	if !strings.HasPrefix(jsonStr, "{") {
-		// if it's not a json object, it's base64 encoded
-		jsonBase64, err := strconv.Unquote(strings.TrimSpace(jsonStr))
-		if err != nil {
-			return nil, err
-		}
-		jsonBytes, err = base64.StdEncoding.DecodeString(jsonBase64)
-		if err != nil {
-			return nil, err
-		}
-		jsonStr = string(jsonBytes)
+	var resp DF4Response
+	if err := json.Unmarshal(respdata, &resp); err != nil {
+		return nil, err
 	}
 
-	// not doing this now, but not removing it either
-	// if td.truncateNow {
-	// 	jsonStr = td.truncateNowSample(jsonStr)
-	// }
+	if resp.Version != "DF4" {
+		return nil, fmt.Errorf("invalid response version (%s)", resp.Version)
+	}
 
-	response := &backend.DataResponse{}
+	frames := data.Frames{}
+	for id, meta := range resp.Meta {
+		if meta.Kind != "numeric" {
+			continue
+		}
+		times := make([]uint64, 0, len(resp.Data[id]))
+		values := make([]float64, 0, len(resp.Data[id]))
+		ts := resp.Head.Start
+		for _, sample := range resp.Data[id] {
+			times = append(times, ts)
+			values = append(values, sample)
+			ts += resp.Head.Period
+		}
+		tags := make(map[string]string)
+		for _, tag := range meta.Tags {
+			parts := strings.SplitN(tag, ":", 2)
+			tc := ""
+			tv := ""
+			if len(parts) > 0 {
+				tc = parts[0]
+				if len(parts) > 1 {
+					tv = parts[1]
+				}
+				tags[tc] = tv
+			}
+		}
+		frames = append(frames, data.NewFrame(meta.Label, data.NewField("time", nil, times),
+			data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
+	}
+
+	return &backend.DataResponse{Frames: frames}, nil
+
 	/*
-		{"_data":[
-				[1623706800,[255.83333333333,8,299]]
-			],
-			"_end":1623706860,
-			"_period":60,
-			"_query":"find('duration')",
-			"_start":1623706800
+		jsonStr := string(data)
+
+		// base64-encoded json response body, sometimes
+		if !strings.HasPrefix(jsonStr, "{") {
+			// if it's not a json object, it's base64 encoded
+			jsonBase64, err := strconv.Unquote(strings.TrimSpace(jsonStr))
+			if err != nil {
+				return nil, err
+			}
+			data, err = base64.StdEncoding.DecodeString(jsonBase64)
+			if err != nil {
+				return nil, err
+			}
+			jsonStr = string(data)
 		}
+
+		// not doing this now, but not removing it either
+		// if td.truncateNow {
+		// 	jsonStr = td.truncateNowSample(jsonStr)
+		// }
+
+		response := &backend.DataResponse{}
+
+			// {"_data":[
+			// 		[1623706800,[255.83333333333,8,299]]
+			// 	],
+			// 	"_end":1623706860,
+			// 	"_period":60,
+			// 	"_query":"find('duration')",
+			// 	"_start":1623706800
+			// }
+
+		jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
+			f, err := strconv.ParseFloat(string(value), 64)
+			if err != nil {
+				return
+			}
+			frame := data.NewFrame("response")
+			frame.Fields = append(frame.Fields,
+				data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
+				data.NewField("values", nil, []float64{f, f}))
+			response.Frames = append(response.Frames, frame)
+
+			log.DefaultLogger.Info("response frame", "time", []time.Time{q.TimeRange.From, q.TimeRange.To}, "values", []float64{f, f})
+		}, "_data", "[0]", "[1]")
+
+		return response, nil
 	*/
-	jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
-		f, err := strconv.ParseFloat(string(value), 64)
-		if err != nil {
-			return
-		}
-		frame := data.NewFrame("response")
-		frame.Fields = append(frame.Fields,
-			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-			data.NewField("values", nil, []float64{f, f}))
-		response.Frames = append(response.Frames, frame)
-
-		log.DefaultLogger.Info("response frame", "time", []time.Time{q.TimeRange.From, q.TimeRange.To}, "values", []float64{f, f})
-
-	}, "_data", "[0]", "[1]")
-
-	return response, nil
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
