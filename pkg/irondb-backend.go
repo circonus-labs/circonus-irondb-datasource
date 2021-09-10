@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -42,9 +44,10 @@ type SampleDatasource struct {
 	// The instance manager can help with lifecycle management
 	// of datasource instances in plugins. It's not a requirements
 	// but a best practice that we recommend that you follow.
-	im   instancemgmt.InstanceManager
-	circ *circ.API
-	qrs  map[string]backend.DataResponse
+	im          instancemgmt.InstanceManager
+	circ        *circ.API
+	qrs         map[string]backend.DataResponse
+	truncateNow bool
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -71,6 +74,12 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		td.circ, err = circ.New(&circ.Config{TokenKey: key})
 		if err != nil {
 			return nil, err
+		}
+
+		// CIRC-6967 -- truncate last data sample if _end within 1s of now
+		tn, err := jsonp.GetBoolean(cfg, "truncateNow")
+		if err == nil { // only apply if setting found
+			td.truncateNow = tn
 		}
 	}
 	if td.qrs == nil {
@@ -141,6 +150,9 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
+	qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Unix()))
+	qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Unix()))
+	qp.Set("period", fmt.Sprintf("%d", int(q.Interval.Seconds())))
 	path := url.URL{
 		Path:     "/v2/caql",
 		RawQuery: qp.Encode(),
@@ -155,17 +167,21 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 	// base64-encoded json response body, sometimes
 	if !strings.HasPrefix(jsonStr, "{") {
 		// if it's not a json object, it's base64 encoded
-		jsonStr := strings.TrimSpace(jsonStr)
-		jsonStr, err = strconv.Unquote(jsonStr)
+		jsonBase64, err := strconv.Unquote(strings.TrimSpace(jsonStr))
 		if err != nil {
 			return nil, err
 		}
-		jsonBytes, err = base64.StdEncoding.DecodeString(jsonStr)
+		jsonBytes, err = base64.StdEncoding.DecodeString(jsonBase64)
 		if err != nil {
 			return nil, err
 		}
 		jsonStr = string(jsonBytes)
 	}
+
+	// not doing this now, but not removing it either
+	// if td.truncateNow {
+	// 	jsonStr = td.truncateNowSample(jsonStr)
+	// }
 
 	response := &backend.DataResponse{}
 	/*
@@ -210,6 +226,49 @@ func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 		Status:  status,
 		Message: message,
 	}, nil
+}
+
+type result struct {
+	Query  string        `json:"_query"`
+	Data   []interface{} `json:"_data"`
+	Start  int64         `json:"_start"`
+	End    int64         `json:"_end"`
+	Period int64         `json:"_period"`
+}
+
+// truncateNowSample removes the last sample in _data if _end within 1s of now -- CIRC-6967
+func (td *SampleDatasource) truncateNowSample(jsonData string) string {
+	if !td.truncateNow {
+		return jsonData
+	}
+	if jsonData == "" {
+		return jsonData
+	}
+
+	end, err := jsonp.GetInt([]byte(jsonData), "_end") // epoch ts, end of query time window range
+	if err != nil {
+		return jsonData
+	}
+
+	if time.Now().Unix()-end > 1 {
+		return jsonData
+	}
+
+	var qr result
+	if err := json.Unmarshal([]byte(jsonData), &qr); err != nil {
+		return jsonData
+	}
+
+	if len(qr.Data) > 0 {
+		qr.Data = qr.Data[:len(qr.Data)-1]
+		d2, err := json.Marshal(qr)
+		if err != nil {
+			return jsonData
+		}
+		return string(d2)
+	}
+
+	return jsonData
 }
 
 type instanceSettings struct {
