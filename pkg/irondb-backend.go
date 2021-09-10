@@ -206,9 +206,10 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
 			data.NewField("values", nil, []float64{f, f}))
 		response.Frames = append(response.Frames, frame)
-	}, "_data", "[0]", "[1]")
 
-	log.DefaultLogger.Info("response", "frames", response)
+		log.DefaultLogger.Info("response frame", "time", []time.Time{q.TimeRange.From, q.TimeRange.To}, "values", []float64{f, f})
+
+	}, "_data", "[0]", "[1]")
 
 	return response, nil
 }
