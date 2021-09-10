@@ -158,6 +158,7 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 		RawQuery: qp.Encode(),
 	}
 
+	log.DefaultLogger.Info("dataqry", "interval", q.Interval.String())
 	log.DefaultLogger.Info("caql api", "path", path.String())
 
 	jsonBytes, err := td.circ.Get(path.String())
