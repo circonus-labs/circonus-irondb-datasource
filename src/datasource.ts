@@ -18,6 +18,9 @@ import {
   decodeTagsInLabel,
 } from './irondb_query';
 
+import { IronDBVariableQuery } from './types';
+import { VariableQueryEditor as IronDBVariableQueryEditor } from './VariableQueryEditor';
+
 import {
   ArrayVector,
   DataFrame,
@@ -500,11 +503,25 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   }
 
   // This is used by the Dashboard Admin Variable Setup function
-  metricFindQuery(query: string, options: any) {
+  // It relies on types/IronDBVariableQuery
+  //
+  // Older versions of grafana had support for an experimental
+  // tag extraction feature which the older version of this
+  // datasource relied on.  That experimental code was removed in Grafana 8.
+  //
+  // In order to support extraction of tag values we need to implement
+  // our own variable query.
+  //
+  // There is code here (called out below) that attempts to migrate
+  // the prior setup (that relied on the experimental feature) into
+  // the new IronDBVariableQuery structure.
+  metricFindQuery(query: IronDBVariableQuery | string, options: any) {
     const variable = options.variable;
     const range = options.range;
     let from = undefined;
     let to = undefined;
+
+    // setup time range for query
     if (!_.isUndefined(range)) {
       from = range.from.valueOf() / 1000;
       to = range.to.valueOf() / 1000;
@@ -519,20 +536,29 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       this.queryRange = range;
     }
 
-    log(() => 'Options: ' + JSON.stringify(options));
-    if (query !== '' && variable !== undefined && (variable.regex !== '' || variable.useTags)) {
-      log(() => 'metricFindQuery() incoming query = ' + query);
-      log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
-      let metricQuery = this.templateSrv.replace(query, null, this.interpolateExpr);
-      const tagCat = variable.tagValuesQuery;
-      log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
-      log(() => 'metricFindQuery() tagCat = ' + tagCat);
+    let q: IronDBVariableQuery = null;
+    if (typeof query === 'string') {
+      // attempt to translate variable.useTags into the new IronDBVariableQuery structure
+      q = {
+        metricFindQuery: query,
+        tagCategory: variable !== undefined && variable.useTags ? variable.tagValuesQuery : '',
+      };
+    } else {
+      q = query;
+    }
 
+    log(() => 'Options: ' + JSON.stringify(options));
+    if (q !== undefined) {
+      log(() => 'metricFindQuery() incoming query = ' + q.metricFindQuery);
+      log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
+      let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, this.interpolateExpr);
+      log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
+      log(() => 'metricFindQuery() tagCat = ' + q.tagCategory);
       if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
         metricQuery = 'and(__name:' + metricQuery + ')';
       }
-      if (tagCat !== '') {
-        return this.metricFindTagValsQuery(metricQuery, tagCat, from, to).then((results) => {
+      if (q.tagCategory !== '') {
+        return this.metricFindTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
           return _.map(results.data, (result) => {
             return { value: result };
           });
