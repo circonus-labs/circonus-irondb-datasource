@@ -218,6 +218,9 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 				tags[tc] = tv
 			}
 		}
+
+		log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
+
 		frames = append(frames, data.NewFrame(meta.Label, data.NewField("time", nil, times),
 			data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
 	}
