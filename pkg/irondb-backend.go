@@ -17,7 +17,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/pkg/errors"
 )
 
 // newDatasource returns datasource.ServeOpts.
@@ -49,7 +48,7 @@ type SampleDatasource struct {
 }
 
 // QueryData handles multiple queries and returns multiple responses.
-// req contains the queries []DataQuery (where each query contains RefID as a unique identifer).
+// req contains the queries []DataQuery (where each query contains RefID as a unique identifier).
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
@@ -62,7 +61,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		}
 
 		if dbType != "hosted" {
-			return nil, errors.New("only `hosted` is currently supported")
+			return nil, fmt.Errorf("only `hosted` is currently supported")
 		}
 
 		key, err := jsonp.GetString(cfg, "apiToken")
@@ -74,11 +73,11 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			return nil, err
 		}
 
-		// CIRC-6967 -- truncate last data sample if _end within 1s of now
-		tn, err := jsonp.GetBoolean(cfg, "truncateNow")
-		if err == nil { // only apply if setting found
-			td.truncateNow = tn
-		}
+		// // CIRC-6967 -- truncate last data sample if _end within 1s of now
+		// tn, err := jsonp.GetBoolean(cfg, "truncateNow")
+		// if err == nil { // only apply if setting found
+		// 	td.truncateNow = tn
+		// }
 	}
 	if td.qrs == nil {
 		td.qrs = make(map[string]backend.DataResponse)
@@ -92,18 +91,19 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		}
 
 		var response *backend.DataResponse
-		if qtype == "caql" {
-			response, err = td.caqlQuery(context.Background(), q)
+		switch qtype {
+		case "caql":
+			response, err = td.caqlQuery(ctx, q)
 			if err != nil {
 				return nil, err
 			}
-		} else if qtype == "basic" {
-			response, err = td.basicQuery(context.Background(), q)
+		case "basic":
+			response, err = td.basicQuery(ctx, q)
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			return nil, errors.Errorf("Unsupported query type %s, try (caql, basic)", qtype)
+		default:
+			return nil, fmt.Errorf("unsupported query type %s, try (caql, basic)", qtype)
 		}
 		rv.Responses[q.RefID] = *response
 		td.qrs[q.RefID] = *response
@@ -111,7 +111,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	return rv, nil
 }
 
-func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse {
+func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse { //nolint:unused
 	return backend.DataResponse{}
 }
 
@@ -131,7 +131,7 @@ func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery)
 		return nil, err
 	}
 
-	return td.caqlApi(ctx, q, query)
+	return td.caqlAPI(ctx, q, query)
 }
 
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
@@ -141,14 +141,14 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	}
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
-	return td.caqlApi(ctx, q, query)
+	return td.caqlAPI(ctx, q, query)
 }
 
 type DF4Response struct {
+	Version string      `json:"version"`
 	Data    [][]float64 `json:"data"`
 	Meta    []DF4Meta   `json:"meta"`
 	Head    DF4Head     `json:"head"`
-	Version string      `json:"version"`
 }
 
 type DF4Head struct {
@@ -163,7 +163,7 @@ type DF4Meta struct {
 	Tags  []string `json:"tags"`
 }
 
-func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
+func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
@@ -176,7 +176,7 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 		RawQuery: qp.Encode(),
 	}
 
-	log.DefaultLogger.Info("caql api", "path", path.String())
+	log.DefaultLogger.Debug("caql api", "path", path.String())
 
 	respdata, err := td.circ.Get(path.String())
 	if err != nil {
@@ -207,6 +207,9 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 		}
 		tags := make(map[string]string)
 		for _, tag := range meta.Tags {
+			if strings.HasPrefix(tag, "__") {
+				continue // skip internal tags
+			}
 			parts := strings.SplitN(tag, ":", 2)
 			tc := ""
 			tv := ""
@@ -219,7 +222,7 @@ func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, qu
 			}
 		}
 
-		log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
+		log.DefaultLogger.Debug("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
 
 		frames = append(frames, data.NewFrame(meta.Label, data.NewField("time", nil, times),
 			data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
@@ -286,7 +289,7 @@ func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 	var status = backend.HealthStatusOk
 	var message = "Data source is working"
 
-	if rand.Int()%2 == 0 {
+	if rand.Int()%2 == 0 { //nolint:gosec
 		status = backend.HealthStatusError
 		message = "randomized error"
 	}
