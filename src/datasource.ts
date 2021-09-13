@@ -502,7 +502,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return q;
   }
 
-  // This is used by the Dashboard Admin Variable Setup function
+  // This is used to load variable values (in the dashboard config variable setup
+  // and also whenever refreshing variable values when viewing a dashboard.
   // It relies on types/IronDBVariableQuery
   //
   // Older versions of grafana had support for an experimental
@@ -559,12 +560,28 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       }
       if (q.tagCategory !== '') {
         return this.metricFindTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              showResultWarning(result_count);
+            }, 100);
+          } else {
+            removeResultWarning();
+          }
           return _.map(results.data, (result) => {
             return { value: result };
           });
         });
       } else {
         return this.metricTagsQuery(metricQuery, false, from, to).then((results) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              showResultWarning(result_count);
+            }, 100);
+          } else {
+            removeResultWarning();
+          }
           return _.map(results.data, (result) => {
             return { value: result.metric_name };
           });
@@ -572,6 +589,43 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       }
     }
     return Promise.resolve([]);
+
+    // manually find the edit pane 'Preview' header and inject a warning beforehand
+    function showResultWarning(result_count) {
+      let form = document.querySelector('[aria-label="Variable editor Form"]');
+      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : []).find(function (el) {
+        return /^Preview\s/.test(el['innerText']);
+      });
+      if (header) {
+        let span = document.createElement('span');
+        span.className = 'result-warning';
+        span.style.color = 'rgb(235, 123, 24)';
+        span.style.marginBottom = '1rem';
+        span.innerHTML =
+          '<strong>Warning:</strong> ' +
+          result_count +
+          ' results found.<br />Only the first 1000 results are used&hellip;please refine your query.';
+        let parent = header.parentElement;
+        let grandparent = parent.parentElement;
+        Array.from(grandparent.getElementsByClassName('result-warning')).forEach(function (el) {
+          el.remove();
+        });
+        grandparent.insertBefore(span, parent);
+      }
+    }
+
+    // manually remove any edit pane results warning added previously
+    function removeResultWarning() {
+      let form = document.querySelector('[aria-label="Variable editor Form"]');
+      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : []).find(function (el) {
+        return /^Preview\s/.test(el['innerText']);
+      });
+      if (header) {
+        Array.from(header.parentElement.parentElement.getElementsByClassName('result-warning')).forEach(function (el) {
+          el.remove();
+        });
+      }
+    }
   }
 
   getAccountId() {

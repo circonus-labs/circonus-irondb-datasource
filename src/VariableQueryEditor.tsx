@@ -57,7 +57,7 @@ export const VariableQueryEditor: React.FC<VariableQueryProps> = ({ onChange, qu
         />
       </div>
       <div className="gf-form">
-        <span className="gf-form-label width-10">Tag Category (to extract)</span>
+        <span className="gf-form-label width-10">Tag Category</span>
         <input
           name="tagCategory"
           className="gf-form-input"
