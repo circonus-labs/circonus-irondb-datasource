@@ -40,15 +40,15 @@ const (
 
 // Segment is part of an IronDB Query
 type Segment struct {
-	Type  SegmentType
 	Value string
+	Type  SegmentType
 }
 
 type IrondbQuery struct {
+	Error    error
 	Basic    string
 	RawQuery string
 	Segments []Segment
-	Error    error
 }
 
 func decodeTag(t string) ([]byte, error) {

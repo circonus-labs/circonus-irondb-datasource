@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +17,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/pkg/errors"
 )
 
 // newDatasource returns datasource.ServeOpts.
@@ -42,13 +41,14 @@ type SampleDatasource struct {
 	// The instance manager can help with lifecycle management
 	// of datasource instances in plugins. It's not a requirements
 	// but a best practice that we recommend that you follow.
-	im   instancemgmt.InstanceManager
-	circ *circ.API
-	qrs  map[string]backend.DataResponse
+	im          instancemgmt.InstanceManager
+	circ        *circ.API
+	qrs         map[string]backend.DataResponse
+	truncateNow bool
 }
 
 // QueryData handles multiple queries and returns multiple responses.
-// req contains the queries []DataQuery (where each query contains RefID as a unique identifer).
+// req contains the queries []DataQuery (where each query contains RefID as a unique identifier).
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
@@ -61,7 +61,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		}
 
 		if dbType != "hosted" {
-			return nil, errors.New("only `hosted` is currently supported")
+			return nil, fmt.Errorf("only `hosted` is currently supported")
 		}
 
 		key, err := jsonp.GetString(cfg, "apiToken")
@@ -71,6 +71,12 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		td.circ, err = circ.New(&circ.Config{TokenKey: key})
 		if err != nil {
 			return nil, err
+		}
+
+		// CIRC-6967 -- truncate last data sample if _end within 1s of now
+		tn, err := jsonp.GetBoolean(cfg, "truncateNow")
+		if err == nil { // only apply if setting found
+			td.truncateNow = tn
 		}
 	}
 	if td.qrs == nil {
@@ -85,18 +91,19 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		}
 
 		var response *backend.DataResponse
-		if qtype == "caql" {
-			response, err = td.caqlQuery(context.Background(), q)
+		switch qtype {
+		case "caql":
+			response, err = td.caqlQuery(ctx, q)
 			if err != nil {
 				return nil, err
 			}
-		} else if qtype == "basic" {
-			response, err = td.basicQuery(context.Background(), q)
+		case "basic":
+			response, err = td.basicQuery(ctx, q)
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			return nil, errors.Errorf("Unsupported query type %s, try (caql, basic)", qtype)
+		default:
+			return nil, fmt.Errorf("unsupported query type %s, try (caql, basic)", qtype)
 		}
 		rv.Responses[q.RefID] = *response
 		td.qrs[q.RefID] = *response
@@ -104,7 +111,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	return rv, nil
 }
 
-func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse {
+func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) backend.DataResponse { //nolint:unused
 	return backend.DataResponse{}
 }
 
@@ -124,7 +131,7 @@ func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery)
 		return nil, err
 	}
 
-	return td.caqlApi(ctx, q, query)
+	return td.caqlAPI(ctx, q, query)
 }
 
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
@@ -134,63 +141,105 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	}
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
-	return td.caqlApi(ctx, q, query)
+	return td.caqlAPI(ctx, q, query)
 }
 
-func (td *SampleDatasource) caqlApi(ctx context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
+type DF4Response struct {
+	Version string      `json:"version"`
+	Data    [][]float64 `json:"data"`
+	Meta    []DF4Meta   `json:"meta"`
+	Head    DF4Head     `json:"head"`
+}
+
+type DF4Head struct {
+	Count  uint64 `json:"count"`
+	Period uint64 `json:"period"`
+	Start  uint64 `json:"start"`
+}
+
+type DF4Meta struct {
+	Kind  string   `json:"kind"`
+	Label string   `json:"label"`
+	Tags  []string `json:"tags"`
+}
+
+func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
+	if td.truncateNow {
+		// shift entire query window back by one minute to reduce impact of partial "now" sample(s)
+		qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Add(-1*time.Minute).Unix()))
+		qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Add(-1*time.Minute).Unix()))
+	} else {
+		qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Unix()))
+		qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Unix()))
+	}
+	qp.Set("period", "60") // because q.Interval is 0 fmt.Sprintf("%d", int(q.Interval.Seconds())))
+	qp.Set("format", "DF4")
 	path := url.URL{
 		Path:     "/v2/caql",
 		RawQuery: qp.Encode(),
 	}
 
-	jsonBytes, err := td.circ.Get(path.String())
+	// log.DefaultLogger.Info("caql api", "path", path.String())
+
+	respdata, err := td.circ.Get(path.String())
 	if err != nil {
 		return nil, err
 	}
-	jsonStr := string(jsonBytes)
 
-	// base64-encoded json response body, sometimes
-	if !strings.HasPrefix(jsonStr, "{") {
-		// if it's not a json object, it's base64 encoded
-		jsonStr := strings.TrimSpace(jsonStr)
-		jsonStr, err = strconv.Unquote(jsonStr)
-		if err != nil {
-			return nil, err
-		}
-		jsonBytes, err = base64.StdEncoding.DecodeString(jsonStr)
-		if err != nil {
-			return nil, err
-		}
-		jsonStr = string(jsonBytes)
+	var resp DF4Response
+	if err := json.Unmarshal(respdata, &resp); err != nil {
+		return nil, err
 	}
 
-	response := &backend.DataResponse{}
-	/*
-		{"_data":[
-				[1623706800,[255.83333333333,8,299]]
-			],
-			"_end":1623706860,
-			"_period":60,
-			"_query":"find('duration')",
-			"_start":1623706800
-		}
-	*/
-	jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
-		f, err := strconv.ParseFloat(string(value), 64)
-		if err != nil {
-			return
-		}
-		frame := data.NewFrame("response")
-		frame.Fields = append(frame.Fields,
-			data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-			data.NewField("values", nil, []float64{f, f}))
-		response.Frames = append(response.Frames, frame)
-	}, "_data", "[0]", "[1]")
+	if resp.Version != "DF4" {
+		return nil, fmt.Errorf("invalid response version (%s)", resp.Version)
+	}
 
-	return response, nil
+	// updated to reflect what graphite datasource does
+	// https://github.com/grafana/grafana/blob/main/pkg/tsdb/graphite/graphite.go#L229-L256
+
+	frames := data.Frames{}
+	for id, meta := range resp.Meta {
+		if meta.Kind != "numeric" {
+			continue
+		}
+		times := make([]time.Time, 0, len(resp.Data[id]))
+		values := make([]float64, 0, len(resp.Data[id]))
+		ts := resp.Head.Start
+		for _, sample := range resp.Data[id] {
+			times = append(times, time.Unix(int64(ts), 0))
+			values = append(values, sample)
+			ts += resp.Head.Period
+		}
+		tags := make(map[string]string)
+		for _, tag := range meta.Tags {
+			if strings.HasPrefix(tag, "__") {
+				continue // skip internal tags
+			}
+			parts := strings.SplitN(tag, ":", 2)
+			tc := ""
+			tv := ""
+			if len(parts) > 0 {
+				tc = parts[0]
+				if len(parts) > 1 {
+					tv = parts[1]
+				}
+				tags[tc] = tv
+			}
+		}
+
+		// log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
+
+		frames = append(
+			frames,
+			data.NewFrame(meta.Label, data.NewField("time", nil, times),
+				data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
+	}
+
+	return &backend.DataResponse{Frames: frames}, nil
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
@@ -201,7 +250,7 @@ func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 	var status = backend.HealthStatusOk
 	var message = "Data source is working"
 
-	if rand.Int()%2 == 0 {
+	if rand.Int()%2 == 0 { //nolint:gosec
 		status = backend.HealthStatusError
 		message = "randomized error"
 	}
