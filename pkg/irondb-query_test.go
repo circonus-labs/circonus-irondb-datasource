@@ -37,14 +37,14 @@ func TestParse(t *testing.T) {
 		err error
 		out []Segment
 	}{
-		{"and(__name:duration)", nil, []Segment{Segment{Value: "duration"}}},
+		{"and(__name:duration)", nil, []Segment{{Value: "duration"}}},
 		{"and(__name:duration,foo:bar)", nil, []Segment{
-			Segment{Value: "duration"},
-			Segment{Type: TagCat, Value: "foo"},
-			Segment{Type: TagPair},
-			Segment{Type: TagVal, Value: "bar"},
-			Segment{Type: TagPlus},
-			Segment{Type: TagEnd},
+			{Value: "duration"},
+			{Type: TagCat, Value: "foo"},
+			{Type: TagPair},
+			{Type: TagVal, Value: "bar"},
+			{Type: TagPlus},
+			{Type: TagEnd},
 		}},
 	} {
 		iq := &IrondbQuery{Basic: test.in}
@@ -61,12 +61,12 @@ func TestParse(t *testing.T) {
 
 func TestToCaql(t *testing.T) {
 	for idx, test := range []struct {
-		in   IrondbQuery
 		err1 error
 		err2 error
 		out  string
+		in   IrondbQuery
 	}{
-		{IrondbQuery{Basic: "and(__name:duration)"}, nil, nil, "find('duration')"},
+		{in: IrondbQuery{Basic: "and(__name:duration)"}, err1: nil, err2: nil, out: "find('duration')"},
 	} {
 		err := test.in.ParseBasic()
 		if err == nil && test.err1 != nil || err != nil && test.err1 == nil {
