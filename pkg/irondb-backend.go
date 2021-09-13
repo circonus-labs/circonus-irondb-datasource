@@ -73,11 +73,11 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			return nil, err
 		}
 
-		// // CIRC-6967 -- truncate last data sample if _end within 1s of now
-		// tn, err := jsonp.GetBoolean(cfg, "truncateNow")
-		// if err == nil { // only apply if setting found
-		// 	td.truncateNow = tn
-		// }
+		// CIRC-6967 -- truncate last data sample if _end within 1s of now
+		tn, err := jsonp.GetBoolean(cfg, "truncateNow")
+		if err == nil { // only apply if setting found
+			td.truncateNow = tn
+		}
 	}
 	if td.qrs == nil {
 		td.qrs = make(map[string]backend.DataResponse)
@@ -167,8 +167,13 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
-	qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Unix()))
-	qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Unix()))
+	if td.truncateNow {
+		qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Add(-1*time.Minute).Unix()))
+		qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Add(-1*time.Minute).Unix()))
+	} else {
+		qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Unix()))
+		qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Unix()))
+	}
 	qp.Set("period", "60") // because q.Interval is 0 fmt.Sprintf("%d", int(q.Interval.Seconds())))
 	qp.Set("format", "DF4")
 	path := url.URL{
@@ -176,7 +181,7 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 		RawQuery: qp.Encode(),
 	}
 
-	log.DefaultLogger.Info("caql api", "path", path.String())
+	// log.DefaultLogger.Info("caql api", "path", path.String())
 
 	respdata, err := td.circ.Get(path.String())
 	if err != nil {
@@ -222,7 +227,7 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 			}
 		}
 
-		log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
+		// log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
 
 		frames = append(
 			frames,
@@ -231,56 +236,6 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 	}
 
 	return &backend.DataResponse{Frames: frames}, nil
-
-	/*
-		jsonStr := string(data)
-
-		// base64-encoded json response body, sometimes
-		if !strings.HasPrefix(jsonStr, "{") {
-			// if it's not a json object, it's base64 encoded
-			jsonBase64, err := strconv.Unquote(strings.TrimSpace(jsonStr))
-			if err != nil {
-				return nil, err
-			}
-			data, err = base64.StdEncoding.DecodeString(jsonBase64)
-			if err != nil {
-				return nil, err
-			}
-			jsonStr = string(data)
-		}
-
-		// not doing this now, but not removing it either
-		// if td.truncateNow {
-		// 	jsonStr = td.truncateNowSample(jsonStr)
-		// }
-
-		response := &backend.DataResponse{}
-
-			// {"_data":[
-			// 		[1623706800,[255.83333333333,8,299]]
-			// 	],
-			// 	"_end":1623706860,
-			// 	"_period":60,
-			// 	"_query":"find('duration')",
-			// 	"_start":1623706800
-			// }
-
-		jsonp.ArrayEach([]byte(jsonStr), func(value []byte, dt jsonp.ValueType, offset int, err error) {
-			f, err := strconv.ParseFloat(string(value), 64)
-			if err != nil {
-				return
-			}
-			frame := data.NewFrame("response")
-			frame.Fields = append(frame.Fields,
-				data.NewField("time", nil, []time.Time{q.TimeRange.From, q.TimeRange.To}),
-				data.NewField("values", nil, []float64{f, f}))
-			response.Frames = append(response.Frames, frame)
-
-			log.DefaultLogger.Info("response frame", "time", []time.Time{q.TimeRange.From, q.TimeRange.To}, "values", []float64{f, f})
-		}, "_data", "[0]", "[1]")
-
-		return response, nil
-	*/
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
@@ -300,49 +255,6 @@ func (td *SampleDatasource) CheckHealth(ctx context.Context, req *backend.CheckH
 		Status:  status,
 		Message: message,
 	}, nil
-}
-
-type result struct {
-	Query  string        `json:"_query"`
-	Data   []interface{} `json:"_data"`
-	Start  int64         `json:"_start"`
-	End    int64         `json:"_end"`
-	Period int64         `json:"_period"`
-}
-
-// truncateNowSample removes the last sample in _data if _end within 1s of now -- CIRC-6967
-func (td *SampleDatasource) truncateNowSample(jsonData string) string {
-	if !td.truncateNow {
-		return jsonData
-	}
-	if jsonData == "" {
-		return jsonData
-	}
-
-	end, err := jsonp.GetInt([]byte(jsonData), "_end") // epoch ts, end of query time window range
-	if err != nil {
-		return jsonData
-	}
-
-	if time.Now().Unix()-end > 1 {
-		return jsonData
-	}
-
-	var qr result
-	if err := json.Unmarshal([]byte(jsonData), &qr); err != nil {
-		return jsonData
-	}
-
-	if len(qr.Data) > 0 {
-		qr.Data = qr.Data[:len(qr.Data)-1]
-		d2, err := json.Marshal(qr)
-		if err != nil {
-			return jsonData
-		}
-		return string(d2)
-	}
-
-	return jsonData
 }
 
 type instanceSettings struct {
