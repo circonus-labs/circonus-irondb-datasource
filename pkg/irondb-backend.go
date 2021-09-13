@@ -197,11 +197,11 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 		if meta.Kind != "numeric" {
 			continue
 		}
-		times := make([]uint64, 0, len(resp.Data[id]))
+		times := make([]time.Time, 0, len(resp.Data[id]))
 		values := make([]float64, 0, len(resp.Data[id]))
 		ts := resp.Head.Start
 		for _, sample := range resp.Data[id] {
-			times = append(times, ts)
+			times = append(times, time.Unix(int64(ts), 0))
 			values = append(values, sample)
 			ts += resp.Head.Period
 		}
