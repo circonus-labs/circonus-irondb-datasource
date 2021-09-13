@@ -197,6 +197,9 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 		return nil, fmt.Errorf("invalid response version (%s)", resp.Version)
 	}
 
+	// updated to reflect what graphite datasource does
+	// https://github.com/grafana/grafana/blob/main/pkg/tsdb/graphite/graphite.go#L229-L256
+
 	frames := data.Frames{}
 	for id, meta := range resp.Meta {
 		if meta.Kind != "numeric" {
