@@ -176,7 +176,7 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 		RawQuery: qp.Encode(),
 	}
 
-	log.DefaultLogger.Debug("caql api", "path", path.String())
+	log.DefaultLogger.Info("caql api", "path", path.String())
 
 	respdata, err := td.circ.Get(path.String())
 	if err != nil {
@@ -222,10 +222,12 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 			}
 		}
 
-		log.DefaultLogger.Debug("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
+		log.DefaultLogger.Info("add frame", "name", meta.Label, "time", times, "value", values, "tags", tags)
 
-		frames = append(frames, data.NewFrame(meta.Label, data.NewField("time", nil, times),
-			data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
+		frames = append(
+			frames,
+			data.NewFrame(meta.Label, data.NewField("time", nil, times),
+				data.NewField("value", tags, values).SetConfig(&data.FieldConfig{DisplayNameFromDS: meta.Label})))
 	}
 
 	return &backend.DataResponse{Frames: frames}, nil
