@@ -168,6 +168,7 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 	qp := url.Values{}
 	qp.Set("query", query)
 	if td.truncateNow {
+		// shift entire query window back by one minute to reduce impact of partial "now" sample(s)
 		qp.Set("end", fmt.Sprintf("%d", q.TimeRange.To.Add(-1*time.Minute).Unix()))
 		qp.Set("start", fmt.Sprintf("%d", q.TimeRange.From.Add(-1*time.Minute).Unix()))
 	} else {
