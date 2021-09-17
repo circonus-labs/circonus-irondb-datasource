@@ -1,6 +1,9 @@
 import _ from 'lodash';
 import Log from './log';
 
+// this is used for Graphite-style query parsing
+import { Parser } from './parser';
+
 const log = Log('IrondbQuery');
 
 export enum SegmentType {
@@ -99,14 +102,14 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   // case %d
   let label = fmt.replace(/%d/g, (idx + 1).toString());
   // case %n
-  label = label.replace(/%n/g, taglessName(meta.metric_name));
+  label = label.replace(/%n/g, taglessName(meta.metric_name || meta.name));
   // case %cn
-  label = label.replace(/%cn/g, meta.metric_name);
+  label = label.replace(/%cn/g, meta.metric_name || meta.name);
 
   // allow accessing the check tags
-  const [name, stream_tags] = taglessNameAndTags(meta.metric_name);
+  const [name, stream_tags] = taglessNameAndTags(meta.metric_name || meta.name);
   const tagSet = splitTags(stream_tags);
-  for (const tag of meta.check_tags) {
+  for (const tag of meta.check_tags || []) {
     const tagSep = tag.split(/:/g);
     let tagCat = tagSep.shift();
     if (!tagCat.startsWith('__') && tagCat !== '') {
@@ -311,7 +314,11 @@ export default class IrondbQuery {
   constructor(datasource, target, templateSrv?, scopedVars?) {
     this.datasource = datasource;
     this.target = target;
-    this.parseTarget();
+    if ('graphite' === target.querytype) {
+      this.parseGraphiteTarget();
+    } else {
+      this.parseTarget();
+    }
   }
 
   parseTarget() {
@@ -370,6 +377,62 @@ export default class IrondbQuery {
     }
 
     log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
+  }
+
+  parseGraphiteTarget() {
+    this.segments = [];
+    this.error = null;
+
+    if (this.target.rawQuery) {
+      return;
+    }
+
+    var parser = new Parser(this.target.query);
+    var astNode = parser.getAst();
+    if (astNode === null) {
+      this.checkOtherSegmentsIndex = 0;
+      return;
+    }
+
+    if (astNode.type === 'error') {
+      this.error = astNode.message + ' at position: ' + astNode.pos;
+      this.target.rawQuery = true;
+      return;
+    }
+
+    try {
+      this.parseGraphiteTargetRecursive(astNode, null);
+    } catch (err) {
+      console.log('error parsing target:', err.message);
+      this.error = err.message;
+      this.target.rawQuery = true;
+    }
+
+    this.checkOtherSegmentsIndex = this.segments.length - 1;
+  }
+
+  getGraphiteSegmentPathUpTo(index) {
+    var arr = this.segments.slice(0, index);
+
+    return _.reduce(
+      arr,
+      function (result, segment) {
+        return result ? result + segment.value + '.' : segment.value + '.';
+      },
+      ''
+    );
+  }
+
+  parseGraphiteTargetRecursive(astNode, func) {
+    if (astNode === null) {
+      return null;
+    }
+
+    switch (astNode.type) {
+      case 'metric':
+        this.segments = astNode.segments;
+        break;
+    }
   }
 
   updateSegmentValue(segment, index) {

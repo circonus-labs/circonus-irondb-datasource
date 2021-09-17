@@ -11,7 +11,7 @@
         </div>
     </div>
     <div class="gf-form-inline">
-      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form">
+      <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Series</label>
       </div>
       <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
@@ -88,11 +88,16 @@
           </div>
         </div>
       </div>
-      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form gf-form--grow ml-1">
+      <div ng-if="ctrl.target.querytype === 'graphite'" class="gf-form gf-form-inline">
+        <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
+          <metric-segment segment="segment" get-options="ctrl.getGraphiteSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( segment, $index )"/>
+        </div>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form gf-form--grow ml-1">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format!=='heatmap'" class="gf-form">
+    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format !== 'heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Label</label>
       </div>
@@ -115,7 +120,7 @@
         </div>
         <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
     </div>
-    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format!=='heatmap'" class="gf-form">
+    <div ng-if="(ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite') && ctrl.target.format !== 'heatmap'" class="gf-form">
       <div class="gf-form">
         <label class="gf-form-label width-6 query-keyword">Value Type</label>
       </div>
