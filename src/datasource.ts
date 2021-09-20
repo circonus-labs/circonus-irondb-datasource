@@ -266,20 +266,24 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       return this.$q.when({ data: [] });
     }
 
-    let isGraphite = (options['targets'][0] || {})['querytype'] === 'graphite';
-
     return Promise.all([this.buildIrondbParams(options)])
       .then((irondbOptions) => {
         if (_.isEmpty(irondbOptions[0])) {
           return this.$q.when({ data: [] });
         }
-        return this.irondbRequest(irondbOptions, true, isGraphite);
+        return this.irondbRequest(irondbOptions, true);
       })
       .then((queryResults) => {
         if (queryResults.t === 'ts') {
           if (queryResults['data'].constructor === Array) {
             queryResults['data'].sort((a, b): number => {
-              return a['target'].localeCompare(b['target']);
+              return a && null == b
+                ? -1
+                : b && null == a
+                ? 1
+                : null == a && null == b
+                ? 0
+                : (a['target'] || '').localeCompare(b['target']);
             });
           }
         }
@@ -637,10 +641,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
-  metricGraphiteQuery(query: string) {
+  metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
     var queryUrl = '/' + this.queryPrefix;
     queryUrl = queryUrl + '/metrics/find?query=' + query;
-    return this.irondbSimpleRequest('GET', queryUrl, false, true, false, true);
+    return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
   }
 
   metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
@@ -743,7 +747,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
   }
 
-  irondbSimpleRequest(method, url, isCaql = false, isFind = false, isLimited = true, isGraphite = false) {
+  irondbSimpleRequest(method, url, isCaql = false, isFind = false, followLimit = true, isGraphite = false) {
     let baseUrl = this.url;
     const headers = { 'Content-Type': 'application/json' };
 
@@ -758,7 +762,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       headers['X-Circonus-Auth-Token'] = this.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
     }
-    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : 'none';
+    headers['X-Snowth-Advisory-Limit'] = followLimit ? this.resultsLimit : 100;
     if ('standalone' === this.irondbType && !isCaql) {
       if (isGraphite) {
         baseUrl = baseUrl + '/graphite/' + this.accountId;
@@ -784,7 +788,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.datasourceRequest(options);
   }
 
-  irondbRequest(optionsAll, isLimited = true, isGraphite = false) {
+  irondbRequest(optionsAll, followLimit = true) {
     const irondbOptions = optionsAll[0];
     log(() => 'irondbRequest() irondbOptions = ' + JSON.stringify(irondbOptions));
     const headers = { 'Content-Type': 'application/json' };
@@ -800,22 +804,74 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     } else {
       headers['X-Circonus-Account'] = this.accountId;
     }
-    headers['X-Snowth-Advisory-Limit'] = isLimited ? this.resultsLimit : 'none';
+    headers['X-Snowth-Advisory-Limit'] = followLimit ? this.resultsLimit : 100;
     headers['Accept'] = 'application/json';
+    if (irondbOptions['graphite']['names'].length) {
+      options = {};
+      options.method = 'POST';
+      options.url = this.url;
+      if ('hosted' === this.irondbType) {
+        options.url = options.url + '/irondb/graphite/series_multi';
+      }
+      if ('standalone' === this.irondbType) {
+        options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
+      }
+      let start = irondbOptions['graphite']['start'];
+      let end = irondbOptions['graphite']['end'];
+      const interval = this.getRollupSpan(
+        irondbOptions,
+        start,
+        end,
+        false,
+        irondbOptions['graphite']['names'][0]['leaf_data']
+      );
+      let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
+      start -= interval;
+      end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
+      // build new request params/data
+      options.data = {
+        start: start,
+        end: end,
+        interval: interval,
+        names: [],
+      };
+      for (var obj of irondbOptions['graphite']['names']) {
+        const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12}).?(.*)/) || [null, '', ''];
+        const new_obj = {
+          leaf_name: obj['leaf_name'],
+          leaf_data: {
+            egress_function: this.translateEgressForGraphite(obj['leaf_data']['egress_function'] || ''),
+            name: name_matches[2],
+            uuid: name_matches[1],
+          },
+        };
+        options.data.names.push(new_obj);
+      }
+      // wrap up other request metadata
+      options.name = 'fetch';
+      options.headers = headers;
+      if (this.basicAuth || this.withCredentials) {
+        options.withCredentials = true;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      options.paneltype = irondbOptions['graphite']['names'][0]['leaf_data']['format'] || 'ts';
+      options.isCaql = false;
+      options.isGraphite = true;
+      options.retry = 1;
+      queries.push(options);
+    }
     if (irondbOptions['std']['names'].length) {
       const paneltype = irondbOptions['std']['names'][0]['leaf_data']['format'] || 'ts';
-      //////////////////////////////////////////////////////////////////////////
-      // Graphite-Style
-      if (isGraphite) {
+      for (let i = 0; i < irondbOptions['std']['names'].length; i++) {
         options = {};
         options.url = this.url;
         if ('hosted' === this.irondbType) {
-          options.url = options.url + '/irondb/graphite/series_multi';
+          options.url = options.url + '/irondb';
         }
         options.method = 'POST';
-        if ('standalone' === this.irondbType) {
-          options.url = options.url + '/graphite/' + this.accountId + '/' + this.queryPrefix + '/series_multi';
-        }
+        options.url = options.url + '/fetch';
         let start = irondbOptions['std']['start'];
         let end = irondbOptions['std']['end'];
         const interval = this.getRollupSpan(
@@ -823,31 +879,48 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           start,
           end,
           false,
-          irondbOptions['std']['names'][0]['leaf_data']
+          irondbOptions['std']['names'][i]['leaf_data']
         );
         let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
         end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
-        // build new request params/data
-        options.data = {
-          start: start,
-          end: end,
-          interval: interval,
-          names: [],
-        };
-        for (var obj of irondbOptions['std']['names']) {
-          const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12}).(.+)/);
-          const new_obj = {
-            leaf_name: obj['leaf_name'],
-            leaf_data: {
-              egress_function: this.translateEgressForGraphite(obj['leaf_data']['egress_function'] || ''),
-              name: name_matches[2],
-              uuid: name_matches[1],
-            },
-          };
-          options.data.names.push(new_obj);
+        const metricLabels = [];
+        const check_tags = [];
+        const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
+        const streams = [];
+        const data = { streams: streams };
+        data['period'] = interval;
+        data['start'] = start;
+        data['count'] = Math.round((end - start) / interval);
+        data['reduce'] = [{ label: '', method: reduce }];
+        const metrictype = irondbOptions['std']['names'][i]['leaf_data']['metrictype'];
+        metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
+        check_tags.push(irondbOptions['std']['names'][i]['leaf_data']['check_tags']);
+        const stream = {};
+        let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
+        if (metrictype === 'histogram') {
+          if (paneltype === 'heatmap') {
+            transform = 'none';
+          } else {
+            transform = HISTOGRAM_TRANSFORMS[transform];
+            const leafName = irondbOptions['std']['names'][i]['leaf_name'];
+            let transformMode = 'default';
+            if (isStatsdCounter(leafName)) {
+              transformMode = 'statsd_counter';
+            }
+            irondbOptions['std']['names'][i]['leaf_data']['target']['hist_transform'] = transformMode;
+          }
         }
-        // wrap up other request metadata
+        stream['transform'] = transform;
+        stream['name'] = irondbOptions['std']['names'][i]['leaf_name'];
+        stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
+        stream['kind'] = metrictype;
+        streams.push(stream);
+        log(() => 'irondbRequest() data = ' + JSON.stringify(data));
+        options.data = data;
+        options.metricLabels = metricLabels;
+        options.check_tags = check_tags;
+
         options.name = 'fetch';
         options.headers = headers;
         if (this.basicAuth || this.withCredentials) {
@@ -857,86 +930,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           options.headers.Authorization = this.basicAuth;
         }
         options.paneltype = paneltype;
+        options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
         options.isCaql = false;
-        options.isGraphite = isGraphite;
+        options.isGraphite = false;
         options.retry = 1;
         queries.push(options);
-      }
-      //////////////////////////////////////////////////////////////////////////
-      // Non-Graphite-Style
-      if (!isGraphite) {
-        for (let i = 0; i < irondbOptions['std']['names'].length; i++) {
-          options = {};
-          options.url = this.url;
-          if ('hosted' === this.irondbType) {
-            options.url = options.url + '/irondb';
-          }
-          options.method = 'POST';
-          options.url = options.url + '/fetch';
-          let start = irondbOptions['std']['start'];
-          let end = irondbOptions['std']['end'];
-          const interval = this.getRollupSpan(
-            irondbOptions,
-            start,
-            end,
-            false,
-            irondbOptions['std']['names'][i]['leaf_data']
-          );
-          let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
-          start -= interval;
-          end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
-          const metricLabels = [];
-          const check_tags = [];
-          const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
-          const streams = [];
-          const data = { streams: streams };
-          data['period'] = interval;
-          data['start'] = start;
-          data['count'] = Math.round((end - start) / interval);
-          data['reduce'] = [{ label: '', method: reduce }];
-          const metrictype = irondbOptions['std']['names'][i]['leaf_data']['metrictype'];
-          metricLabels.push(irondbOptions['std']['names'][i]['leaf_data']['metriclabel']);
-          check_tags.push(irondbOptions['std']['names'][i]['leaf_data']['check_tags']);
-          const stream = {};
-          let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
-          if (metrictype === 'histogram') {
-            if (paneltype === 'heatmap') {
-              transform = 'none';
-            } else {
-              transform = HISTOGRAM_TRANSFORMS[transform];
-              const leafName = irondbOptions['std']['names'][i]['leaf_name'];
-              let transformMode = 'default';
-              if (isStatsdCounter(leafName)) {
-                transformMode = 'statsd_counter';
-              }
-              irondbOptions['std']['names'][i]['leaf_data']['target']['hist_transform'] = transformMode;
-            }
-          }
-          stream['transform'] = transform;
-          stream['name'] = irondbOptions['std']['names'][i]['leaf_name'];
-          stream['uuid'] = irondbOptions['std']['names'][i]['leaf_data']['uuid'];
-          stream['kind'] = metrictype;
-          streams.push(stream);
-          log(() => 'irondbRequest() data = ' + JSON.stringify(data));
-          options.data = data;
-          options.metricLabels = metricLabels;
-          options.check_tags = check_tags;
-
-          options.name = 'fetch';
-          options.headers = headers;
-          if (this.basicAuth || this.withCredentials) {
-            options.withCredentials = true;
-          }
-          if (this.basicAuth) {
-            options.headers.Authorization = this.basicAuth;
-          }
-          options.paneltype = paneltype;
-          options.format = irondbOptions['std']['names'][i]['leaf_data']['format'];
-          options.isCaql = false;
-          options.isGraphite = isGraphite;
-          options.retry = 1;
-          queries.push(options);
-        }
       }
     }
     if (irondbOptions['caql']['names'].length) {
@@ -1524,7 +1522,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
   buildFetchParamsAsync(cleanOptions, target, start, end) {
     const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
-    const queryFn = 'graphite' === target.querytype ? this.metricGraphiteQuery : this.metricTagsQuery;
+    const isGraphite = 'graphite' === target.querytype;
+    const queryFn = isGraphite ? this.metricGraphiteQuery : this.metricTagsQuery;
 
     return queryFn
       .call(this, rawQuery, false, start, end)
@@ -1537,7 +1536,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       })
       .then((result) => {
         for (let i = 0; i < result.length; i++) {
-          cleanOptions['std']['names'].push(this.buildFetchStream(target, result, i, cleanOptions['scopedVars']));
+          cleanOptions[isGraphite ? 'graphite' : 'std']['names'].push(
+            this.buildFetchStream(target, result, i, cleanOptions['scopedVars'])
+          );
         }
         return cleanOptions;
       });
@@ -1578,6 +1579,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     cleanOptions['caql']['start'] = start;
     cleanOptions['caql']['end'] = end;
     cleanOptions['caql']['names'] = [];
+    cleanOptions['graphite'] = {};
+    cleanOptions['graphite']['start'] = start;
+    cleanOptions['graphite']['end'] = end;
+    cleanOptions['graphite']['names'] = [];
     cleanOptions['alert'] = {};
     cleanOptions['alert']['names'] = [];
     cleanOptions['alert']['start'] = start;

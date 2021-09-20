@@ -426,7 +426,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     return this.datasource
-      .metricGraphiteQuery(query + '*')
+      .metricGraphiteQuery(query + '*', true)
       .then((segments) => {
         var allSegments = _.map(segments.data, (segment) => {
           var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
@@ -512,9 +512,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   addSelectMetricSegment() {
     this.queryModel.addSelectMetricSegment();
     const segment = this.uiSegmentSrv.newSelectMetric();
-    if ('graphite' !== this.target.querytype) {
-      this.setSegmentType(segment, SegmentType.MetricName);
-    }
+    this.setSegmentType(segment, SegmentType.MetricName);
     this.segments.push(segment);
   }
 
@@ -668,7 +666,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         );
 
         if (segmentIndex === 1) {
-          // if index is 1 (immediatley after metric name), it's the first add and we're a tagCat
+          // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
           // so that means we need to add in the implicit and() in the front
           this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagOp, value: 'and(' }));
           this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
@@ -845,17 +843,18 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   updateModelTarget() {
     this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    // the call to updateModelTarget() doesn't update or clear queryModel.target.query for graphite
+    if ('graphite' === this.target.querytype) {
+      this.queryModel.target.query = this.queryModel.target.queryDisplay = this.queryModel
+        .getGraphiteSegmentPathUpTo(this.segments.length)
+        .replace(/\.select metric.$/, '')
+        .replace(/\.$/, '');
+    }
+    // the call to updateModelTarget() above seems to always empty queryModel.target.query for non-graphite
     if (!this.queryModel.target.query) {
-      if ('graphite' === this.target.querytype) {
-        this.queryModel.target.query = this.queryModel.target.queryDisplay = this.queryModel
-          .getGraphiteSegmentPathUpTo(this.segments.length)
-          .replace(/\.select metric.$/, '')
-          .replace(/\.$/, '');
-      } else {
-        const streamTags = this.segmentsToStreamTagQuery();
-        log(() => 'updateModelTarget() streamTags = ' + streamTags);
-        this.queryModel.target.query = streamTags;
-      }
+      const streamTags = this.segmentsToStreamTagQuery();
+      log(() => 'updateModelTarget() streamTags = ' + streamTags);
+      this.queryModel.target.query = streamTags;
     }
   }
 
@@ -865,10 +864,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
       return;
     }
 
-    const oldTarget = this.queryModel.target.query;
+    const oldQuery = this.queryModel.target.query;
     this.updateModelTarget();
 
-    if (this.queryModel.target !== oldTarget) {
+    if (this.queryModel.target.query !== oldQuery) {
       this.panelCtrl.refresh();
     }
   }
