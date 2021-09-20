@@ -16,7 +16,7 @@ These instructions will build and run a Docker container with a Grafana instance
 5. export CIRCONUS_API_KEY=<From step 3>
 6. git clone https://github.com/circonus-labs/circonus-irondb-datasource/
 7. Execute ./docker/run-docker.sh
-8. Navigate to http://localhost:3000/ to access.
+8. Navigate to <http://localhost:3000/> to access.
 
 ## Installation
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
