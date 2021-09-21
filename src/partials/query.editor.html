@@ -89,8 +89,8 @@
         </div>
       </div>
       <div ng-if="ctrl.target.querytype === 'graphite'" class="gf-form gf-form-inline">
-        <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
-          <metric-segment segment="segment" get-options="ctrl.getGraphiteSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( segment, $index )"/>
+        <div ng-repeat="gSegment in ctrl.gSegments" role="menuitem" class="gf-form">
+          <metric-segment segment="gSegment" get-options="ctrl.getGraphiteSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
         </div>
       </div>
       <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form gf-form--grow ml-1">

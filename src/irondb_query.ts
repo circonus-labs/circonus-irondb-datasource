@@ -305,8 +305,10 @@ export default class IrondbQuery {
   datasource: any;
   target: any;
   segments: any[];
+  gSegments: any[];
   error: any;
   checkOtherSegmentsIndex: number;
+  checkOtherGSegmentsIndex: number;
   templateSrv: any;
   scopedVars: any;
 
@@ -314,11 +316,8 @@ export default class IrondbQuery {
   constructor(datasource, target, templateSrv?, scopedVars?) {
     this.datasource = datasource;
     this.target = target;
-    if ('graphite' === target.querytype) {
-      this.parseGraphiteTarget();
-    } else {
-      this.parseTarget();
-    }
+    this.parseGraphiteTarget();
+    this.parseTarget();
   }
 
   parseTarget() {
@@ -375,22 +374,20 @@ export default class IrondbQuery {
     if (tags.length === 0) {
       this.segments.push({ type: SegmentType.TagPlus });
     }
-
-    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
   }
 
   parseGraphiteTarget() {
-    this.segments = [];
+    this.gSegments = [];
     this.error = null;
 
     if (this.target.rawQuery) {
       return;
     }
 
-    var parser = new Parser(this.target.query);
+    var parser = new Parser(this.target.query || '*');
     var astNode = parser.getAst();
     if (astNode === null) {
-      this.checkOtherSegmentsIndex = 0;
+      this.checkOtherGSegmentsIndex = 0;
       return;
     }
 
@@ -408,11 +405,11 @@ export default class IrondbQuery {
       this.target.rawQuery = true;
     }
 
-    this.checkOtherSegmentsIndex = this.segments.length - 1;
+    this.checkOtherGSegmentsIndex = this.gSegments.length - 1;
   }
 
   getGraphiteSegmentPathUpTo(index) {
-    var arr = this.segments.slice(0, index);
+    var arr = this.gSegments.slice(0, index);
 
     return _.reduce(
       arr,
@@ -430,21 +427,22 @@ export default class IrondbQuery {
 
     switch (astNode.type) {
       case 'metric':
-        this.segments = astNode.segments;
+        this.gSegments = astNode.segments;
         break;
     }
   }
 
   updateSegmentValue(segment, index) {
-    log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
-    log(() => 'updateSegmentValue() length = ' + this.segments.length);
-    if (this.segments[index] !== undefined) {
-      this.segments[index].value = segment.value;
+    //log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
+    let isGraphite = 'graphite' === this.target.querytype;
+    if (this[isGraphite ? 'gSegments' : 'segments'][index] !== undefined) {
+      this[isGraphite ? 'gSegments' : 'segments'][index].value = segment.value;
     }
   }
 
   addSelectMetricSegment() {
-    this.segments.push({ value: 'select metric' });
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'].push({ value: 'select metric' });
   }
 
   updateModelTarget(targets: any) {

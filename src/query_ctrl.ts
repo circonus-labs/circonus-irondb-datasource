@@ -83,6 +83,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     counter_stddev: '', // FIXME
   };
   segments: any[];
+  gSegments: any[];
 
   /** @ngInject */
   constructor($scope, $injector, private uiSegmentSrv, private templateSrv) {
@@ -96,6 +97,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.query = this.target.query || '';
     this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
     this.target.segments = this.target.segments || [];
+    this.target.gSegments = this.target.gSegments || [];
     this.target.format = this.target.format || 'ts';
     let querytype = this.target.querytype;
     if (
@@ -132,13 +134,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.local_filter_match = 'all';
     this.target.alert_id = '';
     this.emptySegments();
-    this.parseTarget();
+    this.queryModel.parseTarget();
+    this.buildSegments();
     this.panelCtrl.refresh();
   }
 
+  // This changes the query type between CAQL/Standard/Graphite
   toggleEditorMode() {
-    log(() => 'toggleEditorMode()');
     if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
+      // CAQL -> Standard
       const onConfirm = () => {
         this.resetQueryTarget();
       };
@@ -153,12 +157,22 @@ export class IrondbQueryCtrl extends QueryCtrl {
           onConfirm: onConfirm,
         });
       }
+    } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
+      // CAQL -> Graphite
     } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
-      const caqlQuery = this.segmentsToCaqlFind();
+      // Standard -> CAQL
       log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
+      const caqlQuery = this.segmentsToCaqlFind();
       this.target.query = caqlQuery;
       this.panelCtrl.refresh();
+    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
+      // Standard -> Graphite
+    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
+      // Graphite -> CAQL
+    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
+      // Graphite -> Standard
     } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
+      // Alerts
       this.target.query = '';
       this.panelCtrl.refresh();
     }
@@ -299,11 +313,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   getSegments(index, prefix) {
-    log(() => 'getSegments() ' + index + ' prefix = ' + prefix);
+    //log(() => 'getSegments() ' + index + ' prefix = ' + prefix);
     let query = prefix && prefix.length > 0 ? prefix : '';
+    let isGraphite = 'graphite' === this.target.querytype;
 
-    const segmentType = this.segments[index]._type;
-    log(() => 'getSegments() ' + index + ' SegmentType = ' + SegmentType[segmentType]);
+    const segmentType = (this[isGraphite ? 'gSegments' : 'segments'][index] || {})._type;
     if (segmentType === SegmentType.MetricName) {
       if (encodeTag(SegmentType.MetricName, query) !== query) {
         query = 'b/' + btoa(escapeRegExp(query)) + '/';
@@ -317,7 +331,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return taglessName(result.metric_name);
           });
           metricnames = _.uniq(metricnames);
-          log(() => 'getSegments() metricnames = ' + JSON.stringify(metricnames));
 
           const allSegments = _.map(metricnames, (segment) => {
             return this.newSegment(SegmentType.MetricName, {
@@ -332,8 +345,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
           return [];
         });
     } else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
-      const metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
-      log(() => 'getSegments() tags for ' + metricName);
+      const metricName = encodeTag(
+        SegmentType.MetricName,
+        (this[isGraphite ? 'gSegments' : 'segments'][0] || {}).value
+      );
       return this.datasource
         .metricTagCatsQuery(metricName)
         .then((segments) => {
@@ -370,12 +385,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
       ];
       return Promise.resolve(tagSegments);
     } else if (segmentType === SegmentType.TagVal) {
-      const metricName = encodeTag(SegmentType.MetricName, this.segments[0].value);
-      const tagCat = this.segments[index - 2].value;
+      const metricName = encodeTag(
+        SegmentType.MetricName,
+        (this[isGraphite ? 'gSegments' : 'segments'][0] || {}).value
+      );
+      const tagCat = (this[isGraphite ? 'gSegments' : 'segments'][index - 2] || {}).value;
       if (tagCat === 'select tag') {
         return Promise.resolve([]);
       }
-      log(() => 'getSegments() tag vals for ' + metricName + ', ' + tagCat);
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
         .then((segments) => {
@@ -461,11 +478,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
       });
   }
 
-  parseTarget() {
-    this.queryModel.parseTarget();
-    this.buildSegments();
-  }
-
   setSegmentType(segment: any, type: SegmentType) {
     segment._type = type;
     segment._typeName = typeof SegmentType[type];
@@ -496,24 +508,25 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   buildSegments() {
+    // always rebuild both
+    this.gSegments = _.map(this.queryModel.gSegments, (segment) => {
+      return this.uiSegmentSrv.newSegment(segment);
+    });
+    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
+    // only check other segments per actual type
     if ('graphite' === this.target.querytype) {
-      this.segments = _.map(this.queryModel.segments, (segment) => {
-        return this.uiSegmentSrv.newSegment(segment);
-      });
+      this.checkOtherGraphiteSegments(this.queryModel.checkOtherGSegmentsIndex || 0);
     } else {
-      this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
+      this.checkOtherSegments(this.queryModel.checkOtherSegmentsIndex || 0);
     }
-    log(() => 'buildSegments()');
-
-    const checkOtherSegmentsIndex = this.queryModel.checkOtherSegmentsIndex || 0;
-    this.checkOtherSegments(checkOtherSegmentsIndex);
   }
 
   addSelectMetricSegment() {
+    let isGraphite = 'graphite' === this.target.querytype;
     this.queryModel.addSelectMetricSegment();
     const segment = this.uiSegmentSrv.newSelectMetric();
     this.setSegmentType(segment, SegmentType.MetricName);
-    this.segments.push(segment);
+    this[isGraphite ? 'gSegments' : 'segments'].push(segment);
   }
 
   buildSelectTagPlusSegment() {
@@ -523,7 +536,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   addSelectTagPlusSegment() {
-    this.segments.push(this.buildSelectTagPlusSegment());
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'].push(this.buildSelectTagPlusSegment());
   }
 
   newSelectTagValSegment() {
@@ -532,61 +546,61 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return tagValSegment;
   }
 
+  //
   checkOtherSegments(fromIndex) {
-    // graphite-style
-    if ('graphite' === this.target.querytype) {
-      if (fromIndex === 0) {
-        this.addSelectMetricSegment();
-        return;
+    let isGraphite = 'graphite' === this.target.querytype;
+    if (fromIndex === this[isGraphite ? 'gSegments' : 'segments'].length) {
+      const segmentType = this[isGraphite ? 'gSegments' : 'segments'][fromIndex - 1]._type;
+      if (segmentType === SegmentType.MetricName) {
+        this.addSelectTagPlusSegment();
       }
-      const path = this.queryModel.getGraphiteSegmentPathUpTo(fromIndex + 1);
-      if (path === '') {
-        return Promise.resolve();
-      }
-      return this.datasource
-        .metricGraphiteQuery(path + '*')
-        .then((segments) => {
-          if (segments.data.length === 0) {
-            if (path !== '') {
-              this.queryModel.segments = this.queryModel.segments.splice(0, fromIndex + 1);
-              this.segments = this.segments.splice(0, fromIndex + 1);
-            }
-          } else {
-            _.map(segments.data, (segment) => {
-              var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
-              var segmentName = segment.name.replace(pathRegExp, '');
-              segment.name = segmentName;
-            });
-            if (this.segments.length === fromIndex) {
-              this.addSelectMetricSegment();
-            } else {
-              return this.checkOtherSegments(fromIndex + 1);
-            }
-          }
-        })
-        .catch((err) => {});
+    }
+    return Promise.resolve();
+  }
 
-      // non-graphite-style
-    } else {
-      if (fromIndex === this.segments.length) {
-        const segmentType = this.segments[fromIndex - 1]._type;
-        log(() => 'checkOtherSegments() ' + (fromIndex - 1) + ' SegmentType = ' + SegmentType[segmentType]);
-        if (segmentType === SegmentType.MetricName) {
-          this.addSelectTagPlusSegment();
-        }
-      }
+  //
+  checkOtherGraphiteSegments(fromIndex) {
+    if (fromIndex === 0) {
+      this.addSelectMetricSegment();
+      return;
+    }
+    const path = this.queryModel.getGraphiteSegmentPathUpTo(fromIndex + 1);
+    if (path === '') {
       return Promise.resolve();
     }
+    return this.datasource
+      .metricGraphiteQuery(path + '*')
+      .then((segments) => {
+        if (segments.data.length === 0) {
+          if (path !== '') {
+            this.queryModel.gSegments = this.queryModel.gSegments.splice(0, fromIndex + 1);
+            this.gSegments = this.gSegments.splice(0, fromIndex + 1);
+          }
+        } else {
+          _.map(segments.data, (segment) => {
+            var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
+            var segmentName = segment.name.replace(pathRegExp, '');
+            segment.name = segmentName;
+          });
+          if (this.gSegments.length === fromIndex) {
+            this.addSelectMetricSegment();
+          } else {
+            return this.checkOtherGraphiteSegments(fromIndex + 1);
+          }
+        }
+      })
+      .catch((err) => {});
   }
 
   setSegmentFocus(segmentIndex) {
-    _.each(this.segments, (segment, index) => {
+    let isGraphite = 'graphite' === this.target.querytype;
+    _.each(this[isGraphite ? 'gSegments' : 'segments'], (segment, index) => {
       segment.focus = segmentIndex === index;
     });
   }
 
   segmentValueChanged(segment, segmentIndex) {
-    log(() => 'segmentValueChanged()');
+    let isGraphite = 'graphite' === this.target.querytype;
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
@@ -596,9 +610,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         // For every TagOp we hit, we need to get one more TagEnd to remove any sub-ops
         let endIndex = segmentIndex + 1;
         let endsNeeded = 1;
-        const lastIndex = this.segments.length;
+        const lastIndex = this[isGraphite ? 'gSegments' : 'segments'].length;
         while (endsNeeded > 0 && endIndex < lastIndex) {
-          const type = this.segments[endIndex]._type;
+          const type = this[isGraphite ? 'gSegments' : 'segments'][endIndex]._type;
           if (type === SegmentType.TagOp) {
             endsNeeded++;
           } else if (type === SegmentType.TagEnd) {
@@ -616,10 +630,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
           deleteStart--;
           countDelete++;
         }
-        this.segments.splice(deleteStart, countDelete);
+        this[isGraphite ? 'gSegments' : 'segments'].splice(deleteStart, countDelete);
         if (lastIndex === endIndex + 1) {
           // If these match, we removed the outermost operator, so we need a new + button
-          this.segments.push(this.buildSelectTagPlusSegment());
+          this[isGraphite ? 'gSegments' : 'segments'].push(this.buildSelectTagPlusSegment());
         }
       }
       // else Changing an Operator doesn't need to affect any other segments
@@ -628,12 +642,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
     } else if (segment._type === SegmentType.TagPlus) {
       if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
         // Remove myself
-        this.segments.splice(segmentIndex, 1);
+        this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex, 1);
         if (segmentIndex > 2) {
-          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
+          this[isGraphite ? 'gSegments' : 'segments'].splice(
+            segmentIndex,
+            0,
+            this.mapSegment({ type: SegmentType.TagSep })
+          );
         }
         // and replace it with a TagOp + friends
-        this.segments.splice(
+        this[isGraphite ? 'gSegments' : 'segments'].splice(
           segmentIndex + 1,
           0,
           this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
@@ -644,19 +662,23 @@ export class IrondbQueryCtrl extends QueryCtrl {
           this.mapSegment({ type: SegmentType.TagEnd })
         );
         if (segmentIndex > 2) {
-          this.segments.splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
+          this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
         }
         // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
         this.setSegmentFocus(segmentIndex + 3);
         return;
       } else {
         // Remove myself
-        this.segments.splice(segmentIndex, 1);
+        this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex, 1);
         if (segmentIndex > 2) {
-          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagSep }));
+          this[isGraphite ? 'gSegments' : 'segments'].splice(
+            segmentIndex,
+            0,
+            this.mapSegment({ type: SegmentType.TagSep })
+          );
         }
         // and replace it with a TagOp + friends
-        this.segments.splice(
+        this[isGraphite ? 'gSegments' : 'segments'].splice(
           segmentIndex + 1,
           0,
           this.mapSegment({ type: SegmentType.TagCat, value: segment.value }),
@@ -668,8 +690,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if (segmentIndex === 1) {
           // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
           // so that means we need to add in the implicit and() in the front
-          this.segments.splice(segmentIndex, 0, this.mapSegment({ type: SegmentType.TagOp, value: 'and(' }));
-          this.segments.push(this.mapSegment({ type: SegmentType.TagEnd }));
+          this[isGraphite ? 'gSegments' : 'segments'].splice(
+            segmentIndex,
+            0,
+            this.mapSegment({ type: SegmentType.TagOp, value: 'and(' })
+          );
+          this[isGraphite ? 'gSegments' : 'segments'].push(this.mapSegment({ type: SegmentType.TagEnd }));
         }
         // Fall through so targetChanged gets called
       }
@@ -697,30 +723,35 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     this.spliceSegments(segmentIndex + 1);
     if (segment.expandable) {
-      return this.checkOtherSegments(segmentIndex + 1).then(() => {
+      return this.checkOtherGraphiteSegments(segmentIndex + 1).then(() => {
+        this.setSegmentFocus(segmentIndex + 1);
+        this.targetChanged();
         this.setSegmentFocus(segmentIndex + 1);
         this.targetChanged();
       });
     } else {
-      this.spliceSegments(segmentIndex + 1);
+      this.setSegmentFocus(segmentIndex + 1);
+      this.targetChanged();
     }
-
-    this.setSegmentFocus(segmentIndex + 1);
-    this.targetChanged();
   }
 
   spliceSegments(index) {
-    this.segments = this.segments.splice(0, index);
-    this.queryModel.segments = this.queryModel.segments.splice(0, index);
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'] = this[isGraphite ? 'gSegments' : 'segments'].splice(0, index);
+    this.queryModel[isGraphite ? 'gSegments' : 'segments'] = this.queryModel[
+      isGraphite ? 'gSegments' : 'segments'
+    ].splice(0, index);
   }
 
   emptySegments() {
-    this.queryModel.segments = [];
-    this.segments = [];
+    let isGraphite = 'graphite' === this.target.querytype;
+    this.queryModel[isGraphite ? 'gSegments' : 'segments'] = [];
+    this[isGraphite ? 'gSegments' : 'segments'] = [];
   }
 
   segmentsToStreamTagQuery() {
-    const segments = this.segments.slice();
+    let isGraphite = 'graphite' === this.target.querytype;
+    const segments = this[isGraphite ? 'gSegments' : 'segments'].slice();
     // First element is always metric name
     const metricName = segments.shift().value;
     let query = 'and(__name:' + encodeTag(SegmentType.MetricName, metricName);
@@ -797,11 +828,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   segmentsToCaqlFind() {
-    const segments = this.segments.slice();
+    let isGraphite = 'graphite' === this.target.querytype;
+    const segments = this[isGraphite ? 'gSegments' : 'segments'].slice();
     // First element is always metric name
     const metricName = segments.shift().value;
-    const tagless =
-      'graphite' === this.target.querytype || (segments.length === 1 && segments[0]._type === SegmentType.TagPlus);
+    const tagless = isGraphite || (segments.length === 1 && segments[0]._type === SegmentType.TagPlus);
     if (metricName === '*' && tagless) {
       return '';
     }
@@ -846,7 +877,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     // the call to updateModelTarget() doesn't update or clear queryModel.target.query for graphite
     if ('graphite' === this.target.querytype) {
       this.queryModel.target.query = this.queryModel.target.queryDisplay = this.queryModel
-        .getGraphiteSegmentPathUpTo(this.segments.length)
+        .getGraphiteSegmentPathUpTo(this.gSegments.length)
         .replace(/\.select metric.$/, '')
         .replace(/\.$/, '');
     }
