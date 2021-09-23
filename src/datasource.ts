@@ -836,7 +836,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         names: [],
       };
       for (var obj of irondbOptions['graphite']['names']) {
-        const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12}).?(.*)/) || [null, '', ''];
+        const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
         const new_obj = {
           leaf_name: obj['leaf_name'],
           leaf_data: {

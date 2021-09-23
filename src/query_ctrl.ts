@@ -95,7 +95,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.labeltype = this.target.labeltype || 'default';
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
-    this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.gSegments = this.target.gSegments || [];
     this.target.format = this.target.format || 'ts';
@@ -125,7 +124,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
   resetQueryTarget() {
     log(() => 'resetQueryTarget()');
     this.target.query = '';
-    this.target.queryDisplay = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
@@ -141,41 +139,29 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   // This changes the query type between CAQL/Standard/Graphite
   toggleEditorMode() {
+    // CAQL -> Standard
     if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
-      // CAQL -> Standard
-      const onConfirm = () => {
-        this.resetQueryTarget();
-      };
-      if (this.target.query === '') {
-        setTimeout(onConfirm, 0);
-      } else {
-        appEvents.emit('confirm-modal', {
-          title: 'Warning',
-          text2: 'Switching to basic may overwrite your raw CAQL.',
-          icon: 'fa-exclamation',
-          yesText: 'Switch',
-          onConfirm: onConfirm,
-        });
-      }
-    } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
+      // TODO: currently no good way to convert backwards to standard
       // CAQL -> Graphite
-    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
+    } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
+      // TODO: currently no good way to convert backwards to graphite
       // Standard -> CAQL
-      log(() => 'toggleEditorMode() caqlQuery = ' + caqlQuery);
-      const caqlQuery = this.segmentsToCaqlFind();
-      this.target.query = caqlQuery;
-      this.panelCtrl.refresh();
-    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
+    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
+      this.target.query = this.buildCAQLFromStandard();
       // Standard -> Graphite
-    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
+    } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
+      this.convertStandardToGraphite();
       // Graphite -> CAQL
-    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
+    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
+      this.target.query = this.buildCAQLFromGraphite();
       // Graphite -> Standard
-    } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
+    } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
+      this.convertGraphiteToStandard();
       // Alerts
+    } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
       this.target.query = '';
-      this.panelCtrl.refresh();
     }
+    this.panelCtrl.refresh();
     this.target.lastQueryType = this.target.querytype;
   }
 
@@ -302,14 +288,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   onChangeInternal() {
     this.panelCtrl.refresh(); // Asks the panel to refresh data.
-  }
-
-  getCollapsedText() {
-    if (this.target.querytype === 'caql') {
-      return this.target.query;
-    } else {
-      return this.segmentsToCaqlFind();
-    }
   }
 
   getSegments(index, prefix) {
@@ -461,7 +439,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         // add query references
         if (index === 0) {
           _.eachRight(this.panelCtrl.panel.targets, (target) => {
-            if (target.refId === this.queryModel.target.refId) {
+            if (target.refId === this.target.refId) {
               return;
             }
           });
@@ -573,7 +551,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       .then((segments) => {
         if (segments.data.length === 0) {
           if (path !== '') {
-            this.queryModel.gSegments = this.queryModel.gSegments.splice(0, fromIndex + 1);
+            this.queryModel.removeSegments(fromIndex + 1);
             this.gSegments = this.gSegments.splice(0, fromIndex + 1);
           }
         } else {
@@ -592,6 +570,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       .catch((err) => {});
   }
 
+  // this sets segment focus for both standard & graphite segments
   setSegmentFocus(segmentIndex) {
     let isGraphite = 'graphite' === this.target.querytype;
     _.each(this[isGraphite ? 'gSegments' : 'segments'], (segment, index) => {
@@ -599,186 +578,90 @@ export class IrondbQueryCtrl extends QueryCtrl {
     });
   }
 
+  // this is called whenever a CAQL query field is changed
+  caqlValueChanged() {
+    this.targetChanged();
+    this.panelCtrl.refresh();
+  }
+
+  // this is called whenever a standard segment value changes
+  // NOTE: if we're adding or removing segments, do those operations on the
+  // queryModel and then build those changes back into queryCtrl with buildSegments()
   segmentValueChanged(segment, segmentIndex) {
-    let isGraphite = 'graphite' === this.target.querytype;
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
 
-    if (segment._type === SegmentType.TagOp) {
+    // If we changed the start metric, all the filters are invalid, so remove them
+    if (segmentIndex === 0) {
+      this.removeSegments(segmentIndex + 1);
+      // we're removing or changing an operator ('and(', 'or(', 'not(')
+    } else if (segment._type === SegmentType.TagOp) {
+      // We need to remove the entire operator (including every other segment) until our TagEnd.
       if (segment.value === 'REMOVE') {
-        // We need to remove ourself, as well as every other segment until our TagEnd
-        // For every TagOp we hit, we need to get one more TagEnd to remove any sub-ops
-        let endIndex = segmentIndex + 1;
-        let endsNeeded = 1;
-        const lastIndex = this[isGraphite ? 'gSegments' : 'segments'].length;
-        while (endsNeeded > 0 && endIndex < lastIndex) {
-          const type = this[isGraphite ? 'gSegments' : 'segments'][endIndex]._type;
-          if (type === SegmentType.TagOp) {
-            endsNeeded++;
-          } else if (type === SegmentType.TagEnd) {
-            endsNeeded--;
-            if (endsNeeded === 0) {
-              break; // don't increment endIndex
-            }
-          }
-          endIndex++; // keep going
-        }
-        let deleteStart = segmentIndex;
-        let countDelete = endIndex - segmentIndex + 1;
-        if (segmentIndex > 2) {
-          // If I'm not the very first operator, then i have a comma in front of me that needs killing
-          deleteStart--;
-          countDelete++;
-        }
-        this[isGraphite ? 'gSegments' : 'segments'].splice(deleteStart, countDelete);
-        if (lastIndex === endIndex + 1) {
-          // If these match, we removed the outermost operator, so we need a new + button
-          this[isGraphite ? 'gSegments' : 'segments'].push(this.buildSelectTagPlusSegment());
-        }
+        this.queryModel.removeStandardOperator(segmentIndex);
       }
-      // else Changing an Operator doesn't need to affect any other segments
+      // else changing an Operator doesn't need to affect any other segments
+      this.buildSegments();
       this.targetChanged();
+      this.panelCtrl.refresh();
       return;
+      // we're adding something, either an operator or a tag
     } else if (segment._type === SegmentType.TagPlus) {
       if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
-        // Remove myself
-        this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex, 1);
-        if (segmentIndex > 2) {
-          this[isGraphite ? 'gSegments' : 'segments'].splice(
-            segmentIndex,
-            0,
-            this.mapSegment({ type: SegmentType.TagSep })
-          );
-        }
-        // and replace it with a TagOp + friends
-        this[isGraphite ? 'gSegments' : 'segments'].splice(
-          segmentIndex + 1,
-          0,
-          this.mapSegment({ type: SegmentType.TagOp, value: segment.value }),
-          this.mapSegment({ type: SegmentType.TagCat, value: 'select tag', fake: true }),
-          this.mapSegment({ type: SegmentType.TagPair }),
-          this.newSelectTagValSegment(),
-          this.buildSelectTagPlusSegment(),
-          this.mapSegment({ type: SegmentType.TagEnd })
-        );
-        if (segmentIndex > 2) {
-          this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex + 7, 0, this.buildSelectTagPlusSegment());
-        }
-        // Do not trigger targetChanged().  We do not have a valid category, which we need, so set focus on it
+        this.queryModel.addStandardOperator(segmentIndex, segment.value);
+        this.buildSegments();
         this.setSegmentFocus(segmentIndex + 3);
-        return;
+        return; // Do not trigger targetChanged(); we do not have a valid category yet, so set focus on the category segment
       } else {
-        // Remove myself
-        this[isGraphite ? 'gSegments' : 'segments'].splice(segmentIndex, 1);
-        if (segmentIndex > 2) {
-          this[isGraphite ? 'gSegments' : 'segments'].splice(
-            segmentIndex,
-            0,
-            this.mapSegment({ type: SegmentType.TagSep })
-          );
-        }
-        // and replace it with a TagOp + friends
-        this[isGraphite ? 'gSegments' : 'segments'].splice(
-          segmentIndex + 1,
-          0,
-          this.mapSegment({ type: SegmentType.TagCat, value: segment.value }),
-          this.mapSegment({ type: SegmentType.TagPair }),
-          this.newSelectTagValSegment(),
-          this.buildSelectTagPlusSegment()
-        );
-
-        if (segmentIndex === 1) {
-          // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
-          // so that means we need to add in the implicit and() in the front
-          this[isGraphite ? 'gSegments' : 'segments'].splice(
-            segmentIndex,
-            0,
-            this.mapSegment({ type: SegmentType.TagOp, value: 'and(' })
-          );
-          this[isGraphite ? 'gSegments' : 'segments'].push(this.mapSegment({ type: SegmentType.TagEnd }));
-        }
-        // Fall through so targetChanged gets called
+        this.queryModel.addStandardTag(segmentIndex, segment.value);
+        // Fall through so targetChanged() gets called below.
       }
     }
-
-    if (segmentIndex === 0) {
-      // If we changed the start metric, all the filters are invalid
-      this.spliceSegments(segmentIndex + 1);
-    }
-
+    // if we didn't remove or change an operator, we need to rebuild
+    this.buildSegments();
     if (segment.expandable) {
       return this.checkOtherSegments(segmentIndex + 1).then(() => {
         this.setSegmentFocus(segmentIndex + 1);
         this.targetChanged();
-      });
-    }
-
-    this.setSegmentFocus(segmentIndex + 1);
-    this.targetChanged();
-  }
-
-  graphiteSegmentValueChanged(segment, segmentIndex) {
-    this.error = null;
-    this.queryModel.updateSegmentValue(segment, segmentIndex);
-
-    this.spliceSegments(segmentIndex + 1);
-    if (segment.expandable) {
-      return this.checkOtherGraphiteSegments(segmentIndex + 1).then(() => {
-        this.setSegmentFocus(segmentIndex + 1);
-        this.targetChanged();
-        this.setSegmentFocus(segmentIndex + 1);
-        this.targetChanged();
+        this.panelCtrl.refresh();
       });
     } else {
       this.setSegmentFocus(segmentIndex + 1);
       this.targetChanged();
+      this.panelCtrl.refresh();
     }
   }
 
-  spliceSegments(index) {
+  // this is called whenever a graphite segment value changes
+  graphiteSegmentValueChanged(segment, segmentIndex) {
+    this.error = null;
+    this.queryModel.updateSegmentValue(segment, segmentIndex);
+
+    this.removeSegments(segmentIndex + 1);
+    if (segment.expandable) {
+      return this.checkOtherGraphiteSegments(segmentIndex + 1).then(() => {
+        this.setSegmentFocus(segmentIndex + 1);
+        this.targetChanged();
+        this.panelCtrl.refresh();
+      });
+    } else {
+      this.setSegmentFocus(segmentIndex + 1);
+      this.targetChanged();
+      this.panelCtrl.refresh();
+    }
+  }
+
+  // this takes an index and removes that segment and all following segments
+  removeSegments(index) {
     let isGraphite = 'graphite' === this.target.querytype;
     this[isGraphite ? 'gSegments' : 'segments'] = this[isGraphite ? 'gSegments' : 'segments'].splice(0, index);
-    this.queryModel[isGraphite ? 'gSegments' : 'segments'] = this.queryModel[
-      isGraphite ? 'gSegments' : 'segments'
-    ].splice(0, index);
+    this.queryModel.removeSegments(index);
   }
 
   emptySegments() {
     let isGraphite = 'graphite' === this.target.querytype;
-    this.queryModel[isGraphite ? 'gSegments' : 'segments'] = [];
     this[isGraphite ? 'gSegments' : 'segments'] = [];
-  }
-
-  segmentsToStreamTagQuery() {
-    let isGraphite = 'graphite' === this.target.querytype;
-    const segments = this[isGraphite ? 'gSegments' : 'segments'].slice();
-    // First element is always metric name
-    const metricName = segments.shift().value;
-    let query = 'and(__name:' + encodeTag(SegmentType.MetricName, metricName);
-    let noComma = false; // because last was a tag:pair
-    for (const segment of segments) {
-      const type = segment._type;
-      if (type === SegmentType.TagPlus) {
-        continue;
-      }
-      if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
-        query += ',';
-      }
-      if (
-        type === SegmentType.TagOp ||
-        type === SegmentType.TagPair ||
-        type === SegmentType.TagCat ||
-        type === SegmentType.TagSep
-      ) {
-        noComma = true;
-      } else {
-        noComma = false;
-      }
-
-      query += encodeTag(type, segment.value);
-    }
-    query += ')';
-    return query;
+    this.queryModel.emptySegments();
   }
 
   queryFunctionToCaqlFind() {
@@ -827,12 +710,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return " | label('%cn')";
   }
 
-  segmentsToCaqlFind() {
-    let isGraphite = 'graphite' === this.target.querytype;
-    const segments = this[isGraphite ? 'gSegments' : 'segments'].slice();
+  // this builds a CAQL find() query out of standard query segments
+  buildCAQLFromStandard() {
+    const segments = this.segments.slice();
     // First element is always metric name
     const metricName = segments.shift().value;
-    const tagless = isGraphite || (segments.length === 1 && segments[0]._type === SegmentType.TagPlus);
+    const tagless = segments.length === 1 && segments[0]._type === SegmentType.TagPlus;
     if (metricName === '*' && tagless) {
       return '';
     }
@@ -872,34 +755,87 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return query;
   }
 
-  updateModelTarget() {
-    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
-    // the call to updateModelTarget() doesn't update or clear queryModel.target.query for graphite
-    if ('graphite' === this.target.querytype) {
-      this.queryModel.target.query = this.queryModel.target.queryDisplay = this.queryModel
-        .getGraphiteSegmentPathUpTo(this.gSegments.length)
-        .replace(/\.select metric.$/, '')
-        .replace(/\.$/, '');
+  // this builds a CAQL find() query out of graphite-style query segments
+  buildCAQLFromGraphite() {
+    const graphiteName = this.queryModel
+      .getGraphiteSegmentPathUpTo(this.gSegments.length)
+      .replace(/\.select metric.$/, '.*')
+      .replace(/\.$/, '');
+    const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
+    const hasUUID = !!matches[1];
+    if (graphiteName === '*' && !hasUUID) {
+      return '';
     }
-    // the call to updateModelTarget() above seems to always empty queryModel.target.query for non-graphite
-    if (!this.queryModel.target.query) {
-      const streamTags = this.segmentsToStreamTagQuery();
-      log(() => 'updateModelTarget() streamTags = ' + streamTags);
-      this.queryModel.target.query = streamTags;
+    let query = this.queryFunctionToCaqlFind() + "('" + matches[2] + "'";
+    if (hasUUID) {
+      query += ', "and(__check_uuid:' + matches[1] + ')"';
     }
+    query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
+    return query;
+  }
+
+  // this converts standard segments to graphite segments
+  convertStandardToGraphite() {
+    this.queryModel.convertStandardToGraphite();
+    this.buildSegments();
+    this.buildGraphiteQuery();
+  }
+
+  // this converts graphite segments to standard segments
+  convertGraphiteToStandard() {
+    this.queryModel.convertGraphiteToStandard();
+    this.buildSegments();
+    this.buildStandardQuery();
+  }
+
+  // this builds a graphite-style query out of the segments
+  buildGraphiteQuery() {
+    this.target.query = this.queryModel
+      .getGraphiteSegmentPathUpTo(this.gSegments.length)
+      .replace(/\.select metric.$/, '')
+      .replace(/\.$/, '');
+  }
+
+  // this builds a standard query out of the segments
+  buildStandardQuery() {
+    const segments = this.segments.slice();
+    // First element is always metric name
+    const metricName = segments.shift().value;
+    let query = 'and(__name:' + encodeTag(SegmentType.MetricName, metricName);
+    let noComma = false; // because last was a tag:pair
+    for (const segment of segments) {
+      const type = segment._type;
+      if (type === SegmentType.TagPlus) {
+        continue;
+      }
+      if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
+        query += ',';
+      }
+      if (
+        type === SegmentType.TagOp ||
+        type === SegmentType.TagPair ||
+        type === SegmentType.TagCat ||
+        type === SegmentType.TagSep
+      ) {
+        noComma = true;
+      } else {
+        noComma = false;
+      }
+      query += encodeTag(type, segment.value);
+    }
+    query += ')';
+    this.target.query = query;
   }
 
   targetChanged() {
-    log(() => 'targetChanged()');
     if (this.queryModel.error) {
       return;
     }
-
-    const oldQuery = this.queryModel.target.query;
-    this.updateModelTarget();
-
-    if (this.queryModel.target.query !== oldQuery) {
-      this.panelCtrl.refresh();
+    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
+    if ('graphite' === this.target.querytype) {
+      this.buildGraphiteQuery();
+    } else if ('basic' === this.target.querytype) {
+      this.buildStandardQuery();
     }
   }
 

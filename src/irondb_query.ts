@@ -320,6 +320,7 @@ export default class IrondbQuery {
     this.parseTarget();
   }
 
+  // this parses a standard query into segments
   parseTarget() {
     this.segments = [];
     this.error = null;
@@ -376,6 +377,7 @@ export default class IrondbQuery {
     }
   }
 
+  // this parses a graphite-style target into segments
   parseGraphiteTarget() {
     this.gSegments = [];
     this.error = null;
@@ -406,6 +408,51 @@ export default class IrondbQuery {
     }
 
     this.checkOtherGSegmentsIndex = this.gSegments.length - 1;
+  }
+
+  // this converts the standard segments array to the graphite segments array
+  convertStandardToGraphite() {
+    let gSegments = (this.gSegments = []);
+    let metricName = '';
+    this.segments.some(function (segment) {
+      if (segment.type === SegmentType.MetricName) {
+        metricName = segment.value;
+        return true;
+      }
+    });
+    metricName.split('.').forEach(function (piece) {
+      if (piece) {
+        gSegments.push({ value: piece });
+      }
+    });
+    if (!gSegments.length) {
+      gSegments.push({ value: '*' });
+    }
+  }
+
+  // this converts the graphite segments array to the standard segments array
+  convertGraphiteToStandard() {
+    this.segments = [];
+    const graphiteName = this.getGraphiteSegmentPathUpTo(this.gSegments.length)
+      .replace(/\.select metric.$/, '.*')
+      .replace(/\.$/, '');
+    const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', '*'];
+    const hasUUID = !!matches[1];
+    this.segments.push({ type: SegmentType.MetricName, value: matches[2] });
+    // have a UUID? then add it as a tag
+    if (hasUUID) {
+      let tagCat = '__check_uuid';
+      let tagVal = matches[1];
+      this.segments.push({ type: SegmentType.TagOp, value: 'and(' });
+      this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+      this.segments.push({ type: SegmentType.TagPair });
+      this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      this.segments.push({ type: SegmentType.TagPlus });
+      this.segments.push({ type: SegmentType.TagEnd });
+      // don't have a UUID? then add a plus segment
+    } else {
+      this.segments.push({ type: SegmentType.TagPlus });
+    }
   }
 
   getGraphiteSegmentPathUpTo(index) {
@@ -445,10 +492,112 @@ export default class IrondbQuery {
     this[isGraphite ? 'gSegments' : 'segments'].push({ value: 'select metric' });
   }
 
+  // this takes an index and removes that segment and all following segments
+  removeSegments(fromIndex) {
+    if (null == fromIndex) {
+      return;
+    }
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'] = this[isGraphite ? 'gSegments' : 'segments'].splice(0, fromIndex);
+  }
+
+  // this empties the segments
+  emptySegments() {
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'] = [];
+  }
+
+  // this removes an entire operator (e.g. "and(...)" including sub-operators) from a standard query
+  removeStandardOperator(startIndex) {
+    let endIndex = startIndex + 1;
+    let endsNeeded = 1;
+    const lastIndex = this.segments.length;
+    // We need to remove ourself (as well as every other segment) until our TagEnd.
+    // For every TagOp we hit, we need to wait until we hit one more TagEnd (to remove any sub-ops).
+    while (endsNeeded > 0 && endIndex < lastIndex) {
+      const type = this.segments[endIndex].type;
+      if (type === SegmentType.TagOp) {
+        endsNeeded++;
+      } else if (type === SegmentType.TagEnd) {
+        endsNeeded--;
+        if (endsNeeded === 0) {
+          break; // don't increment endIndex
+        }
+      }
+      endIndex++; // keep going
+    }
+    let deleteStart = startIndex;
+    let countDelete = endIndex - startIndex + 1;
+    // If I'm not the very first operator, then I have a comma in front of me that needs killing
+    if (startIndex > 2) {
+      deleteStart--;
+      countDelete++;
+    }
+    this.segments.splice(deleteStart, countDelete);
+    // If these match, we removed the outermost operator, so we need a new plus segment
+    if (lastIndex === endIndex + 1) {
+      this.segments.push({ type: SegmentType.TagPlus });
+    }
+  }
+
+  // this adds an operator--and(), not(), or()--and the first filter tag to a standard query
+  addStandardOperator(startIndex, value) {
+    if (value === 'and(' || value === 'not(' || value === 'or(') {
+      // Remove any plus segment
+      if (this.segments[startIndex] && this.segments[startIndex].type === SegmentType.TagPlus) {
+        this.segments.splice(startIndex, 1);
+      }
+      // if this isn't the first operator, add a separator (comma)
+      if (startIndex > 2) {
+        this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
+      }
+      // add the segments
+      this.segments.splice(
+        startIndex + 1,
+        0,
+        { type: SegmentType.TagOp, value: value },
+        { type: SegmentType.TagCat, value: 'select tag', fake: true },
+        { type: SegmentType.TagPair },
+        { value: '*' },
+        { type: SegmentType.TagPlus },
+        { type: SegmentType.TagEnd }
+      );
+      // if this isn't the first operator, add another plus segment
+      if (startIndex > 2) {
+        this.segments.splice(startIndex + 7, 0, { type: SegmentType.TagPlus });
+      }
+    }
+  }
+
+  // this add a tag (and category) to a standard query
+  addStandardTag(startIndex, value) {
+    // Remove any plus segment
+    if (this.segments[startIndex].type === SegmentType.TagPlus) {
+      this.segments.splice(startIndex, 1);
+    }
+    if (startIndex > 2) {
+      this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
+    }
+    this.segments.splice(
+      startIndex + 1,
+      0,
+      { type: SegmentType.TagCat, value: value },
+      { type: SegmentType.TagPair },
+      { value: '*' },
+      { type: SegmentType.TagPlus }
+    );
+    if (startIndex === 1) {
+      // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
+      // so that means we need to add in the implicit and() in the front
+      this.segments.splice(startIndex, 0, { type: SegmentType.TagOp, value: 'and(' });
+      this.segments.push({ type: SegmentType.TagEnd });
+    }
+  }
+
   updateModelTarget(targets: any) {
     this.updateRenderedTarget(this.target, targets);
 
-    // loop through other queries and update targetFull as needed
+    // loop through other queries and update as needed
     for (let target of targets || []) {
       if (target.refId !== this.target.refId) {
         this.updateRenderedTarget(target, targets);
@@ -456,10 +605,7 @@ export default class IrondbQuery {
     }
   }
 
-  updateRenderedTarget(
-    target: { refId: string | number; query: any; queryDisplay: string; targetFull: any },
-    targets: any
-  ) {
+  updateRenderedTarget(target: { refId: string | number; query: any; queryDisplay: string }, targets: any) {
     // render nested query
     const targetsByRefId = _.keyBy(targets, 'refId');
 
@@ -510,9 +656,8 @@ export default class IrondbQuery {
       targetWithNestedQueries = updated;
     }
 
-    delete target.targetFull;
     if (target.query !== targetWithNestedQueries) {
-      target.query = target.targetFull = targetWithNestedQueries;
+      target.query = targetWithNestedQueries;
     }
   }
 }
