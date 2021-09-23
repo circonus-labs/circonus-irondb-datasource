@@ -95,6 +95,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.labeltype = this.target.labeltype || 'default';
     this.target.rolluptype = this.target.rolluptype || 'automatic';
     this.target.query = this.target.query || '';
+    this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
     this.target.segments = this.target.segments || [];
     this.target.gSegments = this.target.gSegments || [];
     this.target.format = this.target.format || 'ts';
@@ -124,6 +125,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   resetQueryTarget() {
     log(() => 'resetQueryTarget()');
     this.target.query = '';
+    this.target.queryDisplay = '';
     this.target.egressoverride = 'average';
     this.target.labeltype = 'default';
     this.target.rolluptype = 'automatic';
@@ -147,19 +149,19 @@ export class IrondbQueryCtrl extends QueryCtrl {
       // TODO: currently no good way to convert backwards to graphite
       // Standard -> CAQL
     } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
-      this.target.query = this.buildCAQLFromStandard();
+      this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
       // Standard -> Graphite
     } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
       this.convertStandardToGraphite();
       // Graphite -> CAQL
     } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
-      this.target.query = this.buildCAQLFromGraphite();
+      this.target.query = this.target.queryDisplay = this.buildCAQLFromGraphite();
       // Graphite -> Standard
     } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
       this.convertGraphiteToStandard();
       // Alerts
     } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
-      this.target.query = '';
+      this.target.query = this.target.queryDisplay = '';
     }
     this.panelCtrl.refresh();
     this.target.lastQueryType = this.target.querytype;
@@ -174,7 +176,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   updateAlertId() {
-    this.target.query = '';
+    this.target.query = this.target.queryDisplay = '';
     this.panelCtrl.refresh();
   }
 
@@ -580,7 +582,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   // this is called whenever a CAQL query field is changed
   caqlValueChanged() {
-    this.targetChanged();
+    this.buildQueries();
     this.panelCtrl.refresh();
   }
 
@@ -602,7 +604,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       // else changing an Operator doesn't need to affect any other segments
       this.buildSegments();
-      this.targetChanged();
+      this.buildQueries();
       this.panelCtrl.refresh();
       return;
       // we're adding something, either an operator or a tag
@@ -611,10 +613,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.queryModel.addStandardOperator(segmentIndex, segment.value);
         this.buildSegments();
         this.setSegmentFocus(segmentIndex + 3);
-        return; // Do not trigger targetChanged(); we do not have a valid category yet, so set focus on the category segment
+        return; // Do not trigger buildQueries(); we do not have a valid category yet, so set focus on the category segment
       } else {
         this.queryModel.addStandardTag(segmentIndex, segment.value);
-        // Fall through so targetChanged() gets called below.
+        // Fall through so buildQueries() gets called below.
       }
     }
     // if we didn't remove or change an operator, we need to rebuild
@@ -622,12 +624,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (segment.expandable) {
       return this.checkOtherSegments(segmentIndex + 1).then(() => {
         this.setSegmentFocus(segmentIndex + 1);
-        this.targetChanged();
+        this.buildQueries();
         this.panelCtrl.refresh();
       });
     } else {
       this.setSegmentFocus(segmentIndex + 1);
-      this.targetChanged();
+      this.buildQueries();
       this.panelCtrl.refresh();
     }
   }
@@ -641,12 +643,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
     if (segment.expandable) {
       return this.checkOtherGraphiteSegments(segmentIndex + 1).then(() => {
         this.setSegmentFocus(segmentIndex + 1);
-        this.targetChanged();
+        this.buildQueries();
         this.panelCtrl.refresh();
       });
     } else {
       this.setSegmentFocus(segmentIndex + 1);
-      this.targetChanged();
+      this.buildQueries();
       this.panelCtrl.refresh();
     }
   }
@@ -790,7 +792,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   // this builds a graphite-style query out of the segments
   buildGraphiteQuery() {
-    this.target.query = this.queryModel
+    this.target.query = this.target.queryDisplay = this.queryModel
       .getGraphiteSegmentPathUpTo(this.gSegments.length)
       .replace(/\.select metric.$/, '')
       .replace(/\.$/, '');
@@ -824,19 +826,20 @@ export class IrondbQueryCtrl extends QueryCtrl {
       query += encodeTag(type, segment.value);
     }
     query += ')';
-    this.target.query = query;
+    this.target.query = this.target.queryDisplay = query;
   }
 
-  targetChanged() {
+  // this rebuilds queries after segments have changed, or re-renders query replacements after CAQL has changed
+  buildQueries() {
     if (this.queryModel.error) {
       return;
     }
-    this.queryModel.updateModelTarget(this.panelCtrl.panel.targets);
     if ('graphite' === this.target.querytype) {
       this.buildGraphiteQuery();
     } else if ('basic' === this.target.querytype) {
       this.buildStandardQuery();
     }
+    this.queryModel.renderQueries(this.panelCtrl.panel.targets);
   }
 
   escapeRegExp(regexp) {

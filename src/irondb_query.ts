@@ -594,70 +594,81 @@ export default class IrondbQuery {
     }
   }
 
-  updateModelTarget(targets: any) {
-    this.updateRenderedTarget(this.target, targets);
-
-    // loop through other queries and update as needed
+  // this takes an array of all targets in a panel and replaces all of their query reference placeholders
+  renderQueries(targets: any) {
+    this.renderQueryReferences(this.target, targets);
+    // loop through other queries and update targetFull as needed
     for (let target of targets || []) {
       if (target.refId !== this.target.refId) {
-        this.updateRenderedTarget(target, targets);
+        this.renderQueryReferences(target, targets);
       }
     }
   }
 
-  updateRenderedTarget(target: { refId: string | number; query: any; queryDisplay: string }, targets: any) {
-    // render nested query
-    const targetsByRefId = _.keyBy(targets, 'refId');
+  // this takes target.queryDisplay, replaces query reference placeholders (e.g. '#A')...
+  // ...and inserts that rendered query into target.query and target.targetFull.
+  renderQueryReferences(
+    target: { refId: string | number; query: any; queryDisplay: string; targetFull: any },
+    targets: any
+  ) {
+    const placeholderRegex = /\#([A-Z])/g;
+    let renderedQuery = `${target.queryDisplay}`;
 
-    // no references to self
+    // organize targets by refId
+    const targetsByRefId = _.keyBy(targets, 'refId');
+    // remove reference to self
     delete targetsByRefId[target.refId];
 
-    const nestedSeriesRefRegex = /\#([A-Z])/g;
-    let targetWithNestedQueries = `${target.queryDisplay}`;
-
     // Use ref count to track circular references
-    function countTargetRefs(targetsByRefId: any, refId: string) {
+    // NOTE: (cfiskeaux 09-2021) why are we checking thisT.query (the rendered query)
+    // instead of thisT.queryDisplay (the raw query with placeholders)?
+    _.each(targetsByRefId, (t, refId) => {
       let refCount = 0;
-      _.each(targetsByRefId, (t, id) => {
-        if (id !== refId) {
-          const match = nestedSeriesRefRegex.exec(t.query);
-          const count = match && match.length ? match.length - 1 : 0;
-          refCount += count;
+      // loop through all the other targets (the ones not matching `refId`)
+      _.each(targetsByRefId, (thisT, thisRefId) => {
+        if (thisRefId !== refId) {
+          // find all references to refId
+          const matches = ((thisT.query || '').match(placeholderRegex) || []).filter((match) => {
+            return match === '#' + refId;
+          });
+          refCount += matches.length;
         }
       });
-      targetsByRefId[refId].refCount = refCount;
-    }
-    _.each(targetsByRefId, (t, id) => {
-      countTargetRefs(targetsByRefId, id);
+      // this will now show how many references to this query exist in other queries
+      t.refCount = refCount;
     });
 
-    // Keep interpolating until there are no query references
-    // The reason for the loop is that the referenced query might contain another reference to another query
-    while (targetWithNestedQueries.match(nestedSeriesRefRegex) !== null) {
-      const updated = targetWithNestedQueries.replace(nestedSeriesRefRegex, (match: string, g1: string) => {
-        const t = targetsByRefId[g1];
-        if (!t) {
-          return match;
+    // Keep interpolating until there are no query placeholder references (the reason
+    // for the loop is that the referenced query might contain another reference to another query).
+    while (renderedQuery.match(placeholderRegex) !== null) {
+      const updatedQuery = renderedQuery.replace(
+        placeholderRegex,
+        (entireMatch: string, matchGrp: string, offsetIdx: number, origString: string) => {
+          const t = targetsByRefId[matchGrp];
+          // if there's no corresponding target, just return the entire match and no replacement will be done
+          if (!t) {
+            return entireMatch;
+          }
+          // if there are no more references to this target, then remove it from the ref object
+          if (t.refCount <= 0) {
+            delete targetsByRefId[matchGrp];
+          }
+          // decrement the reference count and proceed with the replacement
+          t.refCount--;
+          return t.query;
         }
-
-        // no circular references
-        if (t.refCount === 0) {
-          delete targetsByRefId[g1];
-        }
-        t.refCount--;
-
-        return t.query;
-      });
-
-      if (updated === targetWithNestedQueries) {
+      );
+      // end this cycle if nothing was replaced
+      if (updatedQuery === renderedQuery) {
         break;
+      } else {
+        renderedQuery = updatedQuery;
       }
-
-      targetWithNestedQueries = updated;
     }
-
-    if (target.query !== targetWithNestedQueries) {
-      target.query = targetWithNestedQueries;
+    // check the final rendered query
+    delete target.targetFull;
+    if (target.query !== renderedQuery) {
+      target.query = target.targetFull = renderedQuery;
     }
   }
 }

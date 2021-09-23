@@ -15,7 +15,7 @@
         <label class="gf-form-label width-6 query-keyword">Series</label>
       </div>
       <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
-        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.query" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.caqlValueChanged()"></textarea>
+        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.queryDisplay" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.caqlValueChanged()"></textarea>
       </div>
       <div ng-if="ctrl.target.querytype === 'alerts' || ctrl.target.querytype === 'alert_counts'" class="gf-form gf-form--grow">
           <div class="gf-form-inline">
