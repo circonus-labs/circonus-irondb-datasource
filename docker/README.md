@@ -13,9 +13,8 @@ This docker container is based:
 These instructions will create a production ready copy of the circonus-irondb-datasource Grafana plugin:
 1. [Install Docker](https://docs.docker.com/get-docker/)
 2. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
-4. export GRAFANA_API_KEY=<From step 2>
-3. Execute run-docker.sh --build
-4. Copy the circonus-irondb-datasource folder to your Grafana plugins directory.
+3. export GRAFANA_API_KEY=<From step 2>
+4. Execute ./docker/run-docker.sh -g $GRAFANA_API_KEY -b $GF_PATHS_PLUGINS # Where $GF_PATHS_PLUGINS is the location of your Grafana Plugins directory.
 5. (re)start Grafana
 
 ### Launch demontration Grafana instance
@@ -26,5 +25,5 @@ These instructions will build and run a Docker container with a Grafana instance
 3. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
 4. export GRAFANA_API_KEY=<From step 2>
 5. export CIRCONUS_API_KEY=<From step 3>
-6. Execute run-docker.sh
+6. Execute ./docker/run-docker.sh -g $GRAFANA_API_KEY -c $CIRCONUS_API_KEY
 7. Navigate to http://localhost:3000/ to access.
