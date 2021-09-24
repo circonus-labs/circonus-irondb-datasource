@@ -1,6 +1,9 @@
 import _ from 'lodash';
 import Log from './log';
 
+// this is used for Graphite-style query parsing
+import { Parser } from './parser';
+
 const log = Log('IrondbQuery');
 
 export enum SegmentType {
@@ -99,14 +102,14 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   // case %d
   let label = fmt.replace(/%d/g, (idx + 1).toString());
   // case %n
-  label = label.replace(/%n/g, taglessName(meta.metric_name));
+  label = label.replace(/%n/g, taglessName(meta.metric_name || meta.name));
   // case %cn
-  label = label.replace(/%cn/g, meta.metric_name);
+  label = label.replace(/%cn/g, meta.metric_name || meta.name);
 
   // allow accessing the check tags
-  const [name, stream_tags] = taglessNameAndTags(meta.metric_name);
+  const [name, stream_tags] = taglessNameAndTags(meta.metric_name || meta.name);
   const tagSet = splitTags(stream_tags);
-  for (const tag of meta.check_tags) {
+  for (const tag of meta.check_tags || []) {
     const tagSep = tag.split(/:/g);
     let tagCat = tagSep.shift();
     if (!tagCat.startsWith('__') && tagCat !== '') {
@@ -302,8 +305,10 @@ export default class IrondbQuery {
   datasource: any;
   target: any;
   segments: any[];
+  gSegments: any[];
   error: any;
   checkOtherSegmentsIndex: number;
+  checkOtherGSegmentsIndex: number;
   templateSrv: any;
   scopedVars: any;
 
@@ -311,9 +316,11 @@ export default class IrondbQuery {
   constructor(datasource, target, templateSrv?, scopedVars?) {
     this.datasource = datasource;
     this.target = target;
+    this.parseGraphiteTarget();
     this.parseTarget();
   }
 
+  // this parses a standard query into segments
   parseTarget() {
     this.segments = [];
     this.error = null;
@@ -368,90 +375,300 @@ export default class IrondbQuery {
     if (tags.length === 0) {
       this.segments.push({ type: SegmentType.TagPlus });
     }
+  }
 
-    log(() => 'parseTarget() SegmentType = ' + JSON.stringify(_.map(this.segments, (s) => SegmentType[s.type])));
+  // this parses a graphite-style target into segments
+  parseGraphiteTarget() {
+    this.gSegments = [];
+    this.error = null;
+
+    if (this.target.rawQuery) {
+      return;
+    }
+
+    var parser = new Parser(this.target.query || '*');
+    var astNode = parser.getAst();
+    if (astNode === null) {
+      this.checkOtherGSegmentsIndex = 0;
+      return;
+    }
+
+    if (astNode.type === 'error') {
+      this.error = astNode.message + ' at position: ' + astNode.pos;
+      this.target.rawQuery = true;
+      return;
+    }
+
+    try {
+      this.parseGraphiteTargetRecursive(astNode, null);
+    } catch (err) {
+      console.log('error parsing target:', err.message);
+      this.error = err.message;
+      this.target.rawQuery = true;
+    }
+
+    this.checkOtherGSegmentsIndex = this.gSegments.length - 1;
+  }
+
+  // this converts the standard segments array to the graphite segments array
+  convertStandardToGraphite() {
+    let gSegments = (this.gSegments = []);
+    let metricName = '';
+    this.segments.some(function (segment) {
+      if (segment.type === SegmentType.MetricName) {
+        metricName = segment.value;
+        return true;
+      }
+    });
+    metricName.split('.').forEach(function (piece) {
+      if (piece) {
+        gSegments.push({ value: piece });
+      }
+    });
+    if (!gSegments.length) {
+      gSegments.push({ value: '*' });
+    }
+  }
+
+  // this converts the graphite segments array to the standard segments array
+  convertGraphiteToStandard() {
+    this.segments = [];
+    const graphiteName = this.getGraphiteSegmentPathUpTo(this.gSegments.length)
+      .replace(/\.select metric.$/, '.*')
+      .replace(/\.$/, '');
+    const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', '*'];
+    const hasUUID = !!matches[1];
+    this.segments.push({ type: SegmentType.MetricName, value: matches[2] });
+    // have a UUID? then add it as a tag
+    if (hasUUID) {
+      let tagCat = '__check_uuid';
+      let tagVal = matches[1];
+      this.segments.push({ type: SegmentType.TagOp, value: 'and(' });
+      this.segments.push({ type: SegmentType.TagCat, value: tagCat });
+      this.segments.push({ type: SegmentType.TagPair });
+      this.segments.push({ type: SegmentType.TagVal, value: tagVal });
+      this.segments.push({ type: SegmentType.TagPlus });
+      this.segments.push({ type: SegmentType.TagEnd });
+      // don't have a UUID? then add a plus segment
+    } else {
+      this.segments.push({ type: SegmentType.TagPlus });
+    }
+  }
+
+  getGraphiteSegmentPathUpTo(index) {
+    var arr = this.gSegments.slice(0, index);
+
+    return _.reduce(
+      arr,
+      function (result, segment) {
+        return result ? result + segment.value + '.' : segment.value + '.';
+      },
+      ''
+    );
+  }
+
+  parseGraphiteTargetRecursive(astNode, func) {
+    if (astNode === null) {
+      return null;
+    }
+
+    switch (astNode.type) {
+      case 'metric':
+        this.gSegments = astNode.segments;
+        break;
+    }
   }
 
   updateSegmentValue(segment, index) {
-    log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
-    log(() => 'updateSegmentValue() length = ' + this.segments.length);
-    if (this.segments[index] !== undefined) {
-      this.segments[index].value = segment.value;
+    //log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
+    let isGraphite = 'graphite' === this.target.querytype;
+    if (this[isGraphite ? 'gSegments' : 'segments'][index] !== undefined) {
+      this[isGraphite ? 'gSegments' : 'segments'][index].value = segment.value;
     }
   }
 
   addSelectMetricSegment() {
-    this.segments.push({ value: 'select metric' });
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'].push({ value: 'select metric' });
   }
 
-  updateModelTarget(targets: any) {
-    this.updateRenderedTarget(this.target, targets);
+  // this takes an index and removes that segment and all following segments
+  removeSegments(fromIndex) {
+    if (null == fromIndex) {
+      return;
+    }
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'] = this[isGraphite ? 'gSegments' : 'segments'].splice(0, fromIndex);
+  }
 
+  // this empties the segments
+  emptySegments() {
+    let isGraphite = 'graphite' === this.target.querytype;
+    this[isGraphite ? 'gSegments' : 'segments'] = [];
+  }
+
+  // this removes an entire operator (e.g. "and(...)" including sub-operators) from a standard query
+  removeStandardOperator(startIndex) {
+    let endIndex = startIndex + 1;
+    let endsNeeded = 1;
+    const lastIndex = this.segments.length;
+    // We need to remove ourself (as well as every other segment) until our TagEnd.
+    // For every TagOp we hit, we need to wait until we hit one more TagEnd (to remove any sub-ops).
+    while (endsNeeded > 0 && endIndex < lastIndex) {
+      const type = this.segments[endIndex].type;
+      if (type === SegmentType.TagOp) {
+        endsNeeded++;
+      } else if (type === SegmentType.TagEnd) {
+        endsNeeded--;
+        if (endsNeeded === 0) {
+          break; // don't increment endIndex
+        }
+      }
+      endIndex++; // keep going
+    }
+    let deleteStart = startIndex;
+    let countDelete = endIndex - startIndex + 1;
+    // If I'm not the very first operator, then I have a comma in front of me that needs killing
+    if (startIndex > 2) {
+      deleteStart--;
+      countDelete++;
+    }
+    this.segments.splice(deleteStart, countDelete);
+    // If these match, we removed the outermost operator, so we need a new plus segment
+    if (lastIndex === endIndex + 1) {
+      this.segments.push({ type: SegmentType.TagPlus });
+    }
+  }
+
+  // this adds an operator--and(), not(), or()--and the first filter tag to a standard query
+  addStandardOperator(startIndex, value) {
+    if (value === 'and(' || value === 'not(' || value === 'or(') {
+      // Remove any plus segment
+      if (this.segments[startIndex] && this.segments[startIndex].type === SegmentType.TagPlus) {
+        this.segments.splice(startIndex, 1);
+      }
+      // if this isn't the first operator, add a separator (comma)
+      if (startIndex > 2) {
+        this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
+      }
+      // add the segments
+      this.segments.splice(
+        startIndex + 1,
+        0,
+        { type: SegmentType.TagOp, value: value },
+        { type: SegmentType.TagCat, value: 'select tag', fake: true },
+        { type: SegmentType.TagPair },
+        { value: '*' },
+        { type: SegmentType.TagPlus },
+        { type: SegmentType.TagEnd }
+      );
+      // if this isn't the first operator, add another plus segment
+      if (startIndex > 2) {
+        this.segments.splice(startIndex + 7, 0, { type: SegmentType.TagPlus });
+      }
+    }
+  }
+
+  // this add a tag (and category) to a standard query
+  addStandardTag(startIndex, value) {
+    // Remove any plus segment
+    if (this.segments[startIndex].type === SegmentType.TagPlus) {
+      this.segments.splice(startIndex, 1);
+    }
+    if (startIndex > 2) {
+      this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
+    }
+    this.segments.splice(
+      startIndex + 1,
+      0,
+      { type: SegmentType.TagCat, value: value },
+      { type: SegmentType.TagPair },
+      { value: '*' },
+      { type: SegmentType.TagPlus }
+    );
+    if (startIndex === 1) {
+      // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
+      // so that means we need to add in the implicit and() in the front
+      this.segments.splice(startIndex, 0, { type: SegmentType.TagOp, value: 'and(' });
+      this.segments.push({ type: SegmentType.TagEnd });
+    }
+  }
+
+  // this takes an array of all targets in a panel and replaces all of their query reference placeholders
+  renderQueries(targets: any) {
+    this.renderQueryReferences(this.target, targets);
     // loop through other queries and update targetFull as needed
     for (let target of targets || []) {
       if (target.refId !== this.target.refId) {
-        this.updateRenderedTarget(target, targets);
+        this.renderQueryReferences(target, targets);
       }
     }
   }
 
-  updateRenderedTarget(
+  // this takes target.queryDisplay, replaces query reference placeholders (e.g. '#A')...
+  // ...and inserts that rendered query into target.query and target.targetFull.
+  renderQueryReferences(
     target: { refId: string | number; query: any; queryDisplay: string; targetFull: any },
     targets: any
   ) {
-    // render nested query
-    const targetsByRefId = _.keyBy(targets, 'refId');
+    const placeholderRegex = /\#([A-Z])/g;
+    let renderedQuery = `${target.queryDisplay}`;
 
-    // no references to self
+    // organize targets by refId
+    const targetsByRefId = _.keyBy(targets, 'refId');
+    // remove reference to self
     delete targetsByRefId[target.refId];
 
-    const nestedSeriesRefRegex = /\#([A-Z])/g;
-    let targetWithNestedQueries = `${target.queryDisplay}`;
-
     // Use ref count to track circular references
-    function countTargetRefs(targetsByRefId: any, refId: string) {
+    // NOTE: (cfiskeaux 09-2021) why are we checking thisT.query (the rendered query)
+    // instead of thisT.queryDisplay (the raw query with placeholders)?
+    _.each(targetsByRefId, (t, refId) => {
       let refCount = 0;
-      _.each(targetsByRefId, (t, id) => {
-        if (id !== refId) {
-          const match = nestedSeriesRefRegex.exec(t.query);
-          const count = match && match.length ? match.length - 1 : 0;
-          refCount += count;
+      // loop through all the other targets (the ones not matching `refId`)
+      _.each(targetsByRefId, (thisT, thisRefId) => {
+        if (thisRefId !== refId) {
+          // find all references to refId
+          const matches = ((thisT.query || '').match(placeholderRegex) || []).filter((match) => {
+            return match === '#' + refId;
+          });
+          refCount += matches.length;
         }
       });
-      targetsByRefId[refId].refCount = refCount;
-    }
-    _.each(targetsByRefId, (t, id) => {
-      countTargetRefs(targetsByRefId, id);
+      // this will now show how many references to this query exist in other queries
+      t.refCount = refCount;
     });
 
-    // Keep interpolating until there are no query references
-    // The reason for the loop is that the referenced query might contain another reference to another query
-    while (targetWithNestedQueries.match(nestedSeriesRefRegex) !== null) {
-      const updated = targetWithNestedQueries.replace(nestedSeriesRefRegex, (match: string, g1: string) => {
-        const t = targetsByRefId[g1];
-        if (!t) {
-          return match;
+    // Keep interpolating until there are no query placeholder references (the reason
+    // for the loop is that the referenced query might contain another reference to another query).
+    while (renderedQuery.match(placeholderRegex) !== null) {
+      const updatedQuery = renderedQuery.replace(
+        placeholderRegex,
+        (entireMatch: string, matchGrp: string, offsetIdx: number, origString: string) => {
+          const t = targetsByRefId[matchGrp];
+          // if there's no corresponding target, just return the entire match and no replacement will be done
+          if (!t) {
+            return entireMatch;
+          }
+          // if there are no more references to this target, then remove it from the ref object
+          if (t.refCount <= 0) {
+            delete targetsByRefId[matchGrp];
+          }
+          // decrement the reference count and proceed with the replacement
+          t.refCount--;
+          return t.query;
         }
-
-        // no circular references
-        if (t.refCount === 0) {
-          delete targetsByRefId[g1];
-        }
-        t.refCount--;
-
-        return t.query;
-      });
-
-      if (updated === targetWithNestedQueries) {
+      );
+      // end this cycle if nothing was replaced
+      if (updatedQuery === renderedQuery) {
         break;
+      } else {
+        renderedQuery = updatedQuery;
       }
-
-      targetWithNestedQueries = updated;
     }
-
+    // check the final rendered query
     delete target.targetFull;
-    if (target.query !== targetWithNestedQueries) {
-      target.query = target.targetFull = targetWithNestedQueries;
+    if (target.query !== renderedQuery) {
+      target.query = target.targetFull = renderedQuery;
     }
   }
 }

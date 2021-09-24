@@ -116,6 +116,7 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+yarn.lock
 
 # Binaries for programs and plugins
 *.exe
@@ -132,3 +133,9 @@ dist
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Prettier
+.prettierrc.js
+
+# Jest
+jest.config.js

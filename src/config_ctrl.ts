@@ -6,7 +6,8 @@ export class IrondbConfigCtrl {
 
   /** @ngInject */
   constructor($scope) {
-    this.current.jsonData.irondbType = this.current.jsonData.irondbType || 'standalone';
+    this.current.jsonData.irondbType = this.current.jsonData.irondbType || 'hosted';
+    this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefix || '';
     this.current.jsonData.resultsLimit = this.current.jsonData.resultsLimit || '100';
     this.current.jsonData.caqlMinPeriod = this.current.jsonData.caqlMinPeriod || '';
     this.current.jsonData.truncateNow = _.defaultTo(this.current.jsonData.truncateNow, false);
