@@ -307,8 +307,7 @@ export default class IrondbQuery {
   segments: any[];
   gSegments: any[];
   error: any;
-  checkOtherSegmentsIndex: number;
-  checkOtherGSegmentsIndex: number;
+  lastGSegmentsIndex: number;
   templateSrv: any;
   scopedVars: any;
 
@@ -386,10 +385,10 @@ export default class IrondbQuery {
       return;
     }
 
-    var parser = new Parser(this.target.query || '*');
+    var parser = new Parser(this.target.query || '');
     var astNode = parser.getAst();
     if (astNode === null) {
-      this.checkOtherGSegmentsIndex = 0;
+      this.lastGSegmentsIndex = 0;
       return;
     }
 
@@ -399,15 +398,19 @@ export default class IrondbQuery {
       return;
     }
 
-    try {
-      this.parseGraphiteTargetRecursive(astNode, null);
-    } catch (err) {
-      console.log('error parsing target:', err.message);
-      this.error = err.message;
-      this.target.rawQuery = true;
+    // try {
+    switch (astNode.type) {
+      case 'metric':
+        this.gSegments = astNode.segments;
+        break;
     }
+    // } catch (err) {
+    //   console.log('error parsing target:', err.message);
+    //   this.error = err.message;
+    //   this.target.rawQuery = true;
+    // }
 
-    this.checkOtherGSegmentsIndex = this.gSegments.length - 1;
+    this.lastGSegmentsIndex = this.gSegments.length - 1;
   }
 
   // this converts the standard segments array to the graphite segments array
@@ -425,8 +428,9 @@ export default class IrondbQuery {
         gSegments.push({ value: piece });
       }
     });
-    if (!gSegments.length) {
-      gSegments.push({ value: '*' });
+    // if the standard query was '*', we want a blank graphite query
+    if (1 === this.gSegments.length && '*' === this.gSegments[0].value) {
+      this.gSegments.splice(0, 1);
     }
   }
 
@@ -465,18 +469,6 @@ export default class IrondbQuery {
       },
       ''
     );
-  }
-
-  parseGraphiteTargetRecursive(astNode, func) {
-    if (astNode === null) {
-      return null;
-    }
-
-    switch (astNode.type) {
-      case 'metric':
-        this.gSegments = astNode.segments;
-        break;
-    }
   }
 
   updateSegmentValue(segment, index) {
