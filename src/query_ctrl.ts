@@ -118,7 +118,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.alert_id = this.target.alert_id || '';
     this.target.min_period = this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
+    window.console.log('--> A (queryModel) ', JSON.stringify(this.queryModel.gSegments, null, 4));
     this.buildSegments();
+    window.console.log('--> A (ctrl) ', JSON.stringify(this.gSegments, null, 4));
     this.updateMetricLabelValue(false);
   }
 
@@ -415,43 +417,35 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return Promise.resolve([]);
   }
 
-  getGraphiteSegments(index, prefix) {
+  // this queries the graphite endpoint with the current [incomplete] query path to get an array of options for the next segment
+  getGraphiteOptionSegments(index, prefix) {
     var query = prefix && prefix.length > 0 ? prefix : '';
 
+    // if this isn't the first segment, we need to get the query path up to this segment
     if (index > 0) {
       query = this.queryModel.getGraphiteSegmentPathUpTo(index) + query;
     }
 
     return this.datasource
       .metricGraphiteQuery(query + '*', true)
-      .then((segments) => {
-        var allSegments = _.map(segments.data, (segment) => {
+      .then((values) => {
+        // convert values into segment objects
+        var optionSegments = _.map(values.data, (option) => {
           var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
-
           return this.uiSegmentSrv.newSegment({
-            value: segment.name.replace(queryRegExp, ''),
-            expandable: !segment.leaf,
+            value: option.name.replace(queryRegExp, ''), // strip out the query path before this segment to only show this last segment value
+            expandable: !option.leaf,
           });
         });
-
-        if (index > 0 && allSegments.length === 0) {
-          return allSegments;
+        // de-dupe options if there are any
+        if (optionSegments.length) {
+          optionSegments = _.uniqBy(optionSegments, 'value');
         }
-
-        // add query references
-        if (index === 0) {
-          _.eachRight(this.panelCtrl.panel.targets, (target) => {
-            if (target.refId === this.target.refId) {
-              return;
-            }
-          });
+        // add wildcard option if there are other options or if this is the first segment
+        if (index === 0 || optionSegments.length) {
+          optionSegments.unshift(this.uiSegmentSrv.newSegment('*'));
         }
-
-        // de-dupe segments
-        allSegments = _.uniqBy(allSegments, 'value');
-        // add wildcard option
-        allSegments.unshift(this.uiSegmentSrv.newSegment('*'));
-        return allSegments;
+        return optionSegments;
       })
       .catch((err) => {
         return [];
@@ -487,20 +481,6 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return this.setSegmentType(uiSegment, segment.type);
   }
 
-  buildSegments() {
-    // always rebuild both
-    this.gSegments = _.map(this.queryModel.gSegments, (segment) => {
-      return this.uiSegmentSrv.newSegment(segment);
-    });
-    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
-    // only check other segments per actual type
-    if ('graphite' === this.target.querytype) {
-      this.checkOtherGraphiteSegments(this.queryModel.checkOtherGSegmentsIndex || 0);
-    } else {
-      this.checkOtherSegments(this.queryModel.checkOtherSegmentsIndex || 0);
-    }
-  }
-
   addSelectMetricSegment() {
     let isGraphite = 'graphite' === this.target.querytype;
     this.queryModel.addSelectMetricSegment();
@@ -526,47 +506,38 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return tagValSegment;
   }
 
-  //
-  checkOtherSegments(fromIndex) {
-    let isGraphite = 'graphite' === this.target.querytype;
-    if (fromIndex === this[isGraphite ? 'gSegments' : 'segments'].length) {
-      const segmentType = this[isGraphite ? 'gSegments' : 'segments'][fromIndex - 1]._type;
-      if (segmentType === SegmentType.MetricName) {
-        this.addSelectTagPlusSegment();
-      }
+  // if the specified segment is the last segment and it's the metric name, then add a plus segment following it
+  checkForPlusSegment(segmentIndex) {
+    const isLastSegment = segmentIndex === this.segments.length - 1;
+    const isMetricName = (this.segments[segmentIndex] || {})._type === SegmentType.MetricName;
+    if (isLastSegment && isMetricName) {
+      this.addSelectTagPlusSegment();
     }
-    return Promise.resolve();
   }
 
-  //
-  checkOtherGraphiteSegments(fromIndex) {
-    if (fromIndex === 0) {
+  // check to see if we need to add a "select metric" segment to the graphite segments
+  checkForGraphiteSelectMetricSegment(segmentIndex) {
+    // if this is the first segment, add a select-metric segment and be done
+    if (segmentIndex === 0) {
       this.addSelectMetricSegment();
-      return;
-    }
-    const path = this.queryModel.getGraphiteSegmentPathUpTo(fromIndex + 1);
-    if (path === '') {
       return Promise.resolve();
     }
+    // check the metric name so far...if there isn't one, be done
+    const path = this.queryModel.getGraphiteSegmentPathUpTo(segmentIndex + 1);
+    if (!path) {
+      return Promise.resolve();
+    }
+    // since we have a metric name, query to see if there are value options for the next segment (which likely doesn't exist yet)
     return this.datasource
       .metricGraphiteQuery(path + '*')
-      .then((segments) => {
-        if (segments.data.length === 0) {
-          if (path !== '') {
-            this.queryModel.removeSegments(fromIndex + 1);
-            this.gSegments = this.gSegments.splice(0, fromIndex + 1);
-          }
+      .then((values) => {
+        // if we have no value options, remove all subsequent segments (b/c there aren't any values for the following segment(s))
+        if (!values.data.length) {
+          this.removeSegments(segmentIndex + 1);
+        } else if (segmentIndex === this.gSegments.length - 1) {
+          this.addSelectMetricSegment();
         } else {
-          _.map(segments.data, (segment) => {
-            var pathRegExp = new RegExp(this.escapeRegExp(path), 'i');
-            var segmentName = segment.name.replace(pathRegExp, '');
-            segment.name = segmentName;
-          });
-          if (this.gSegments.length === fromIndex) {
-            this.addSelectMetricSegment();
-          } else {
-            return this.checkOtherGraphiteSegments(fromIndex + 1);
-          }
+          return this.checkForGraphiteSelectMetricSegment(segmentIndex + 1);
         }
       })
       .catch((err) => {});
@@ -622,34 +593,39 @@ export class IrondbQueryCtrl extends QueryCtrl {
     // if we didn't remove or change an operator, we need to rebuild
     this.buildSegments();
     if (segment.expandable) {
-      return this.checkOtherSegments(segmentIndex + 1).then(() => {
-        this.setSegmentFocus(segmentIndex + 1);
-        this.buildQueries();
-        this.panelCtrl.refresh();
-      });
-    } else {
-      this.setSegmentFocus(segmentIndex + 1);
-      this.buildQueries();
-      this.panelCtrl.refresh();
+      this.checkForPlusSegment(segmentIndex); // add a new plus segment if needed
     }
+    this.setSegmentFocus(segmentIndex + 1);
+    this.buildQueries();
+    this.panelCtrl.refresh();
   }
 
   // this is called whenever a graphite segment value changes
   graphiteSegmentValueChanged(segment, segmentIndex) {
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
-
     this.removeSegments(segmentIndex + 1);
+    // "expandable" means it's not the last segment, so there will be another segment dropdown to follow.
     if (segment.expandable) {
-      return this.checkOtherGraphiteSegments(segmentIndex + 1).then(() => {
-        this.setSegmentFocus(segmentIndex + 1);
-        this.buildQueries();
-        this.panelCtrl.refresh();
-      });
+      this.addSelectMetricSegment();
+    }
+    this.setSegmentFocus(segmentIndex + 1);
+    this.buildQueries();
+    this.panelCtrl.refresh();
+  }
+
+  // this takes the queryModel segment JSON and builds it into actual segment objects
+  buildSegments() {
+    // always rebuild both
+    this.gSegments = _.map(this.queryModel.gSegments, (segment) => {
+      return this.uiSegmentSrv.newSegment(segment);
+    });
+    this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
+    // check to see if we need a "select metric" or "plus" segment
+    if ('graphite' === this.target.querytype) {
+      this.checkForGraphiteSelectMetricSegment(Math.max(this.queryModel.gSegments.length, 1) - 1); // Math.max() ensures that we never pass -1 even if gSegments is empty
     } else {
-      this.setSegmentFocus(segmentIndex + 1);
-      this.buildQueries();
-      this.panelCtrl.refresh();
+      this.checkForPlusSegment(0);
     }
   }
 
@@ -660,12 +636,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.queryModel.removeSegments(index);
   }
 
+  // this empties an entire segments array
   emptySegments() {
     let isGraphite = 'graphite' === this.target.querytype;
     this[isGraphite ? 'gSegments' : 'segments'] = [];
     this.queryModel.emptySegments();
   }
 
+  // this takes a standard query egress param and chooses the proper CAQL find() function
   queryFunctionToCaqlFind() {
     if (this.target.paneltype === 'Heatmap' || this.target.hist_transform !== undefined) {
       return 'find:histogram';
