@@ -107,9 +107,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
     ) {
       this.target.querytype = querytype;
     } else if (this.target.isCaql !== null) {
-      this.target.querytype = this.target.isCaql ? 'caql' : 'basic';
+      this.target.querytype = this.target.isCaql ? 'caql' : this.datasource.allowGraphite ? 'graphite' : 'basic';
     } else {
-      this.target.querytype = 'basic';
+      this.target.querytype = this.datasource.allowGraphite ? 'graphite' : 'basic';
     }
     this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
     this.target.local_filter = this.target.local_filter || '';
@@ -118,9 +118,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.target.alert_id = this.target.alert_id || '';
     this.target.min_period = this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
     this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
-    window.console.log('--> A (queryModel) ', JSON.stringify(this.queryModel.gSegments, null, 4));
     this.buildSegments();
-    window.console.log('--> A (ctrl) ', JSON.stringify(this.gSegments, null, 4));
     this.updateMetricLabelValue(false);
   }
 
@@ -139,6 +137,18 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.queryModel.parseTarget();
     this.buildSegments();
     this.panelCtrl.refresh();
+  }
+
+  // this returns the query type options (b/c graphite may be shown or hidden)
+  getQueryTypeOptions() {
+    const allowGraphite = this.datasource.allowGraphite;
+    let options = [];
+    _.each(this.queryTypeOptions, (obj, index) => {
+      if (allowGraphite || 'graphite' !== obj.value) {
+        options.push(obj);
+      }
+    });
+    return options;
   }
 
   // This changes the query type between CAQL/Standard/Graphite
@@ -294,12 +304,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.panelCtrl.refresh(); // Asks the panel to refresh data.
   }
 
-  getSegments(index, prefix) {
-    //log(() => 'getSegments() ' + index + ' prefix = ' + prefix);
-    let query = prefix && prefix.length > 0 ? prefix : '';
-    let isGraphite = 'graphite' === this.target.querytype;
+  // this queries various endpoints with the current [incomplete] search to get an array of options for the next segment
+  //   index: the index of this segment
+  //   search: any search string the user has entered to filter the autocomplete
+  getOptionSegments(index, search) {
+    let query = search || '';
 
-    const segmentType = (this[isGraphite ? 'gSegments' : 'segments'][index] || {})._type;
+    const segmentType = (this.segments[index] || {})._type;
     if (segmentType === SegmentType.MetricName) {
       if (encodeTag(SegmentType.MetricName, query) !== query) {
         query = 'b/' + btoa(escapeRegExp(query)) + '/';
@@ -308,34 +319,31 @@ export class IrondbQueryCtrl extends QueryCtrl {
       }
       return this.datasource
         .metricTagsQuery('and(__name:' + query + ')', true)
-        .then((results) => {
-          let metricnames = _.map(results.data, (result) => {
-            return taglessName(result.metric_name);
+        .then((values) => {
+          let metricnames = _.map(values.data, (option) => {
+            return taglessName(option.metric_name);
           });
           metricnames = _.uniq(metricnames);
 
-          const allSegments = _.map(metricnames, (segment) => {
+          const allSegments = _.map(metricnames, (value) => {
             return this.newSegment(SegmentType.MetricName, {
-              value: segment,
+              value: value,
               expandable: true,
             });
           });
           return allSegments;
         })
         .catch((err) => {
-          log(() => 'getSegments() err = ' + err.toString());
+          log(() => 'getOptionSegments() err = ' + err.toString());
           return [];
         });
     } else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
-      const metricName = encodeTag(
-        SegmentType.MetricName,
-        (this[isGraphite ? 'gSegments' : 'segments'][0] || {}).value
-      );
+      const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
       return this.datasource
         .metricTagCatsQuery(metricName)
-        .then((segments) => {
-          if (segments.data && segments.data.length > 0) {
-            const tagCats = segments.data;
+        .then((values) => {
+          if (values.data && values.data.length > 0) {
+            const tagCats = values.data;
             const tagSegments = [];
             for (const tagCat of tagCats) {
               tagSegments.push(
@@ -355,7 +363,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch((err) => {
-          log(() => 'getSegments() err = ' + err);
+          log(() => 'getOptionSegments() err = ' + err);
           return [];
         });
     } else if (segmentType === SegmentType.TagOp) {
@@ -367,19 +375,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
       ];
       return Promise.resolve(tagSegments);
     } else if (segmentType === SegmentType.TagVal) {
-      const metricName = encodeTag(
-        SegmentType.MetricName,
-        (this[isGraphite ? 'gSegments' : 'segments'][0] || {}).value
-      );
-      const tagCat = (this[isGraphite ? 'gSegments' : 'segments'][index - 2] || {}).value;
+      const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
+      const tagCat = (this.segments[index - 2] || {}).value;
       if (tagCat === 'select tag') {
         return Promise.resolve([]);
       }
       return this.datasource
         .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
-        .then((segments) => {
-          if (segments.data && segments.data.length > 0) {
-            const tagVals = segments.data;
+        .then((values) => {
+          if (values.data && values.data.length > 0) {
+            const tagVals = values.data;
             const tagSegments = [];
             tagSegments.push(
               this.newSegment(SegmentType.TagVal, {
@@ -410,7 +415,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           }
         })
         .catch((err) => {
-          log(() => 'getSegments() err = ' + err);
+          log(() => 'getOptionSegments() err = ' + err);
           return [];
         });
     }
@@ -418,20 +423,25 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   // this queries the graphite endpoint with the current [incomplete] query path to get an array of options for the next segment
-  getGraphiteOptionSegments(index, prefix) {
-    var query = prefix && prefix.length > 0 ? prefix : '';
-
-    // if this isn't the first segment, we need to get the query path up to this segment
-    if (index > 0) {
-      query = this.queryModel.getGraphiteSegmentPathUpTo(index) + query;
-    }
+  //   index: the index of this segment
+  //   search: any search string the user has entered to filter the autocomplete
+  getGraphiteOptionSegments(index, search) {
+    const isFirstSegment = 0 === index;
+    // if we're ignoring UUIDs, then we need to prepend our search with '*.' to skip the first segment (the UUID)
+    const ignoreUUIDs = this.datasource.ignoreGraphiteUUIDs();
+    // if this is not the first segment, we need to get the entire preceding path
+    let query = isFirstSegment ? '' : this.queryModel.getGraphiteSegmentPathUpTo(index);
 
     return this.datasource
-      .metricGraphiteQuery(query + '*', true)
+      .metricGraphiteQuery(query + (search || '') + '*', true)
       .then((values) => {
         // convert values into segment objects
-        var optionSegments = _.map(values.data, (option) => {
-          var queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+        let optionSegments = _.map(values.data, (option) => {
+          const uuidRegExp = /^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})./;
+          const queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+          if (ignoreUUIDs) {
+            option.name = option.name.replace(uuidRegExp, '');
+          }
           return this.uiSegmentSrv.newSegment({
             value: option.name.replace(queryRegExp, ''), // strip out the query path before this segment to only show this last segment value
             expandable: !option.leaf,
@@ -442,7 +452,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
           optionSegments = _.uniqBy(optionSegments, 'value');
         }
         // add wildcard option if there are other options or if this is the first segment
-        if (index === 0 || optionSegments.length) {
+        if (isFirstSegment || optionSegments.length) {
           optionSegments.unshift(this.uiSegmentSrv.newSegment('*'));
         }
         return optionSegments;

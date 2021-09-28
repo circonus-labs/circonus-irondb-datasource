@@ -5,7 +5,7 @@
         </div>
         <div role="menuitem" class="gf-form" style="align-self:flex-start;">
             <gf-form-dropdown name="querytype" model="ctrl.target.querytype" on-change="ctrl.queryTypeValueChanged()" css-class="gf-size-auto"
-                              get-options="ctrl.queryTypeOptions"
+                              get-options="ctrl.getQueryTypeOptions()"
                               lookup-text="true">
             </gf-form-dropdown>
         </div>
@@ -71,19 +71,19 @@
                 <div class="gf-form-label"><b>{{segment.value}}</b></div>
             </div>
             <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':segment.value!='select tag'}">
-                <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+                <metric-segment segment="segment" get-options="ctrl.getOptionSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
             <div ng-switch-when="TagVal" class="irondb-tag-val mash-l join-r join-l">
-                <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+                <metric-segment segment="segment" get-options="ctrl.getOptionSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
             <div ng-switch-when="TagPlus" class="irondb-tag-plus join-r join-l">
-                <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+                <metric-segment segment="segment" get-options="ctrl.getOptionSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
             <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r join-l">
-                <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+                <metric-segment segment="segment" get-options="ctrl.getOptionSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
             <div ng-switch-default class="join-l">
-              <metric-segment segment="segment" get-options="ctrl.getSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
+              <metric-segment segment="segment" get-options="ctrl.getOptionSegments( $index, $query )" on-change="ctrl.segmentValueChanged( segment, $index )"/>
             </div>
           </div>
         </div>
