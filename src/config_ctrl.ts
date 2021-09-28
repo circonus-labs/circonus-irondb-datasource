@@ -29,10 +29,11 @@ export class IrondbConfigCtrl {
     }
   }
 
+  // unneeded at the moment
   updateQueryPrefixValue(event) {
-    const element = event.currentTarget;
-    if (this.current.jsonData.queryPrefix === '*.') {
-      element.value = this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefixDefault;
-    }
+    // const element = event.currentTarget;
+    // if (this.current.jsonData.queryPrefix === '') {
+    //   element.value = this.current.jsonData.queryPrefix = this.current.jsonData.queryPrefixDefault;
+    // }
   }
 }
