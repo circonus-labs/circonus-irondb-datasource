@@ -142,13 +142,14 @@ export interface IrondbQueryInterface extends DataQuery {
 export interface IrondbOptions extends DataSourceJsonData {
   accountId?: number;
   irondbType: string;
-  queryPrefix: string;
   resultsLimit: string;
   caqlMinPeriod: string;
   apiToken?: string;
   truncateNow?: boolean;
   useCaching?: boolean;
   activityTracking?: boolean;
+  allowGraphite: boolean;
+  queryPrefix: string;
 }
 
 export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface, IrondbOptions> {
@@ -157,12 +158,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   type: string;
   accountId: number;
   irondbType: string;
-  queryPrefix: string;
   resultsLimit: string;
   caqlMinPeriod: string;
   truncateNow: boolean;
   useCaching: boolean;
   activityTracking: boolean;
+  allowGraphite: boolean;
+  queryPrefix: string;
   url: any;
   apiToken: string;
   appName: string;
@@ -233,13 +235,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     this.id = instanceSettings.id;
     this.accountId = instanceSettings.jsonData.accountId;
     this.irondbType = instanceSettings.jsonData.irondbType;
-    this.queryPrefix = instanceSettings.jsonData.queryPrefix;
     this.resultsLimit = instanceSettings.jsonData.resultsLimit;
     this.caqlMinPeriod = instanceSettings.jsonData.caqlMinPeriod;
     this.apiToken = instanceSettings.jsonData.apiToken;
     this.useCaching = instanceSettings.jsonData.useCaching;
     this.truncateNow = instanceSettings.jsonData.truncateNow;
     this.activityTracking = instanceSettings.jsonData.activityTracking;
+    this.allowGraphite = instanceSettings.jsonData.allowGraphite;
+    this.queryPrefix = instanceSettings.jsonData.queryPrefix;
     this.url = instanceSettings.url;
     this.supportAnnotations = false;
     this.supportMetrics = true;
@@ -641,9 +644,16 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     return this.irondbType === 'standalone' ? '/' + this.accountId : '';
   }
 
+  // this indicates whether we should ignore the Check UUID at the beginning of the the first segment in graphite-style queries.
+  // (they always start with check UUIDs as the first segment if no query prefix is used)
+  ignoreGraphiteUUIDs() {
+    return !_.isString(this.queryPrefix) || '' === this.queryPrefix;
+  }
+
   metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
-    var queryUrl = '/' + this.queryPrefix;
-    queryUrl = queryUrl + '/metrics/find?query=' + query;
+    const ignoreUUIDs = this.ignoreGraphiteUUIDs();
+    let queryUrl = '/' + this.queryPrefix;
+    queryUrl = queryUrl + '/metrics/find?query=' + (ignoreUUIDs ? '*.' : '') + query;
     return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
   }
 
@@ -807,6 +817,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     headers['X-Snowth-Advisory-Limit'] = followLimit ? this.resultsLimit : 100;
     headers['Accept'] = 'application/json';
     if (irondbOptions['graphite']['names'].length) {
+      const ignoreUUIDs = this.ignoreGraphiteUUIDs();
       options = {};
       options.method = 'POST';
       options.url = this.url;
@@ -838,7 +849,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       for (var obj of irondbOptions['graphite']['names']) {
         const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
         const new_obj = {
-          leaf_name: obj['leaf_name'],
+          leaf_name: ignoreUUIDs ? name_matches[2] : obj['leaf_name'],
           leaf_data: {
             egress_function: this.translateEgressForGraphite(obj['leaf_data']['egress_function'] || ''),
             name: name_matches[2],
