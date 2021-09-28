@@ -653,7 +653,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
     const ignoreUUIDs = this.ignoreGraphiteUUIDs();
     let queryUrl = '/' + this.queryPrefix;
-    queryUrl = queryUrl + '/metrics/find?query=' + (ignoreUUIDs ? '*.' : '') + query;
+    queryUrl = queryUrl + '/metrics/find?query=' + (ignoreUUIDs ? '*.' : '') + query + '&activity=0';
     return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
   }
 
@@ -845,6 +845,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         end: end,
         interval: interval,
         names: [],
+        activity: 0,
       };
       for (var obj of irondbOptions['graphite']['names']) {
         const name_matches = obj['leaf_name'].match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
