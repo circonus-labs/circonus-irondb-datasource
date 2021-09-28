@@ -155,10 +155,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
   toggleEditorMode() {
     // CAQL -> Standard
     if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
-      // TODO: currently no good way to convert backwards to standard
+      this.buildQueries();
       // CAQL -> Graphite
     } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
-      // TODO: currently no good way to convert backwards to graphite
+      this.buildQueries();
       // Standard -> CAQL
     } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
       this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
