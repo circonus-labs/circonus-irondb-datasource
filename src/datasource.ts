@@ -1386,7 +1386,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   static readonly MAX_DATAPOINTS_THRESHOLD = 1.5;
   static readonly MAX_EXACT_DATAPOINTS_THRESHOLD = 1.5;
   static readonly MIN_DURATION_MS_FETCH = 1;
-  static readonly MIN_DURATION_MS_CAQL = 60 * 1000;
+  static readonly MIN_DURATION_MS_CAQL = 1000;
   static readonly ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], (x) => x * 1000);
   static readonly ROLLUP_ALIGN_MS_1DAY = 86400 * 1000;
 
