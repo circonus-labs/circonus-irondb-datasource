@@ -61,17 +61,11 @@ const DURATION_UNITS = {
 };
 
 function parseDurationMs(duration: string): number {
-  if (!/^[0-9]+(ms|s|m|h|d)?$/g.test(duration.toLocaleLowerCase())) {
+  const matches = duration.toLocaleLowerCase().match(/^([0-9]+)(ms|s|m|h|d)?$/);
+  if (!matches) {
     throw new Error('Invalid time duration: ' + duration);
   }
-  let unit = DURATION_UNITS_DEFAULT;
-  for (const k in DURATION_UNITS) {
-    if (duration.endsWith(k)) {
-      unit = k;
-      duration = duration.slice(0, duration.length - k.length);
-    }
-  }
-  return parseInt(duration, 10) * DURATION_UNITS[unit];
+  return parseInt(matches[1], 10) * DURATION_UNITS[matches[2] || DURATION_UNITS_DEFAULT];
 }
 
 const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
@@ -961,26 +955,34 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if ('hosted' === this.irondbType) {
           options.url = options.url + '/public';
         }
+        // render CAQL query
+        const caqlQuery = this.templateSrv.replace(
+          irondbOptions['caql']['names'][i].leaf_name,
+          irondbOptions['scopedVars']
+        );
+        const minPeriod = (irondbOptions['caql']['names'][i].leaf_data || {}).min_period;
+        const caqlQueryMP =
+          (minPeriod && !/^#min_period=/.test(caqlQuery) ? '#min_period=' + minPeriod + ' ' : '') + caqlQuery; // prefix with min_period if min_period isn't in the query already
+        // render start, end, & period
         let start = irondbOptions['caql']['start'];
         let end = irondbOptions['caql']['end'];
-        const interval = this.getRollupSpan(
+        const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2})\s/i);
+        const minPeriodDirective = minPeriodMatches ? Math.round(parseDurationMs(minPeriodMatches[1]) / 1000) : null;
+        const calculatedInterval = this.getRollupSpan(
           irondbOptions,
           start,
           end,
           true,
           irondbOptions['caql']['names'][i].leaf_data
         );
+        // any min_period directive overrides the resolution here if it's lower and we're already at the min resolution
+        const interval =
+          minPeriodDirective && calculatedInterval === Math.round(IrondbDatasource.MIN_DURATION_MS_CAQL / 1000)
+            ? Math.min(calculatedInterval, minPeriodDirective)
+            : calculatedInterval;
         let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
         end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
-        const caqlQuery = this.templateSrv.replace(
-          irondbOptions['caql']['names'][i].leaf_name,
-          irondbOptions['scopedVars']
-        );
-        // prefix with min_period if needed
-        const minPeriod = (irondbOptions['caql']['names'][i].leaf_data || {}).min_period;
-        const caqlQueryMP =
-          (minPeriod && !/^#min_period=/.test(caqlQuery) ? '#min_period=' + minPeriod + ' ' : '') + caqlQuery;
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
         options.url = options.url + '&period=' + interval;
