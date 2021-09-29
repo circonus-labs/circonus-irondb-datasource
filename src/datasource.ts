@@ -966,7 +966,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         // render start, end, & period
         let start = irondbOptions['caql']['start'];
         let end = irondbOptions['caql']['end'];
-        const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2})\s/i); // any min_period directive overrides the resolution here if it's lower
+        const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2})\s/i);
         const minPeriodDirective = minPeriodMatches ? Math.round(parseDurationMs(minPeriodMatches[1]) / 1000) : null;
         const calculatedInterval = this.getRollupSpan(
           irondbOptions,
@@ -975,7 +975,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           true,
           irondbOptions['caql']['names'][i].leaf_data
         );
-        const interval = minPeriodDirective ? Math.min(calculatedInterval, minPeriodDirective) : calculatedInterval;
+        // any min_period directive overrides the resolution here if it's lower and we're already at the min resolution
+        const interval =
+          minPeriodDirective && calculatedInterval === Math.round(IrondbDatasource.MIN_DURATION_MS_CAQL / 1000)
+            ? Math.min(calculatedInterval, minPeriodDirective)
+            : calculatedInterval;
         let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
         start -= interval;
         end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
