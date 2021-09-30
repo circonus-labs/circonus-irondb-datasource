@@ -7,6 +7,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 parent_dir=$(dirname $script_dir)
+tag="circonus-labs/circonus-irondb-datasource"
 
 usage() {
   cat <<EOF
@@ -53,10 +54,11 @@ die() {
 parse_params() {
   # default values of variables set from params
   build=false
-  dest=''
+  dest=${script_dir}
+  publish='-p 30000:3000'
   GRAFANA_API_KEY=''
   CIRCONUS_API_KEY=''
-  GF_SERVER_ROOT_URL=''
+  GF_SERVER_ROOT_URL='http://localhost:3000/'
 
   while :; do
     case "${1-}" in
@@ -65,6 +67,7 @@ parse_params() {
     -b | --build-only) 
       dest="${2-}"
       build=true
+      publish=''
       shift
       ;; 
     -g | --gapi)
@@ -89,9 +92,7 @@ parse_params() {
 
   # check required params and arguments
   [[ -z "${GRAFANA_API_KEY}" ]] && die "Grafana requires backend plugins to be signed. Please specify the key with --gapi"
-  [[ -z "${dest}" ]] && [[ -z "${CIRCONUS_API_KEY}" ]] && die "Circonus API Key is required for demonstration mode. Please specify the key with --capi"
-  [[ -z "${dest}" ]] && dest="${script_dir}" # if destination dir is empty set to script folder
-  [[ -z "${GF_SERVER_ROOT_URL}" ]] && GF_SERVER_ROOT_URL="http://localhost:3000/"
+  [[ ${build} = false ]] && [[ -z "${CIRCONUS_API_KEY}" ]] && die "Circonus API Key is required for demonstration mode. Please specify the key with --capi"
   [[ ! -z "${dest}" ]] && [[ ! -d $dest ]] && die "Provided output directory does not exist: $dest"
   [[ ! -z "${dest}" ]] && [[ ! -w $dest ]] && die "Provided output directory is not wriable: $dest"
   [[ ${#args[@]} -gt 0 ]] && die "Unexepected arguments."
@@ -110,15 +111,28 @@ msg "- Circonus API Key: ${CIRCONUS_API_KEY}"
 msg "- Ouput Directory: ${dest}"
 msg "- Build only: ${build}"
 msg "- Grafana ROOT URL: $GF_SERVER_ROOT_URL"
-msg ""
+
+msg "${BLUE}Stopping any instances of ${tag}${NOFORMAT}"
+containers=$(docker container ps -f "ancestor=${tag}" | awk 'NR>1 {print $1}')
+
+for CONTAINER in $containers
+do
+    msg "${RED}Stopping ${CONTAINER}${NOFORMAT}"
+    docker stop $CONTAINER || die "Failed to check for stop container"
+    msg "${RED}${CONTAINER} Stopped${NOFORMAT}"
+done
+msg "${GREEN}Done${NOFORMAT}"
+
 msg "${BLUE}Building Docker Container...${NOFORMAT}"
-docker build $script_dir -t circonus-irondb-datasource
+docker build $script_dir -t ${tag}
+msg "${GREEN}Done${NOFORMAT}"
+
 msg "${BLUE}Running Docker Container...${NOFORMAT}"
-docker run --rm -p 3000:3000 -v $dest:/dist \
+docker run --rm $publish -v $dest:/dist \
     -v $parent_dir:/circonus-irondb-datasource \
     -e GRAFANA_API_KEY=${GRAFANA_API_KEY} \
     -e CIRCONUS_API_KEY=${CIRCONUS_API_KEY} \
     -e GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL} \
     -e build=${build} \
-    --name circonus-irondb-datasource \
-    circonus-irondb-datasource
+    ${tag} || msg "${YELLOW}Container stopped.${NOFORMAT}"; true
+msg "${GREEN}Done${NOFORMAT}"

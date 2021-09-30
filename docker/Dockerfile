@@ -52,6 +52,7 @@ RUN curl -s -N https://dl.grafana.com/enterprise/release/grafana-enterprise-7.5.
 
 
 # Start
+SHELL ["/bin/bash", "-c"]
 WORKDIR /
 COPY entrypoint.sh /
-ENTRYPOINT ["sh", "/entrypoint.sh" ]
+ENTRYPOINT ["/entrypoint.sh" ]
