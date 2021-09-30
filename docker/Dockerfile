@@ -12,58 +12,47 @@ rm -f /lib/systemd/system/anaconda.target.wants/*;
 VOLUME [ "/sys/fs/cgroup" ]
 
 # Install pre-reqs and utilities
-RUN yum install -y curl wget initscripts urw-fonts git
+RUN yum install -y curl initscripts urw-fonts git && yum clean all
 
 # Install Node.js
 FROM distro as nodejs
 ENV PATH "$PATH:/usr/local/lib/nodejs/bin"
-RUN curl -s -N https://nodejs.org/dist/v14.17.6/node-v14.17.6-linux-x64.tar.xz | tar -Jx -C /usr/local/lib --transform s/node-v14.17.6-linux-x64/nodejs/ \
+RUN curl -s -N https://nodejs.org/dist/v14.17.6/node-v14.17.6-linux-x64.tar.xz \
+     | tar -Jx -C /usr/local/lib --transform s/node-v14.17.6-linux-x64/nodejs/ \
+     && rm -f node-v14.17.6-linux-x64.tar.xz \
      && npm install -g yarn
 
 # Install Go and Mage
 FROM nodejs as golang
-ENV PATH "$PATH:/usr/local/go/bin"
-RUN curl -s -N -L https://golang.org/dl/go1.17.1.linux-amd64.tar.gz | tar -xz -C /usr/local/
-RUN git clone https://github.com/magefile/mage
-WORKDIR /mage
-RUN go run bootstrap.go
-
-# Build plugin
-FROM golang as pluginbuild
-ENV PATH "$PATH:/usr/local/lib/nodejs/bin:/usr/local/go/bin:/root/go/bin"
-WORKDIR /root
-ADD https://api.github.com/repos/circonus-labs/circonus-irondb-datasource/git/refs/heads/master version.json
-RUN git clone https://github.com/circonus-labs/circonus-irondb-datasource/
-WORKDIR /root/circonus-irondb-datasource
-RUN yarn install \
-     && yarn build \
-     && mage -v
-
-# Sign plugin
-FROM pluginbuild as pluginsign
-WORKDIR /root/circonus-irondb-datasource
-ARG GRAFANA_API_KEY
-ENV GRAFANA_API_KEY=$GRAFANA_API_KEY
-RUN node $(find . -type f -iname "grafana-toolkit.js") plugin:sign --rootUrls http://localhost:3000/
-ARG CIRCONUS_API_KEY
-ENV CIRCONUS_API_KEY=$CIRCONUS_API_KEY 
-RUN sed -i "s/@@CIRCONUS_API_KEY@@/$CIRCONUS_API_KEY/g" /root/circonus-irondb-datasource/docker/provisioning/datasources/irondb.yaml
+ENV PATH "$PATH:/usr/local/go/bin:/root/go/bin"
+RUN curl -s -N -L https://golang.org/dl/go1.17.1.linux-amd64.tar.gz \
+     | tar -xz -C /usr/local/ \
+     && rm -f go1.17.1.linux-amd64.tar.gz \
+     && git clone https://github.com/magefile/mage \
+     && cd /mage \
+     && go run bootstrap.go
 
 # Install Grafana
-FROM distro as grafana
-RUN curl -s -N https://dl.grafana.com/enterprise/release/grafana-enterprise-7.5.3.linux-amd64.tar.gz | tar -xz -C /usr/local/lib --transform s/grafana-7.5.3/grafana/
-ARG CIRCONUS_API_KEY
-ENV CIRCONUS_API_KEY=$CIRCONUS_API_KEY 
-COPY --from=pluginsign "/root/circonus-irondb-datasource/dist" "/usr/local/lib/grafana/data/plugins/circonus-irondb-datasource"
-COPY --from=pluginsign "/root/circonus-irondb-datasource/docker/provisioning" "/var/lib/grafana/provisioning"
-COPY --from=pluginsign "/root/circonus-irondb-datasource/docker/dashboards" "/var/lib/grafana/dashboards"
+FROM golang as grafana
+ENV PATH "$PATH:/usr/local/lib/nodejs/bin:/usr/local/go/bin:/root/go/bin"
+ENV GOCACHE /circonus-irondb-datasource/.cache
 ENV GF_PATHS_PROVISIONING "/var/lib/grafana/provisioning"
-ENV GF_SECURITY_ADMIN_PASSWORD=admin
-ENV GF_AUTH_BASIC_ENABLED=false
-ENV GF_AUTH_ANONYMOUS_ENABLED=true
-ENV GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+ENV GF_PATHS_PLUGINS "/var/lib/grafana/plugins"
+ENV GF_APP_MODE "development"
+ENV GF_SECURITY_ADMIN_PASSWORD "admin"
+ENV GF_AUTH_BASIC_ENABLED "false"
+ENV GF_AUTH_ANONYMOUS_ENABLED "true"
+ENV GF_AUTH_ANONYMOUS_ORG_ROLE "Admin"
+RUN curl -s -N https://dl.grafana.com/enterprise/release/grafana-enterprise-7.5.3.linux-amd64.tar.gz \
+     | tar -xz -C /usr/local/lib --transform s/grafana-7.5.3/grafana/ \
+     && rm -f grafana-enterprise-7.5.3.linux-amd64.tar.gz \
+     && mkdir -p ${GF_PATHS_PLUGINS}/circonus-irondb-datasource \
+     && mkdir -p ${GF_PATHS_PROVISIONING}/datasources \
+     && mkdir -p /var/lib/grafana/dashboards
 
-# Start Grafana
-WORKDIR /usr/local/lib/grafana
+
+# Start
+SHELL ["/bin/bash", "-c"]
+WORKDIR /
 COPY entrypoint.sh /
-ENTRYPOINT ["sh", "/entrypoint.sh" ]
+ENTRYPOINT ["/entrypoint.sh" ]

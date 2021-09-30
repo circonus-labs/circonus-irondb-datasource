@@ -15,7 +15,7 @@ These instructions will build and run a Docker container with a Grafana instance
 4. export GRAFANA_API_KEY=<From step 2>
 5. export CIRCONUS_API_KEY=<From step 3>
 6. git clone https://github.com/circonus-labs/circonus-irondb-datasource/
-7. Execute ./docker/run-docker.sh
+7. Execute ./docker/run-docker.sh -g $GRAFANA_API_KEY -c $CIRCONUS_API_KEY
 8. Navigate to <http://localhost:3000/> to access.
 
 ## Installation
