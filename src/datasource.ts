@@ -641,7 +641,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
   // this indicates whether we should ignore the Check UUID at the beginning of the the first segment in graphite-style queries.
   // (they always start with check UUIDs as the first segment if no query prefix is used)
   ignoreGraphiteUUIDs() {
-    return !_.isString(this.queryPrefix) || '' === this.queryPrefix;
+    return !(this.queryPrefix || '').trim();
   }
 
   metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
