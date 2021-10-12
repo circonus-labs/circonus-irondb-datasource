@@ -1405,6 +1405,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
   }
 
+  // force <1m rollups to be aligned along 10s increments
+  static forceRollupAlignment(rollup_ms) {
+    if (rollup_ms < 60000) {
+      rollup_ms = Math.max(10000, Math.ceil(rollup_ms / 10000) * 10000);
+    }
+    return rollup_ms;
+  }
+
   getRollupSpan(options, start, end, isCaql, leafData) {
     log(() => `getRollupSpan() intervalMs = ${options.intervalMs}, maxDataPoints = ${options.maxDataPoints}`);
     log(() => `getRollupSpan() ${isCaql ? 'CAQL' : '/fetch'} ${JSON.stringify(leafData)}`);
@@ -1422,7 +1430,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         throw new Error('Too many datapoints requested');
       }
       IrondbDatasource.checkRollupAligned(exactMs);
-      return exactMs / 1000.0;
+      return IrondbDatasource.forceRollupAlignment(exactMs) / 1000;
     } else {
       let minimumMs = IrondbDatasource.MIN_DURATION_MS_FETCH;
       if (isCaql) {
@@ -1436,7 +1444,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       if (intervalMs < minimumMs) {
         intervalMs = minimumMs;
       }
-      let interval = nudgeInterval(intervalMs / 1000, -1);
+      let interval = nudgeInterval(IrondbDatasource.forceRollupAlignment(intervalMs) / 1000, -1);
       while ((end - start) / interval > options.maxDatapoints * IrondbDatasource.MAX_DATAPOINTS_THRESHOLD) {
         interval = nudgeInterval(interval + 0.001, 1);
       }
