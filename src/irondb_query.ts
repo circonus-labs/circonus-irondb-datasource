@@ -413,16 +413,19 @@ export default class IrondbQuery {
     this.lastGSegmentsIndex = this.gSegments.length - 1;
   }
 
-  // this converts the standard segments array to the graphite segments array
-  convertStandardToGraphite() {
+  // this converts the standard segments array (or another arbitrary string) to the graphite segments array
+  convertStandardToGraphite(metricNameOverride = '') {
     let gSegments = (this.gSegments = []);
-    let metricName = '';
-    this.segments.some(function (segment) {
-      if (segment.type === SegmentType.MetricName) {
-        metricName = segment.value;
-        return true;
-      }
-    });
+    let metricName = String(metricNameOverride);
+
+    if (!metricNameOverride) {
+      this.segments.some(function (segment) {
+        if (segment.type === SegmentType.MetricName) {
+          metricName = segment.value;
+          return true;
+        }
+      });
+    }
     metricName.split('.').forEach(function (piece) {
       if (piece) {
         gSegments.push({ value: piece });
