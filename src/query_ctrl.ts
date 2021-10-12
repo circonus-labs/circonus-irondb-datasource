@@ -612,9 +612,17 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
   // this is called whenever a graphite segment value changes
   graphiteSegmentValueChanged(segment, segmentIndex) {
+    const isMultiSegment = /\./.test(String(segment.value));
+
     this.error = null;
     this.queryModel.updateSegmentValue(segment, segmentIndex);
     this.removeSegments(segmentIndex + 1);
+    // if they've entered multiple segments, we need to reconstruct the name segments by using the entire name entered so far
+    if (isMultiSegment) {
+      const graphiteName = this.queryModel.getGraphiteSegmentPathUpTo(this.gSegments.length).replace(/\.$/, '');
+      this.queryModel.convertStandardToGraphite(graphiteName);
+      this.buildSegments(true);
+    }
     // "expandable" means it's not the last segment, so there will be another segment dropdown to follow.
     if (segment.expandable) {
       this.addSelectMetricSegment();
@@ -625,17 +633,19 @@ export class IrondbQueryCtrl extends QueryCtrl {
   }
 
   // this takes the queryModel segment JSON and builds it into actual segment objects
-  buildSegments() {
+  buildSegments(skipPlusCheck = false) {
     // always rebuild both
     this.gSegments = _.map(this.queryModel.gSegments, (segment) => {
       return this.uiSegmentSrv.newSegment(segment);
     });
     this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
     // check to see if we need a "select metric" or "plus" segment
-    if ('graphite' === this.target.querytype) {
-      this.checkForGraphiteSelectMetricSegment(Math.max(this.queryModel.gSegments.length, 1) - 1); // Math.max() ensures that we never pass -1 even if gSegments is empty
-    } else {
-      this.checkForPlusSegment(0);
+    if (!skipPlusCheck) {
+      if ('graphite' === this.target.querytype) {
+        this.checkForGraphiteSelectMetricSegment(Math.max(this.queryModel.gSegments.length, 1) - 1); // Math.max() ensures that we never pass -1 even if gSegments is empty
+      } else {
+        this.checkForPlusSegment(0);
+      }
     }
   }
 
