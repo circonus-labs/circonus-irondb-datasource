@@ -1511,9 +1511,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
       result[i]['leaf_data'].metricrollup = target.metricrollup;
     }
     result[i]['leaf_data'].metrictype = result[i]['type'];
-    if ('graphite' === target.querytype && 'hosted' === this.irondbType) {
-      leafName = this.queryPrefix + leafName;
-    }
     return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
   }
 
