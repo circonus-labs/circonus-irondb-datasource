@@ -849,7 +849,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         check_tags.push(irondbOptions['std']['names'][i]['leaf_data']['check_tags']);
         const stream = {};
         let transform = irondbOptions['std']['names'][i]['leaf_data']['egress_function'];
-        window.console.log('----> ', metrictype, paneltype);
         if (metrictype === 'histogram') {
           if (paneltype === 'heatmap') {
             transform = 'none';
