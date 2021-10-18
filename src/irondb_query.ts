@@ -102,7 +102,10 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   // case %d
   let label = fmt.replace(/%d/g, (idx + 1).toString());
   // case %n
-  label = label.replace(/%n/g, taglessName(meta.metric_name || meta.name));
+  label = label.replace(
+    /%n/g,
+    taglessName((meta.leaf_data && meta.leaf_data.metric_name) || meta.metric_name || meta.name)
+  );
   // case %cn
   label = label.replace(/%cn/g, meta.metric_name || meta.name);
 
@@ -324,10 +327,6 @@ export default class IrondbQuery {
     this.segments = [];
     this.error = null;
 
-    if (this.target.rawQuery) {
-      return;
-    }
-
     log(() => 'parseTarget() target = ' + JSON.stringify(this.target));
     let metricName = this.target.query;
     // Strip 'and(__name:)' from metric name
@@ -381,7 +380,7 @@ export default class IrondbQuery {
     this.gSegments = [];
     this.error = null;
 
-    if (this.target.rawQuery) {
+    if (this.target.rawGraphiteQuery) {
       return;
     }
 
@@ -394,7 +393,7 @@ export default class IrondbQuery {
 
     if (astNode.type === 'error') {
       this.error = astNode.message + ' at position: ' + astNode.pos;
-      this.target.rawQuery = true;
+      this.target.rawGraphiteQuery = true;
       return;
     }
 
@@ -407,7 +406,7 @@ export default class IrondbQuery {
     // } catch (err) {
     //   console.log('error parsing target:', err.message);
     //   this.error = err.message;
-    //   this.target.rawQuery = true;
+    //   this.target.rawGraphiteQuery = true;
     // }
 
     this.lastGSegmentsIndex = this.gSegments.length - 1;
