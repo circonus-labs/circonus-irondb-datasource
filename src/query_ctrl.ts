@@ -218,6 +218,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     this.panelCtrl.refresh();
   }
 
+  formatChanged() {
+    this.panelCtrl.refresh();
+  }
+
   metricLabelKeyUp(event) {
     const self = this;
     const element = event.currentTarget;

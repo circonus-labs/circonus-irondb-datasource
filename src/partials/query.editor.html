@@ -166,7 +166,7 @@
             <label class="gf-form-label width-6 query-keyword">Format</label>
         </div>
         <div role="menuitem" class="gf-form" style="align-self:flex-start;">
-            <gf-form-dropdown name="format" model="ctrl.target.format" css-class="gf-size-auto"
+            <gf-form-dropdown name="format" model="ctrl.target.format" on-change="ctrl.formatChanged()" css-class="gf-size-auto"
                               get-options="ctrl.formatOptions"
                               lookup-text="true">
             </gf-form-dropdown>
