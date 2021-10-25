@@ -14,7 +14,7 @@
         </info-popover></span>
       <div class="gf-form-select-wrapper gf-form-select-wrapper--has-help-icon">
         <select 
-          class="gf-form-input width-20" 
+          class="gf-form-input width-20" style="height: 2.2857rem;"
           ng-model='ctrl.current.jsonData.irondbType' 
           ng-options="irondbType for irondbType in ['standalone', 'hosted']" 
           ng-init='ctrl.current.jsonData.irondbType'></select>
@@ -39,12 +39,28 @@
   </div>
   <div class="gf-form-inline">
     <div class="gf-form">
+      <span class="gf-form-label width-13">Graphite Query Prefix
+        <info-popover mode="right-normal">
+          <p>Prefix to be added to all graphite-style queries sent to IRONdb.</p>
+          <p>For standalone installations, this defaults to "<strong>graphite.</strong>".</p>
+          <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
+          <p>For access to any metric in the system, leave it blank.</p>
+        </info-popover></span>
+      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.queryPrefix' ng-init="ctrl.current.jsonData.queryPrefix" ng-keyup="ctrl.queryPrefixKeyUp($event)" ng-blur="ctrl.updateQueryPrefixValue($event)"></input>
+    </div>
+  </div>
+  <div class="gf-form-inline">
+    <div class="gf-form">
       <span class="gf-form-label width-13">Results Limit
         <info-popover mode="right-normal">
           <p>Limit number of search results items fetched.</p>
           <p>Setting it to -1 or "none" removes the limit.</p>
         </info-popover></span>
-      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.resultsLimit' ng-init="ctrl.current.jsonData.resultsLimit"></input>
+      <input class="gf-form-input width-5" type="text" 
+        ng-model='ctrl.current.jsonData.resultsLimit' 
+        ng-init="ctrl.current.jsonData.resultsLimit" 
+        ng-keyup="ctrl.resultsLimitKeyUp($event)" 
+        ng-blur="ctrl.updateResultsLimitValue($event)"></input>
     </div>
   </div>
   <div class="gf-form-inline">
@@ -54,15 +70,34 @@
           <p>By default CAQL works on 60 second data. For data ingested at higher frequency, you can add a different default period here to use in your queries (enter the period of your data in seconds).</p>
           <p>You may override the default in individual queries by prefixing them with the #min_period directive. See <a href="https://docs.circonus.com/caql/reference/#directives" target="_blank">the docs</a> for more info.</p>
         </info-popover></span>
-      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.caqlMinPeriod' ng-init="ctrl.current.jsonData.caqlMinPeriod"></input>
+      <input class="gf-form-input width-5" type="text" 
+        ng-model='ctrl.current.jsonData.caqlMinPeriod' 
+        ng-init="ctrl.current.jsonData.caqlMinPeriod" 
+        ng-keyup="ctrl.caqlMinPeriodKeyUp($event)" 
+        ng-blur="ctrl.updateCaqlMinPeriodValue($event)"></input><span style="margin-left:0.25em;line-height:2.1429;">seconds</span>
     </div>
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
       label-class="width-13" switch-class="width-5"
-      label="Truncate Last 'Now' Values" checked="ctrl.current.jsonData.truncateNow"
-      tooltip="When viewing a time range ending in 'now,' truncate the last value (or the last 30s if viewing high-resolution data). Also, alerting queries will be time-shifted back by one minute to allow for aggregation windows to close before being alerted upon.">
+      label="Truncate 'Now' Values" 
+      checked="ctrl.current.jsonData.truncateNow"
+      tooltip="When viewing a time range ending in 'now,' truncate the last value (or the last 30s if viewing high-resolution data...this minimum truncation duration is configurable below). Also, alerting queries will be time-shifted back by one minute to allow for aggregation windows to close before being alerted upon.">
     </gf-form-switch>
+  </div>
+  <div class="gf-form-inline">
+    <div class="gf-form">
+      <span class="gf-form-label width-13">Minimum Truncation Duration
+        <info-popover mode="right-normal">
+          <p>When viewing a time range ending in 'now,' with 'Truncate Now Values' enabled above, this is the 
+            minimum truncation performed (in seconds). It's useful when viewing high-resolution data.</p>
+        </info-popover></span>
+      <input class="gf-form-input width-5" type="text" 
+        ng-model='ctrl.current.jsonData.minTruncation' 
+        ng-init="ctrl.current.jsonData.minTruncation" 
+        ng-keyup="ctrl.minTruncationKeyUp($event)" 
+        ng-blur="ctrl.updateMinTruncationValue($event)"></input><span style="margin-left:0.25em;line-height:2.1429;">seconds</span>
+    </div>
   </div>
   <div class="gf-form-inline">
     <gf-form-switch class="gf-form"
@@ -84,17 +119,5 @@
       label="Allow Graphite Queries" checked="ctrl.current.jsonData.allowGraphite"
       tooltip="IRONdb supports graphite-style queries, albeit without any tag support.">
     </gf-form-switch>
-  </div>
-  <div class="gf-form-inline">
-    <div class="gf-form">
-      <span class="gf-form-label width-13">Graphite Query Prefix
-        <info-popover mode="right-normal">
-            <p>Prefix to be added to all graphite-style queries sent to IRONdb.</p>
-            <p>For standalone installations, this defaults to "<strong>graphite.</strong>".</p>
-            <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
-            <p>For access to any metric in the system, leave it blank.</p>
-        </info-popover></span>
-      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.queryPrefix' ng-init="ctrl.current.jsonData.queryPrefix" ng-keyup="ctrl.queryPrefixKeyUp($event)" ng-blur="ctrl.updateQueryPrefixValue($event)"></input>
-    </div>
   </div>
 </div>
