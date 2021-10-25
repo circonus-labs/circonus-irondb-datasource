@@ -832,9 +832,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           false,
           irondbOptions['std']['names'][i]['leaf_data']
         );
-        let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
-        start -= interval;
-        end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
+        const range_shift = Math.max(interval, 30); // when shifting the range to truncate the end, never shift less than 30s
+        const ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
+        start -= range_shift;
+        end = ends_now && this.truncateNow ? end - range_shift : end + interval; // sometimes we want to drop the last interval b/c that data is frequently incomplete
         const metricLabels = [];
         const check_tags = [];
         const reduce = paneltype === 'heatmap' ? 'merge' : 'pass';
@@ -929,9 +930,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
           minPeriodDirective && calculatedInterval === Math.round(IrondbDatasource.MIN_DURATION_MS_CAQL / 1000)
             ? Math.min(calculatedInterval, minPeriodDirective)
             : calculatedInterval;
-        let ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
-        start -= interval;
-        end = ends_now && this.truncateNow ? end - interval : end + interval; // drop the last interval b/c that data is frequently incomplete
+        const range_shift = Math.max(interval, 30); // when shifting the range to truncate the end, never shift less than 30s
+        const ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
+        start -= range_shift;
+        end = ends_now && this.truncateNow ? end - range_shift : end + interval; // sometimes we want to drop the last interval b/c that data is frequently incomplete
         options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
         options.url = options.url + '&end=' + end.toFixed(3);
         options.url = options.url + '&period=' + interval;
