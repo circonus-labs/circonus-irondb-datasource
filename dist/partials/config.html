@@ -61,7 +61,7 @@
     <gf-form-switch class="gf-form"
       label-class="width-13" switch-class="width-5"
       label="Truncate Last 'Now' Values" checked="ctrl.current.jsonData.truncateNow"
-      tooltip="When viewing a time range ending in 'now,' truncate the last value (or the last 1m if viewing high-resolution data). Also, alerting queries will be time-shifted back by one minute to allow for aggregation windows to close before being alerted upon.">
+      tooltip="When viewing a time range ending in 'now,' truncate the last value (or the last 30s if viewing high-resolution data). Also, alerting queries will be time-shifted back by one minute to allow for aggregation windows to close before being alerted upon.">
     </gf-form-switch>
   </div>
   <div class="gf-form-inline">
