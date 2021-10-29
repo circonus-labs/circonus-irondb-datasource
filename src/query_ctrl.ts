@@ -439,6 +439,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
     return this.datasource
       .metricGraphiteQuery(query + (search || '') + '*', true)
       .then((values) => {
+        // strip tags from the name
+        values.data = this.datasource.stripTags(values.data);
         // convert values into segment objects
         let optionSegments = _.map(values.data, (option) => {
           const uuidRegExp = /^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})./;
