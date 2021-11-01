@@ -1431,6 +1431,19 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     });
   }
 
+  stripTags(data) {
+    // remove any tags from the name b/c it won't work if they're on there...
+    // graphite-style finding results in names like this if they have tags:
+    // `2ff643a7-c9de-4c24-9f59-3fdb3baa6a38.automation.example-service...refresh;collector=statsd;source=circonus-agent;statsd_type=timing`
+    data.forEach(function (obj, i) {
+      if (obj.leaf) {
+        const name_pcs = ((obj.leaf_data || {}).name || '').split('|ST');
+        obj.name = name_pcs[0];
+      }
+    });
+    return data;
+  }
+
   buildFetchStream(target, result, i, scopedVars) {
     let leafName = result[i]['metric_name'] || result[i]['name'];
     let leaf_uuid = (result[i]['leaf_data'] || {}).uuid;
