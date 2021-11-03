@@ -1,35 +1,35 @@
 {
-  "type": "datasource",
-  "name": "IRONdb",
-  "id": "circonus-irondb-datasource",
-  "backend": true,
-  "executable": "irondb-backend",
-  "alerting": true,
+    "type": "datasource",
+    "name": "IRONdb",
+    "id": "circonus-irondb-datasource",
+    "backend": true,
+    "executable": "irondb-backend",
+    "alerting": true,
 
-  "info": {
-    "description": "Datasource plugin to pull data from an IRONdb installation.",
-    "author": {
-      "name": "Circonus",
-      "url": "https://www.circonus.com/irondb/"
+    "info": {
+        "description": "Datasource plugin to pull data from an IRONdb installation.",
+        "author": {
+            "name": "Circonus",
+            "url": "https://www.circonus.com/irondb/"
+        },
+        "keywords": ["circonus", "irondb", "time series"],
+        "logos": {
+            "small": "img/irondb-logo.svg",
+            "large": "img/irondb-logo.svg"
+        },
+        "links": [
+            { "name": "Project site", "url": "https://www.circonus.com/irondb/" },
+            { "name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE" }
+        ],
+        "version": "0.9.5",
+        "updated": "2021-10-29"
     },
-    "keywords": ["circonus", "irondb", "time series"],
-    "logos": {
-      "small": "img/irondb-logo.svg",
-      "large": "img/irondb-logo.svg"
+
+    "dependencies": {
+        "grafanaVersion": "7.x.x",
+        "plugins": []
     },
-    "links": [
-      {"name": "Project site", "url": "https://www.circonus.com/irondb/"},
-      {"name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE"}
-    ],
-    "version": "0.9.5",
-    "updated": "2021-10-29"
-  },
 
-  "dependencies": {
-    "grafanaVersion": "7.x.x",
-    "plugins": [ ]
-  },
-
-  "metrics": true,
-  "annotations": true
+    "metrics": true,
+    "annotations": true
 }
