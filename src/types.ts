@@ -1,4 +1,4 @@
 export interface IronDBVariableQuery {
-  metricFindQuery: string;
-  tagCategory: string;
+    metricFindQuery: string;
+    tagCategory: string;
 }
