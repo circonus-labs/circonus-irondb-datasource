@@ -90,7 +90,32 @@
       </div>
       <div ng-if="ctrl.target.querytype === 'graphite'" class="gf-form gf-form-inline">
         <div ng-repeat="gSegment in ctrl.gSegments" role="menuitem" class="gf-form">
-          <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+          <div ng-switch="gSegment._typeName">
+            <div ng-switch-when="TagPair" class="irondb-tag-pair mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagEnd" class="irondb-tag-end join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':gSegment.value!='select tag'}">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+            </div>
+            <div ng-switch-when="TagVal" class="irondb-tag-val mash-l join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+            </div>
+            <div ng-switch-when="TagPlus" class="irondb-tag-plus join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+            </div>
+            <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+            </div>
+            <div ng-switch-default class="join-l">
+              <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOptionSegments( $index, $query )" on-change="ctrl.graphiteSegmentValueChanged( gSegment, $index )"/>
+            </div>
+          </div>
         </div>
       </div>
       <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form gf-form--grow ml-1">
