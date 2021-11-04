@@ -601,7 +601,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     checkForPlusAndSelect() {
         let isGraphite = 'graphite' === this.target.querytype;
         let hasNonMetricSegment = this.segments.some((el) => {
-            return el._type != null && el._type !== 'segment' && el._type !== SegmentType.MetricName;
+            return el._type != null && el._type !== SegmentType.MetricName;
         });
         if (isGraphite) {
             this.checkForGraphiteSelectMetricSegment();

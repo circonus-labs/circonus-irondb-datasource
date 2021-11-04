@@ -444,11 +444,11 @@ export default class IrondbQuery {
     convertGraphiteToStandard() {
         this.segments = [];
         const graphiteName = this.getGraphiteSegmentPathUpTo(this.gSegments.length)
-            .replace(/\.select metric.$/, '.*')
+            .replace(/\.select metric\.$/, '.*')
             .replace(/\.$/, '');
         const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', '*'];
         const hasUUID = !!matches[1];
-        this.segments.push({ type: SegmentType.MetricName, value: matches[2] });
+        this.segments.push({ type: SegmentType.MetricName, value: matches[2] }); // if there's no metric expression segment selected yet, this will be plain "select metric"
         // have a UUID? then add it as a tag
         if (hasUUID) {
             let tagCat = '__check_uuid';
@@ -468,7 +468,7 @@ export default class IrondbQuery {
     // return the entire graphite metric segment path (not including any tag filter)
     getGraphiteSegmentPath() {
         var idx = this.gSegments.findIndex((el) => {
-            return el.type != null && el.type !== 'segment' && el.type !== 'MetricName';
+            return el.type != null && el.type !== SegmentType.MetricName;
         });
         if (!~idx) {
             idx = this.gSegments.length;
@@ -482,7 +482,9 @@ export default class IrondbQuery {
         if (!arr.length) {
             arr.push('');
         }
-        return arr.reduce((str, segment) => (str || '') + segment.value + '.');
+        return arr.reduce((str, segment) => {
+            return (str || '') + (segment.value || '') + '.';
+        }, '');
     }
 
     updateSegmentValue(segment, index) {
@@ -496,10 +498,10 @@ export default class IrondbQuery {
     addSelectMetricSegment() {
         let isGraphite = 'graphite' === this.target.querytype;
         let hasSelectAlready = this[isGraphite ? 'gSegments' : 'segments'].some((el) => {
-            return el.type == null && el.value === 'select metric';
+            return el.value === 'select metric';
         });
         let idx = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
-            return el.type != null && el.type !== 'segment' && el.type !== 'MetricName';
+            return el.type != null && el.type !== SegmentType.MetricName;
         });
         // if there isn't a non-metric segment, add it at the end
         if (!~idx) {
@@ -507,7 +509,10 @@ export default class IrondbQuery {
         }
         // if we don't already have a select segment, add one
         if (!hasSelectAlready) {
-            this[isGraphite ? 'gSegments' : 'segments'].splice(idx, 0, { value: 'select metric' });
+            this[isGraphite ? 'gSegments' : 'segments'].splice(idx, 0, {
+                type: SegmentType.MetricName,
+                value: 'select metric',
+            });
         }
     }
 
