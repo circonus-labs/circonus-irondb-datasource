@@ -471,18 +471,21 @@ export class IrondbQueryCtrl extends QueryCtrl {
             });
     }
 
+    // create a UI segment with a passed set of options, and set its type correctly
+    newSegment(type: SegmentType, options: any) {
+        const segment = this.uiSegmentSrv.newSegment(options);
+        return this.setSegmentType(segment, type);
+    }
+
+    // set the correct type properties on a segment object
     setSegmentType(segment: any, type: SegmentType) {
         segment._type = type;
         segment._typeName = typeof SegmentType[type];
         return segment;
     }
 
-    newSegment(type: SegmentType, options: any) {
-        const segment = this.uiSegmentSrv.newSegment(options);
-        return this.setSegmentType(segment, type);
-    }
-
-    mapSegment(segment) {
+    // convert a segment config object (from the query model) into a bona fide UI segment
+    convertSegment(segment) {
         let uiSegment;
         if (segment.type === SegmentType.TagOp) {
             uiSegment = this.uiSegmentSrv.newOperator(segment.value);
@@ -493,53 +496,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
         } else if (segment.type === SegmentType.TagSep) {
             uiSegment = this.uiSegmentSrv.newCondition(',');
         } else if (segment.type === SegmentType.TagPlus) {
-            uiSegment = this.buildSelectTagPlusSegment();
+            uiSegment = this.uiSegmentSrv.newPlusButton();
         } else {
             uiSegment = this.uiSegmentSrv.newSegment(segment);
         }
         return this.setSegmentType(uiSegment, segment.type);
-    }
-
-    addSelectMetricSegment() {
-        this.queryModel.addSelectMetricSegment();
-        this.buildSegments();
-    }
-
-    buildSelectTagPlusSegment() {
-        const tagCatSegment = this.uiSegmentSrv.newPlusButton();
-        this.setSegmentType(tagCatSegment, SegmentType.TagPlus);
-        return tagCatSegment;
-    }
-
-    addSelectTagPlusSegment() {
-        let isGraphite = 'graphite' === this.target.querytype;
-        this[isGraphite ? 'gSegments' : 'segments'].push(this.buildSelectTagPlusSegment());
-    }
-
-    newSelectTagValSegment() {
-        const tagValSegment = this.uiSegmentSrv.newKeyValue('*');
-        this.setSegmentType(tagValSegment, SegmentType.TagVal);
-        return tagValSegment;
-    }
-
-    // check to see if we need to add a "select metric" segment to the graphite segments
-    checkForGraphiteSelectMetricSegment() {
-        // check the metric name so far...if there isn't one, add a select-metric segment and be done
-        const path = this.queryModel.getGraphiteSegmentPath();
-        if (!path) {
-            this.addSelectMetricSegment();
-            return Promise.resolve();
-        }
-        // since we have a metric name, query to see if there are value options for the next segment (which likely doesn't exist yet)
-        return this.datasource
-            .metricGraphiteQuery(path + '*')
-            .then((values) => {
-                // if we have value options then add a "select metric" segment
-                if (values.data.length) {
-                    this.addSelectMetricSegment();
-                }
-            })
-            .catch((err) => {});
     }
 
     // this sets segment focus for both standard & graphite segments
@@ -622,7 +583,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
         // "expandable" means it's not the last segment, so there will be another segment dropdown to follow.
         if (segment.expandable) {
-            this.addSelectMetricSegment();
+            this.queryModel.addSelectMetricSegment();
+            this.buildSegments();
         }
         this.setSegmentFocus(segmentIndex + 1);
         this.buildQueries();
@@ -631,18 +593,47 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     // this takes the queryModel segment JSON and builds it into actual segment objects
     buildSegments() {
-        this.gSegments = this.queryModel.gSegments.map((s) => this.mapSegment(s));
-        this.segments = this.queryModel.segments.map((s) => this.mapSegment(s));
+        this.gSegments = this.queryModel.gSegments.map((s) => this.convertSegment(s));
+        this.segments = this.queryModel.segments.map((s) => this.convertSegment(s));
     }
 
     // check to see if we need a "select metric" or "plus" segment
     checkForPlusAndSelect() {
-        if ('graphite' === this.target.querytype) {
+        let isGraphite = 'graphite' === this.target.querytype;
+        let hasNonMetricSegment = this.segments.some((el) => {
+            return el._type != null && el._type !== 'segment' && el._type !== SegmentType.MetricName;
+        });
+        if (isGraphite) {
             this.checkForGraphiteSelectMetricSegment();
-        } else if (1 === this.segments.length) {
-            // if the first segment is the last segment then add a plus segment following it
-            this.addSelectTagPlusSegment();
         }
+        // only add a plus segment if this is a bare metric with no plus segment or filter yet
+        if ((!isGraphite && 1 === this.segments.length) || (isGraphite && !hasNonMetricSegment)) {
+            // if the first segment is the last segment then add a plus segment following it
+            let plusSegment = this.setSegmentType(this.uiSegmentSrv.newPlusButton(), SegmentType.TagPlus);
+            this[isGraphite ? 'gSegments' : 'segments'].push(plusSegment);
+        }
+    }
+
+    // check to see if we need to add a "select metric" segment to the graphite segments
+    checkForGraphiteSelectMetricSegment() {
+        // check the metric name so far...if there isn't one, add a select-metric segment and be done
+        const path = this.queryModel.getGraphiteSegmentPath();
+        if (!path) {
+            this.queryModel.addSelectMetricSegment();
+            this.buildSegments();
+            return Promise.resolve();
+        }
+        // since we have a metric name, query to see if there are value options for the next segment (which likely doesn't exist yet)
+        return this.datasource
+            .metricGraphiteQuery(path + '*')
+            .then((values) => {
+                // if we have value options then add a "select metric" segment
+                if (values.data.length) {
+                    this.queryModel.addSelectMetricSegment();
+                    this.buildSegments();
+                }
+            })
+            .catch((err) => {});
     }
 
     // this takes an index and removes that segment and all following segments

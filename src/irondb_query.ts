@@ -479,12 +479,13 @@ export default class IrondbQuery {
     // return the graphite metric segment path up to the specified index
     getGraphiteSegmentPathUpTo(index) {
         var arr = this.gSegments.slice(0, index);
-
-        return arr.reduce((str, segment) => str + segment.value + '.');
+        if (!arr.length) {
+            arr.push('');
+        }
+        return arr.reduce((str, segment) => (str || '') + segment.value + '.');
     }
 
     updateSegmentValue(segment, index) {
-        //log(() => 'updateSegmentValue() ' + index + ' segment = ' + JSON.stringify(segment));
         let isGraphite = 'graphite' === this.target.querytype;
         if (this[isGraphite ? 'gSegments' : 'segments'][index] !== undefined) {
             this[isGraphite ? 'gSegments' : 'segments'][index].value = segment.value;
@@ -494,13 +495,20 @@ export default class IrondbQuery {
     // add a "select metric" segment before any tag filter segments
     addSelectMetricSegment() {
         let isGraphite = 'graphite' === this.target.querytype;
-        var idx = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
+        let hasSelectAlready = this[isGraphite ? 'gSegments' : 'segments'].some((el) => {
+            return el.type == null && el.value === 'select metric';
+        });
+        let idx = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
             return el.type != null && el.type !== 'segment' && el.type !== 'MetricName';
         });
+        // if there isn't a non-metric segment, add it at the end
         if (!~idx) {
             idx = this[isGraphite ? 'gSegments' : 'segments'].length;
         }
-        this[isGraphite ? 'gSegments' : 'segments'].splice(idx, 0, { value: 'select metric' });
+        // if we don't already have a select segment, add one
+        if (!hasSelectAlready) {
+            this[isGraphite ? 'gSegments' : 'segments'].splice(idx, 0, { value: 'select metric' });
+        }
     }
 
     // this takes an index and removes that segment and all following segments
