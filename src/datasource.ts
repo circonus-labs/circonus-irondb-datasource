@@ -966,7 +966,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 options.url = options.url + '&end=' + end.toFixed(3);
                 options.url = options.url + '&period=' + interval;
                 options.url = options.url + '&q=' + encodeURIComponent(caqlQueryMP);
-                options.name = irondbOptions['caql']['names'][i];
                 options.headers = headers;
                 options.start = start;
                 options.end = end;
@@ -978,8 +977,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     options.headers.Authorization = this.basicAuth;
                 }
                 options.isCaql = true;
-                options.format = irondbOptions['caql']['names'][i]['leaf_data']['format'];
-                options.refId = irondbOptions['caql']['names'][i]['leaf_data']['refId'];
+                options.name = irondbOptions['caql']['names'][i];
+                options.format = (options.name['leaf_data'] || {})['format'];
+                options.refId = (options.name['leaf_data'] || {})['refId'];
                 queries.push(options);
             }
         }

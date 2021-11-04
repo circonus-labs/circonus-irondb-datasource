@@ -467,7 +467,9 @@ export default class IrondbQuery {
 
     // return the entire graphite metric segment path (not including any tag filter)
     getGraphiteSegmentPath() {
-        var idx = this.gSegments.findIndex((el) => { return el.type != null && el.type !== 'segment' && el.type !== 'MetricName' });
+        var idx = this.gSegments.findIndex((el) => {
+            return el.type != null && el.type !== 'segment' && el.type !== 'MetricName';
+        });
         if (!~idx) {
             idx = this.gSegments.length;
         }
@@ -492,7 +494,9 @@ export default class IrondbQuery {
     // add a "select metric" segment before any tag filter segments
     addSelectMetricSegment() {
         let isGraphite = 'graphite' === this.target.querytype;
-        var idx = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => { return el.type != null && el.type !== 'segment' && el.type !== 'MetricName' });
+        var idx = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
+            return el.type != null && el.type !== 'segment' && el.type !== 'MetricName';
+        });
         if (!~idx) {
             idx = this[isGraphite ? 'gSegments' : 'segments'].length;
         }
