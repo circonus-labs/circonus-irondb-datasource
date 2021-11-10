@@ -443,8 +443,8 @@ export default class IrondbQuery {
     // this converts the graphite segments array to the standard segments array
     convertGraphiteToStandard() {
         this.segments = [];
-        const graphiteName = this.getGraphiteSegmentPathUpTo(this.gSegments.length)
-            .replace(/\.select metric\.$/, '.*')
+        const graphiteName = this.getGraphiteSegmentPath()
+            .replace(/\.select\smetric\.$/, '.*')
             .replace(/\.$/, '');
         const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', '*'];
         const hasUUID = !!matches[1];
@@ -476,9 +476,12 @@ export default class IrondbQuery {
         return this.getGraphiteSegmentPathUpTo(idx);
     }
 
-    // return the graphite metric segment path up to the specified index
+    // return the graphite metric segment path up to the specified index (but never including any tag filter)
     getGraphiteSegmentPathUpTo(index) {
-        var arr = this.gSegments.slice(0, index);
+        var tag_filter_idx = this.gSegments.findIndex((el) => {
+            return el.type != null && el.type !== SegmentType.MetricName;
+        });
+        var arr = this.gSegments.slice(0, Math.min(index, tag_filter_idx));
         if (!arr.length) {
             arr.push('');
         }
@@ -487,11 +490,10 @@ export default class IrondbQuery {
         }, '');
     }
 
+    // update a segment's value
     updateSegmentValue(segment, index) {
         let isGraphite = 'graphite' === this.target.querytype;
-        if (this[isGraphite ? 'gSegments' : 'segments'][index] !== undefined) {
-            this[isGraphite ? 'gSegments' : 'segments'][index].value = segment.value;
-        }
+        (this[isGraphite ? 'gSegments' : 'segments'][index] || {}).value = segment.value;
     }
 
     // add a "select metric" segment before any tag filter segments
@@ -516,6 +518,20 @@ export default class IrondbQuery {
         }
     }
 
+    // add a "plus" segment at the end
+    addPlusSegment() {
+        let isGraphite = 'graphite' === this.target.querytype;
+        let hasPlusAlready = this[isGraphite ? 'gSegments' : 'segments'].some((el) => {
+            return el.type === SegmentType.TagPlus;
+        });
+        // if we don't already have a plus segment, add one
+        if (!hasPlusAlready) {
+            this[isGraphite ? 'gSegments' : 'segments'].push({
+                type: SegmentType.TagPlus,
+            });
+        }
+    }
+
     // this takes an index and removes that segment and all following segments
     removeSegments(fromIndex) {
         if (null == fromIndex) {
@@ -531,15 +547,16 @@ export default class IrondbQuery {
         this[isGraphite ? 'gSegments' : 'segments'] = [];
     }
 
-    // this removes an entire operator (e.g. "and(...)" including sub-operators) from a standard query
-    removeStandardOperator(startIndex) {
+    // this removes an entire operator (e.g. "and(...)" including sub-operators) from a query
+    removeOperator(startIndex) {
+        let isGraphite = 'graphite' === this.target.querytype;
         let endIndex = startIndex + 1;
         let endsNeeded = 1;
-        const lastIndex = this.segments.length;
+        const lastIndex = this[isGraphite ? 'gSegments' : 'segments'].length;
         // We need to remove ourself (as well as every other segment) until our TagEnd.
         // For every TagOp we hit, we need to wait until we hit one more TagEnd (to remove any sub-ops).
         while (endsNeeded > 0 && endIndex < lastIndex) {
-            const type = this.segments[endIndex].type;
+            const type = this[isGraphite ? 'gSegments' : 'segments'][endIndex].type;
             if (type === SegmentType.TagOp) {
                 endsNeeded++;
             } else if (type === SegmentType.TagEnd) {
@@ -557,61 +574,70 @@ export default class IrondbQuery {
             deleteStart--;
             countDelete++;
         }
-        this.segments.splice(deleteStart, countDelete);
+        this[isGraphite ? 'gSegments' : 'segments'].splice(deleteStart, countDelete);
         // If these match, we removed the outermost operator, so we need a new plus segment
         if (lastIndex === endIndex + 1) {
-            this.segments.push({ type: SegmentType.TagPlus });
+            this[isGraphite ? 'gSegments' : 'segments'].push({ type: SegmentType.TagPlus });
         }
     }
 
-    // this adds an operator--and(), not(), or()--and the first filter tag to a standard query
-    addStandardOperator(startIndex, value) {
-        if (value === 'and(' || value === 'not(' || value === 'or(') {
-            // Remove any plus segment
-            if (this.segments[startIndex] && this.segments[startIndex].type === SegmentType.TagPlus) {
-                this.segments.splice(startIndex, 1);
-            }
-            // if this isn't the first operator, add a separator (comma)
-            if (startIndex > 2) {
-                this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
-            }
-            // add the segments
-            this.segments.splice(
-                startIndex + 1,
-                0,
-                { type: SegmentType.TagOp, value: value },
-                { type: SegmentType.TagCat, value: 'select tag', fake: true },
-                { type: SegmentType.TagPair },
-                { value: '*' },
-                { type: SegmentType.TagPlus },
-                { type: SegmentType.TagEnd }
-            );
-            // if this isn't the first operator, add another plus segment
-            if (startIndex > 2) {
-                this.segments.splice(startIndex + 7, 0, { type: SegmentType.TagPlus });
-            }
+    // this adds an operator--and(), not(), or()--and the first filter tag to a query
+    addOperator(startIndex, value) {
+        let isGraphite = 'graphite' === this.target.querytype;
+        const firstNonMetricIndex = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
+            return el.type != null && el.type !== SegmentType.MetricName;
+        });
+        if (value !== 'and(' && value !== 'not(' && value !== 'or(') {
+            return;
+        }
+        // Remove any plus segment
+        if ((this[isGraphite ? 'gSegments' : 'segments'][startIndex] || {}).type === SegmentType.TagPlus) {
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 1);
+        }
+        // if this isn't the first operator, add a separator (comma)
+        if ((isGraphite && firstNonMetricIndex < startIndex) || (!isGraphite && startIndex > 2)) {
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 0, { type: SegmentType.TagSep });
+        }
+        // add the segments
+        this[isGraphite ? 'gSegments' : 'segments'].splice(
+            startIndex + 1,
+            0,
+            { type: SegmentType.TagOp, value: value },
+            { type: SegmentType.TagCat, value: 'select tag', fake: true },
+            { type: SegmentType.TagPair },
+            { type: SegmentType.TagVal, value: '*' },
+            { type: SegmentType.TagPlus },
+            { type: SegmentType.TagEnd }
+        );
+        // if this isn't the first operator, add another plus segment
+        if (startIndex > 2) {
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex + 7, 0, { type: SegmentType.TagPlus });
         }
     }
 
-    // this adds a tag (and category) to a standard query
-    addStandardTag(startIndex, value) {
+    // this adds a tag (and category) to a query
+    addTag(startIndex, value) {
+        let isGraphite = 'graphite' === this.target.querytype;
         // if this is at least the third segment, then we have at least one tag before us and we need a separator
         if (startIndex > 2) {
-            this.segments.splice(startIndex, 0, { type: SegmentType.TagSep });
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 0, { type: SegmentType.TagSep });
         }
         // add the tag
-        this.segments.splice(
+        this[isGraphite ? 'gSegments' : 'segments'].splice(
             startIndex + (startIndex > 2 ? 1 : 0),
             0,
             { type: SegmentType.TagCat, value: value },
             { type: SegmentType.TagPair },
-            { value: '*' }
+            { type: SegmentType.TagVal, value: '*' }
         );
         // if index is 1 (immediately after metric name), it's the first add and we're a tagCat
         // so that means we need to add in the implicit and() in the front
         if (startIndex === 1) {
-            this.segments.splice(startIndex, 0, { type: SegmentType.TagOp, value: 'and(' });
-            this.segments.push({ type: SegmentType.TagEnd });
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 0, {
+                type: SegmentType.TagOp,
+                value: 'and(',
+            });
+            this[isGraphite ? 'gSegments' : 'segments'].push({ type: SegmentType.TagEnd });
         }
     }
 
