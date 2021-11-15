@@ -118,15 +118,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.rolluptype = this.target.rolluptype || 'automatic';
         this.target.query = this.target.query || '';
         this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
-        this.target.segments = this.target.segments || [];
-        this.target.gSegments = this.target.gSegments || [];
         this.target.format = this.target.format || 'ts';
         let querytype = this.target.querytype;
-        if (
-            this.queryTypeOptions.some(function (cfg) {
-                return cfg.value === querytype;
-            })
-        ) {
+        if (this.queryTypeOptions.some((cfg) => cfg.value === querytype)) {
             this.target.querytype = querytype;
         } else if (this.target.isCaql !== null) {
             this.target.querytype = this.target.isCaql ? 'caql' : this.datasource.allowGraphite ? 'graphite' : 'basic';
@@ -966,10 +960,35 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     // this builds a graphite-style query out of the segments
     buildGraphiteQuery() {
+        // query
         this.target.query = this.target.queryDisplay = this.queryModel
             .getGraphiteSegmentPath()
             .replace(/\.select metric.$/, '')
             .replace(/\.$/, '');
+        // tag filter
+        let filterValues = [];
+        this.queryModel.gSegments.forEach((segment) => {
+            switch (segment.type) {
+                case SegmentType.TagPair:
+                    filterValues.push(':');
+                    break;
+
+                case SegmentType.TagSep:
+                    filterValues.push(',');
+                    break;
+
+                case SegmentType.TagEnd:
+                    filterValues.push(')');
+                    break;
+
+                case SegmentType.TagCat:
+                case SegmentType.TagVal:
+                case SegmentType.TagOp:
+                    filterValues.push(segment.value);
+                    break;
+            }
+        });
+        this.target.tagFilter = filterValues.join('');
     }
 
     // this builds a standard query out of the segments
