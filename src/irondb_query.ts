@@ -417,23 +417,36 @@ export default class IrondbQuery {
     }
 
     // this converts the standard segments array (or another arbitrary string) to the graphite segments array
-    convertStandardToGraphite(metricNameOverride = '') {
-        let gSegments = (this.gSegments = []);
-        let metricName = String(metricNameOverride);
+    convertStandardToGraphite(metricName = '') {
+        let nameSegments = [];
+        let filterSegments = [];
 
-        if (!metricNameOverride) {
-            this.segments.some(function (segment) {
+        if (metricName) {
+            // process a passed metricName
+            nameSegments = metricName
+                .split('|ST')[0]
+                .split('.')
+                .map(function (piece) {
+                    return { type: SegmentType.MetricName, value: piece };
+                });
+        } else {
+            // split segments into name & filter segments
+            this.segments.forEach((segment) => {
                 if (segment.type === SegmentType.MetricName) {
-                    metricName = segment.value;
-                    return true;
+                    nameSegments = (segment.value || '')
+                        .split('|ST')[0]
+                        .split('.')
+                        .map(function (piece) {
+                            return { type: SegmentType.MetricName, value: piece };
+                        });
+                } else {
+                    const clonedSegment = _.assign({}, segment);
+                    filterSegments.push(clonedSegment);
                 }
             });
         }
-        metricName.split('.').forEach(function (piece) {
-            if (piece) {
-                gSegments.push({ value: piece });
-            }
-        });
+        this.gSegments = nameSegments.concat(filterSegments);
+
         // if the standard query was '*', we want a blank graphite query
         if (1 === this.gSegments.length && '*' === this.gSegments[0].value) {
             this.gSegments.splice(0, 1);
@@ -442,26 +455,85 @@ export default class IrondbQuery {
 
     // this converts the graphite segments array to the standard segments array
     convertGraphiteToStandard() {
-        this.segments = [];
-        const graphiteName = this.getGraphiteSegmentPath()
-            .replace(/\.select\smetric\.$/, '.*')
-            .replace(/\.$/, '');
-        const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', '*'];
-        const hasUUID = !!matches[1];
-        this.segments.push({ type: SegmentType.MetricName, value: matches[2] }); // if there's no metric expression segment selected yet, this will be plain "select metric"
-        // have a UUID? then add it as a tag
-        if (hasUUID) {
-            let tagCat = '__check_uuid';
-            let tagVal = matches[1];
-            this.segments.push({ type: SegmentType.TagOp, value: 'and(' });
-            this.segments.push({ type: SegmentType.TagCat, value: tagCat });
-            this.segments.push({ type: SegmentType.TagPair });
-            this.segments.push({ type: SegmentType.TagVal, value: tagVal });
-            this.segments.push({ type: SegmentType.TagPlus });
-            this.segments.push({ type: SegmentType.TagEnd });
-            // don't have a UUID? then add a plus segment
-        } else {
-            this.segments.push({ type: SegmentType.TagPlus });
+        const tagCat = '__check_uuid';
+        let namePieces = [];
+        let filterSegments = [];
+        let uuid = '';
+        // split segments into name & filter segments
+        this.gSegments.forEach((segment, segmentIndex) => {
+            if (segment.type === SegmentType.MetricName) {
+                if (/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$/.test(segment.value) && 0 === segmentIndex) {
+                    // pull any UUID off of the beginning
+                    uuid = segment.value;
+                } else {
+                    // we don't want "select metric" at the end of a partial metric name
+                    namePieces.push('select metric' === segment.value ? '*' : segment.value);
+                }
+            } else {
+                let clonedSegment = _.assign({}, segment);
+                filterSegments.push(clonedSegment);
+            }
+        });
+        // combine everything into a single segments array
+        this.segments = [{ type: SegmentType.MetricName, value: namePieces.join('.') }].concat(filterSegments);
+        // have a UUID? then add it as a tag filter
+        if (uuid) {
+            let firstOpIsAnd = false;
+            let hasTagFilter = this.segments.some((segment) => {
+                if (segment.type === SegmentType.TagOp) {
+                    firstOpIsAnd = 'and(' === segment.value;
+                }
+                return segment.type === SegmentType.TagOp;
+            });
+            // if there's a tag filter and the outer operator is `and()`, insert the UUID at the end of that operator
+            if (hasTagFilter && firstOpIsAnd) {
+                const lastSegment = this.segments[this.segments.length - 1];
+                const nextLastSegment = this.segments[this.segments.length - 2];
+                let spliceIndex = -1;
+                if (lastSegment.type === SegmentType.TagEnd) {
+                    if (nextLastSegment.type === SegmentType.TagPlus) {
+                        spliceIndex = this.segments.length - 2;
+                    } else {
+                        spliceIndex = this.segments.length - 1;
+                    }
+                }
+                if (~spliceIndex) {
+                    this.segments.splice(
+                        spliceIndex,
+                        0,
+                        { type: SegmentType.TagSep },
+                        { type: SegmentType.TagCat, value: tagCat },
+                        { type: SegmentType.TagPair },
+                        { type: SegmentType.TagVal, value: uuid }
+                    );
+                }
+            }
+            // if there's a tag filter but the outer operator is not `and()`, wrap the filter in an `and()` operator
+            if (hasTagFilter && !firstOpIsAnd) {
+                const firstOpIndex = this.segments.findIndex((segment) => segment.type === SegmentType.TagOp);
+                if (~firstOpIndex) {
+                    this.segments.splice(firstOpIndex, 0, { type: SegmentType.TagOp, value: 'and(' });
+                }
+                this.segments.push(
+                    { type: SegmentType.TagSep },
+                    { type: SegmentType.TagCat, value: tagCat },
+                    { type: SegmentType.TagPair },
+                    { type: SegmentType.TagVal, value: uuid },
+                    { type: SegmentType.TagPlus },
+                    { type: SegmentType.TagEnd }
+                );
+            }
+            // if there's no tag filter so far, add an `and()` operator
+            if (!hasTagFilter) {
+                this.segments.push(
+                    { type: SegmentType.TagOp, value: 'and(' },
+                    { type: SegmentType.TagCat, value: tagCat },
+                    { type: SegmentType.TagPair },
+                    { type: SegmentType.TagVal, value: uuid },
+                    { type: SegmentType.TagPlus },
+                    { type: SegmentType.TagEnd }
+                );
+            }
         }
     }
 
@@ -584,9 +656,12 @@ export default class IrondbQuery {
     // this adds an operator--and(), not(), or()--and the first filter tag to a query
     addOperator(startIndex, value) {
         let isGraphite = 'graphite' === this.target.querytype;
-        const firstNonMetricIndex = this[isGraphite ? 'gSegments' : 'segments'].findIndex((el) => {
-            return el.type != null && el.type !== SegmentType.MetricName;
+        const firstNonMetricIndex = this[isGraphite ? 'gSegments' : 'segments'].findIndex((segment) => {
+            return segment.type != null && segment.type !== SegmentType.MetricName;
         });
+        const isNotTheFirstOperator =
+            (isGraphite && firstNonMetricIndex < startIndex) || (!isGraphite && startIndex > 2);
+        let indexMod = 0;
         if (value !== 'and(' && value !== 'not(' && value !== 'or(') {
             return;
         }
@@ -595,12 +670,13 @@ export default class IrondbQuery {
             this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 1);
         }
         // if this isn't the first operator, add a separator (comma)
-        if ((isGraphite && firstNonMetricIndex < startIndex) || (!isGraphite && startIndex > 2)) {
+        if (isNotTheFirstOperator) {
             this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex, 0, { type: SegmentType.TagSep });
+            indexMod = 1;
         }
         // add the segments
         this[isGraphite ? 'gSegments' : 'segments'].splice(
-            startIndex + 1,
+            startIndex + indexMod,
             0,
             { type: SegmentType.TagOp, value: value },
             { type: SegmentType.TagCat, value: 'select tag', fake: true },
@@ -610,8 +686,10 @@ export default class IrondbQuery {
             { type: SegmentType.TagEnd }
         );
         // if this isn't the first operator, add another plus segment
-        if (startIndex > 2) {
-            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex + 7, 0, { type: SegmentType.TagPlus });
+        if (isNotTheFirstOperator) {
+            this[isGraphite ? 'gSegments' : 'segments'].splice(startIndex + indexMod + 6, 0, {
+                type: SegmentType.TagPlus,
+            });
         }
     }
 

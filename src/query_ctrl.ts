@@ -9,8 +9,30 @@ import './css/query_editor.css';
 
 const log = Log('IrondbQueryCtrl');
 
-function escapeRegExp(regexp) {
+function _escapeRegExp(regexp) {
     return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function _fixRegExp(regexp) {
+    var specialChars = '[]{}()*?.,';
+    var fixedRegExp = [];
+    for (var i = 0; i < regexp.length; ++i) {
+        var c = regexp.charAt(i);
+        switch (c) {
+            case '?':
+                fixedRegExp.push('.');
+                break;
+            case '*':
+                fixedRegExp.push('.*?');
+                break;
+            default:
+                if (specialChars.indexOf(c) >= 0) {
+                    fixedRegExp.push('\\');
+                }
+                fixedRegExp.push(c);
+        }
+    }
+    return fixedRegExp.join('');
 }
 
 export class IrondbQueryCtrl extends QueryCtrl {
@@ -156,26 +178,32 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     // This changes the query type between CAQL/Standard/Graphite
     toggleEditorMode() {
-        // CAQL -> Standard
         if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
+            // CAQL -> Standard
             this.buildQueries();
-            // CAQL -> Graphite
         } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
+            // CAQL -> Graphite
             this.buildQueries();
-            // Standard -> CAQL
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
+            // Standard -> CAQL
             this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
-            // Standard -> Graphite
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
+            // Standard -> Graphite
             this.convertStandardToGraphite();
-            // Graphite -> CAQL
+            this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.buildGraphiteQuery();
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
+            // Graphite -> CAQL
             this.target.query = this.target.queryDisplay = this.buildCAQLFromGraphite();
-            // Graphite -> Standard
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
+            // Graphite -> Standard
             this.convertGraphiteToStandard();
-            // Alerts
+            this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.buildStandardQuery();
         } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
+            // Alerts
             this.target.query = this.target.queryDisplay = '';
         }
         this.panelCtrl.refresh();
@@ -420,7 +448,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         const segmentType = (this.segments[index] || {})._type;
         if (segmentType === SegmentType.MetricName) {
             if (encodeTag(SegmentType.MetricName, query) !== query) {
-                query = 'b/' + btoa(escapeRegExp(query)) + '/';
+                query = 'b/' + btoa(_escapeRegExp(query)) + '/';
             } else {
                 query += '*';
             }
@@ -572,7 +600,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 // convert values into segment objects
                 let optionSegments = _.map(values.data, (option) => {
                     const uuidRegExp = /^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})./;
-                    const queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+                    const queryRegExp = new RegExp(_fixRegExp(query), 'i');
                     if (ignoreUUIDs) {
                         option.name = option.name.replace(uuidRegExp, '');
                     }
@@ -707,9 +735,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.checkForPlusAndSelect();
             this.buildSegments();
             this.setSegmentFocus(index + 1);
-            this.buildQueries();
-            this.panelCtrl.refresh();
         }
+        this.buildQueries();
+        this.panelCtrl.refresh();
     }
 
     // TagCat: this updates a graphite category segment value
@@ -777,7 +805,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.queryModel.convertStandardToGraphite(graphiteName);
         }
         // "expandable" means it's not the last segment, so there will be another segment dropdown to follow.
-        if (segment.expandable) {
+        if (segment.expandable && segment._type === SegmentType.MetricName) {
             this.queryModel.addSelectMetricSegment();
         }
         this.checkForPlusAndSelect();
@@ -825,20 +853,20 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // this takes a standard query egress param and chooses the proper CAQL find() function
-    queryFunctionToCaqlFind() {
+    getCAQLFindFunction() {
         if (this.target.paneltype === 'Heatmap' || this.target.hist_transform !== undefined) {
             return 'find:histogram';
         }
         let findFunction = 'find';
         let egressOverride = this.target.egressoverride;
-        if (egressOverride !== 'average') {
+        if ('average' !== egressOverride && 'automatic' !== egressOverride) {
             egressOverride = this.caqlFindFunctions[egressOverride];
             findFunction += ':' + egressOverride;
         }
         return findFunction;
     }
 
-    buildHistogramTransform() {
+    getCAQLHistogramTransform() {
         if (this.target.hist_transform !== undefined) {
             let egressOverride = this.target.egressoverride;
             if (egressOverride === 'automatic') {
@@ -854,7 +882,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
     }
 
-    buildCaqlLabel() {
+    getCAQLLabel() {
         const labeltype = this.target.labeltype;
         let metriclabel = this.target.metriclabel;
         if (labeltype !== 'default') {
@@ -872,67 +900,52 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // this builds a CAQL find() query out of standard query segments
-    buildCAQLFromStandard() {
-        const segments = this.segments.slice();
-        // First element is always metric name
-        const metricName = segments.shift().value;
-        const tagless = segments.length === 1 && segments[0]._type === SegmentType.TagPlus;
-        if (metricName === '*' && tagless) {
-            return '';
-        }
-        let query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
-        if (tagless) {
-            query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
-            return query;
-        }
-        let firstTag = true;
-        let noComma = false; // because last was a tag:pair
-        for (const segment of segments) {
-            const type = segment._type;
-            if (type === SegmentType.TagPlus) {
-                continue;
-            }
-            if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
-                query += ',';
-                if (firstTag) {
-                    query += " '";
-                    firstTag = false;
-                }
-            }
-            if (
-                type === SegmentType.TagOp ||
-                type === SegmentType.TagPair ||
-                type === SegmentType.TagCat ||
-                type === SegmentType.TagSep
-            ) {
-                noComma = true;
-            } else {
-                noComma = false;
-            }
+    /* params:
+     *     metricPrefix (a string to be prepended to the metric name...used to prepend the `[graphite]` index specifier)
+     */
+    buildCAQLFromStandard(metricPrefix = '') {
+        let metric = '*';
+        let filterValues = [];
+        this.queryModel.segments.forEach((segment) => {
+            switch (segment.type) {
+                case SegmentType.MetricName:
+                    metric = segment.value;
+                    break;
 
-            query += encodeTag(type, segment.value);
+                case SegmentType.TagPair:
+                    filterValues.push(':');
+                    break;
+
+                case SegmentType.TagSep:
+                    filterValues.push(',');
+                    break;
+
+                case SegmentType.TagEnd:
+                    filterValues.push(')');
+                    break;
+
+                case SegmentType.TagCat:
+                case SegmentType.TagVal:
+                case SegmentType.TagOp:
+                    filterValues.push(segment.value);
+                    break;
+            }
+        });
+        let filter = filterValues.join('');
+        let query = this.getCAQLFindFunction() + "('" + metricPrefix + metric + "'";
+        if (filter) {
+            query += ", '" + filter + "')" + this.getCAQLHistogramTransform() + this.getCAQLLabel();
+        } else {
+            query += ')' + this.getCAQLHistogramTransform() + this.getCAQLLabel();
         }
-        query += "')" + this.buildHistogramTransform() + this.buildCaqlLabel();
         return query;
     }
 
     // this builds a CAQL find() query out of graphite-style query segments
     buildCAQLFromGraphite() {
-        const graphiteName = this.queryModel
-            .getGraphiteSegmentPath()
-            .replace(/\.select\smetric.$/, '.*')
-            .replace(/\.$/, '');
-        const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
-        const hasUUID = !!matches[1];
-        if (graphiteName === '*' && !hasUUID) {
-            return '';
-        }
-        let query = this.queryFunctionToCaqlFind() + "('[graphite]" + matches[2] + "'";
-        if (hasUUID) {
-            query += ', "and(__check_uuid:' + matches[1] + ')"';
-        }
-        query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
-        return query;
+        this.convertGraphiteToStandard();
+        this.buildSegments();
+        return this.buildCAQLFromStandard('[graphite]');
     }
 
     // this converts standard segments to graphite segments
@@ -1001,27 +1014,5 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.buildStandardQuery();
         }
         this.queryModel.renderQueries(this.panelCtrl.panel.targets);
-    }
-
-    escapeRegExp(regexp) {
-        var specialChars = '[]{}()*?.,';
-        var fixedRegExp = [];
-        for (var i = 0; i < regexp.length; ++i) {
-            var c = regexp.charAt(i);
-            switch (c) {
-                case '?':
-                    fixedRegExp.push('.');
-                    break;
-                case '*':
-                    fixedRegExp.push('.*?');
-                    break;
-                default:
-                    if (specialChars.indexOf(c) >= 0) {
-                        fixedRegExp.push('\\');
-                    }
-                    fixedRegExp.push(c);
-            }
-        }
-        return fixedRegExp.join('');
     }
 }
