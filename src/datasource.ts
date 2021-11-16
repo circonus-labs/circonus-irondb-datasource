@@ -662,14 +662,18 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return !(this.queryPrefix || '').trim();
     }
 
-    metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
+    metricGraphiteQuery(query: string, doNotFollowLimit: boolean, from?: number, to?: number, tagFilter?: string) {
         const ignoreUUIDs = this.ignoreGraphiteUUIDs();
-        let queryUrl = '/' + this.queryPrefix;
-        queryUrl = queryUrl + '/metrics/find?query=' + (ignoreUUIDs ? '*.' : '') + query + '&activity=0';
+        let queryUrl = '/' + this.queryPrefix + '/metrics/find';
+        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0'];
+        if (tagFilter) {
+            qsParams.push('irondb_tag_filter=' + tagFilter);
+        }
+        queryUrl += '?' + qsParams.join('&');
         return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
     }
 
-    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
+    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number) {
         if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
             return Promise.resolve({ data: [] });
         }
@@ -685,7 +689,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     // Used by metricFindQuery
-    metricFindTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
+    metricFindTagValsQuery(metricQuery: string, cat: string, from?: number, to?: number) {
         let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=' + metricQuery;
         if (this.activityTracking && from && to) {
             log(() => 'metricFindTagsQuery() activityWindow = [' + from + ',' + to + ']');
@@ -696,7 +700,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
     }
 
-    metricTagValsQuery(encodedMetricName: string, cat: string, from?: number = null, to: number = null) {
+    metricTagValsQuery(encodedMetricName: string, cat: string, from?: number, to?: number) {
         let queryUrl =
             '/find' +
             this.getAccountId() +
@@ -714,7 +718,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
     }
 
-    metricTagCatsQuery(encodedMetricName: string, from?: number = null, to: number = null) {
+    metricTagCatsQuery(encodedMetricName: string, from?: number, to?: number) {
         let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=and(__name:' + encodedMetricName + ')&query=';
         if (this.activityTracking && from && to) {
             log(() => 'metricTagsCatsQuery() activityWindow = [' + from + ',' + to + ']');
@@ -1544,10 +1548,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     buildFetchParamsAsync(cleanOptions, target, start, end) {
         const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
         const isGraphite = 'graphite' === target.querytype;
+        const tagFilter = target['tagFilter'] || '';
         const queryFn = isGraphite ? this.metricGraphiteQuery : this.metricTagsQuery;
 
         return queryFn
-            .call(this, rawQuery, false, start, end)
+            .call(this, rawQuery, false, start, end, tagFilter)
             .then((result) => {
                 result.data = this.filterMetricsByType(target, result.data);
                 for (let i = 0; i < result.data.length; i++) {

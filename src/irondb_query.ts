@@ -645,8 +645,8 @@ export default class IrondbQuery {
         }
         let deleteStart = startIndex;
         let countDelete = endIndex - startIndex + 1;
-        // If I'm not the very first operator, then I have a comma in front of me that needs killing
-        if (startIndex > 2) {
+        // If I have a comma in front of me that needs killing, remove it
+        if ((this[isGraphite ? 'gSegments' : 'segments'][startIndex - 1] || {}).type === SegmentType.TagSep) {
             deleteStart--;
             countDelete++;
         }
