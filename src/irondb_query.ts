@@ -256,7 +256,7 @@ export function encodeTag(type: SegmentType, tag: string, exactMatch = true): st
 }
 
 export function decodeTag(tag: string): string {
-    if ((tag.startsWith('b"') && tag.endsWith('"')) || (tag.startsWith('b!') && tag.endsWith('!'))) {
+    if (/^b(["!]{1}).+\1$/.test(tag)) {
         tag = atob(tag.slice(2, tag.length - 1));
     }
     return tag;

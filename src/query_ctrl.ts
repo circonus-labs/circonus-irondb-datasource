@@ -340,7 +340,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         const segmentType = (this.segments[index] || {})._type;
         const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
         return this.datasource
-            .metricTagCatsQuery(metricName)
+            .metricTagCatsQuery('and(__name:' + metricName + ')')
             .then((values) => {
                 if (values.data && values.data.length > 0) {
                     const tagCats = values.data;
@@ -378,7 +378,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return Promise.resolve([]);
         }
         return this.datasource
-            .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
+            .metricTagValsQuery('and(__name:' + metricName + ')', encodeTag(SegmentType.TagCat, tagCat, false))
             .then((values) => {
                 const tagVals = values.data;
                 const tagSegments = [];
@@ -480,7 +480,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             .replace(/\.select\smetric\.$/, '.*')
             .replace(/\.$/, '');
         return this.datasource
-            .metricTagCatsQuery(metricName)
+            .metricTagCatsQuery('and(__name:' + metricName + ')')
             .then((values) => {
                 if (values.data && values.data.length > 0) {
                     const tagCats = values.data;
@@ -521,7 +521,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
             return Promise.resolve([]);
         }
         return this.datasource
-            .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
+            .metricTagValsQuery('and(__name:' + metricName + ')', encodeTag(SegmentType.TagCat, tagCat, false))
             .then((values) => {
                 const tagVals = values.data;
                 const tagSegments = [];
