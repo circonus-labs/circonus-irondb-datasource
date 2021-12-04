@@ -33,6 +33,7 @@ These instructions will build and run a Docker container with a Grafana instance
    npm install --global yarn
    yarn install
    yarn build
+   mage -v
    export GRAFANA_API_KEY=<Obtained from: https://grafana.com/docs/grafana-cloud/reference/create-api-key/>
    export GRAFANA_TOOLKIT=$(find . -type f -iname "grafana-toolkit.js")
    node $GRAFANA_TOOLKIT plugin:sign --rootUrls http://localhost:3000/ # Change to match the URL of your Grafana install
