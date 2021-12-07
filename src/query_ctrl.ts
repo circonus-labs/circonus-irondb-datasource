@@ -9,8 +9,30 @@ import './css/query_editor.css';
 
 const log = Log('IrondbQueryCtrl');
 
-function escapeRegExp(regexp) {
+function _escapeRegExp(regexp) {
     return String(regexp).replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function _fixRegExp(regexp) {
+    var specialChars = '[]{}()*?.,';
+    var fixedRegExp = [];
+    for (var i = 0; i < regexp.length; ++i) {
+        var c = regexp.charAt(i);
+        switch (c) {
+            case '?':
+                fixedRegExp.push('.');
+                break;
+            case '*':
+                fixedRegExp.push('.*?');
+                break;
+            default:
+                if (specialChars.indexOf(c) >= 0) {
+                    fixedRegExp.push('\\');
+                }
+                fixedRegExp.push(c);
+        }
+    }
+    return fixedRegExp.join('');
 }
 
 export class IrondbQueryCtrl extends QueryCtrl {
@@ -96,15 +118,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.rolluptype = this.target.rolluptype || 'automatic';
         this.target.query = this.target.query || '';
         this.target.queryDisplay = this.target.queryDisplay || this.target.query || '';
-        this.target.segments = this.target.segments || [];
-        this.target.gSegments = this.target.gSegments || [];
         this.target.format = this.target.format || 'ts';
         let querytype = this.target.querytype;
-        if (
-            this.queryTypeOptions.some(function (cfg) {
-                return cfg.value === querytype;
-            })
-        ) {
+        if (this.queryTypeOptions.some((cfg) => cfg.value === querytype)) {
             this.target.querytype = querytype;
         } else if (this.target.isCaql !== null) {
             this.target.querytype = this.target.isCaql ? 'caql' : this.datasource.allowGraphite ? 'graphite' : 'basic';
@@ -119,6 +135,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.min_period =
             this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
         this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
+        this.checkForPlusAndSelect();
         this.buildSegments();
         this.updateMetricLabelValue(false);
     }
@@ -136,6 +153,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.alert_id = '';
         this.emptySegments();
         this.queryModel.parseTarget();
+        this.checkForPlusAndSelect();
         this.buildSegments();
         this.panelCtrl.refresh();
     }
@@ -154,26 +172,32 @@ export class IrondbQueryCtrl extends QueryCtrl {
 
     // This changes the query type between CAQL/Standard/Graphite
     toggleEditorMode() {
-        // CAQL -> Standard
         if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
+            // CAQL -> Standard
             this.buildQueries();
-            // CAQL -> Graphite
         } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
+            // CAQL -> Graphite
             this.buildQueries();
-            // Standard -> CAQL
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
+            // Standard -> CAQL
             this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
-            // Standard -> Graphite
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
+            // Standard -> Graphite
             this.convertStandardToGraphite();
-            // Graphite -> CAQL
+            this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.buildGraphiteQuery();
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
+            // Graphite -> CAQL
             this.target.query = this.target.queryDisplay = this.buildCAQLFromGraphite();
-            // Graphite -> Standard
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
+            // Graphite -> Standard
             this.convertGraphiteToStandard();
-            // Alerts
+            this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.buildStandardQuery();
         } else if (this.target.querytype === 'alerts' || this.target.queryType === 'alert_counts') {
+            // Alerts
             this.target.query = this.target.queryDisplay = '';
         }
         this.panelCtrl.refresh();
@@ -309,16 +333,116 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.panelCtrl.refresh(); // Asks the panel to refresh data.
     }
 
-    // this queries various endpoints with the current [incomplete] search to get an array of options for the next segment
+    // TagCat: this queries the tag cat endpoint with the current metric name to get an array of options for the next segment
     //   index: the index of this segment
     //   search: any search string the user has entered to filter the autocomplete
-    getOptionSegments(index, search) {
+    getStandardCategoryOptions(index, search) {
+        const segmentType = (this.segments[index] || {})._type;
+        const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
+        return this.datasource
+            .metricTagCatsQuery('and(__name:' + metricName + ')')
+            .then((values) => {
+                if (values.data && values.data.length > 0) {
+                    const tagCats = values.data;
+                    const tagSegments = [];
+                    for (const tagCat of tagCats) {
+                        tagSegments.push(
+                            this.newSegment(SegmentType.TagCat, {
+                                value: decodeTag(tagCat),
+                                expandable: true,
+                            })
+                        );
+                    }
+                    if (segmentType === SegmentType.TagPlus) {
+                        // For Plus, we want to allow new operators, so put those on the front
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'and(' }));
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'not(' }));
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'or(' }));
+                    }
+                    return tagSegments;
+                }
+            })
+            .catch((err) => {
+                log(() => 'getOptionSegments() err = ' + err);
+                return [];
+            });
+    }
+
+    // TagVal: this queries the tag val endpoint with the current metric name and tag category to get an array of options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getStandardValueOptions(index, search) {
+        const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
+        const tagCat = (this.segments[index - 2] || {}).value;
+        if (tagCat === 'select tag') {
+            return Promise.resolve([]);
+        }
+        return this.datasource
+            .metricTagValsQuery('and(__name:' + metricName + ')', encodeTag(SegmentType.TagCat, tagCat, false))
+            .then((values) => {
+                const tagVals = values.data;
+                const tagSegments = [];
+                tagSegments.push(
+                    this.newSegment(SegmentType.TagVal, {
+                        value: '*',
+                        expandable: true,
+                    })
+                );
+                if (tagVals && tagVals.length) {
+                    _.eachRight(this.templateSrv.variables, (variable) => {
+                        tagSegments.push(
+                            this.newSegment(SegmentType.TagVal, {
+                                type: 'template',
+                                value: '$' + variable.name,
+                                expandable: true,
+                            })
+                        );
+                    });
+                    for (const tagVal of tagVals) {
+                        tagSegments.push(
+                            this.newSegment(SegmentType.TagVal, {
+                                value: decodeTag(tagVal),
+                                expandable: true,
+                            })
+                        );
+                    }
+                }
+                return tagSegments;
+            })
+            .catch((err) => {
+                log(() => 'getOptionSegments() err = ' + err);
+                return [];
+            });
+    }
+
+    // TagPlus: this gets the standard category options here also
+    getStandardPlusOptions(index, search) {
+        return this.getStandardCategoryOptions(index, search);
+    }
+
+    // TagOp: this returns an array of operator options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getStandardOperatorOptions(index, search) {
+        const tagSegments = [
+            this.newSegment(SegmentType.TagOp, { value: 'REMOVE' }),
+            this.newSegment(SegmentType.TagOp, { value: 'and(' }),
+            this.newSegment(SegmentType.TagOp, { value: 'not(' }),
+            this.newSegment(SegmentType.TagOp, { value: 'or(' }),
+        ];
+        return Promise.resolve(tagSegments);
+    }
+
+    // this queries tag query endpoint with the current [incomplete] search to get an array of options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getStandardDefaultOptions(index, search) {
         let query = search || '';
 
         const segmentType = (this.segments[index] || {})._type;
         if (segmentType === SegmentType.MetricName) {
             if (encodeTag(SegmentType.MetricName, query) !== query) {
-                query = 'b/' + btoa(escapeRegExp(query)) + '/';
+                query = 'b/' + btoa(_escapeRegExp(query)) + '/';
             } else {
                 query += '*';
             }
@@ -342,95 +466,120 @@ export class IrondbQueryCtrl extends QueryCtrl {
                     log(() => 'getOptionSegments() err = ' + err.toString());
                     return [];
                 });
-        } else if (segmentType === SegmentType.TagCat || segmentType === SegmentType.TagPlus) {
-            const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
-            return this.datasource
-                .metricTagCatsQuery(metricName)
-                .then((values) => {
-                    if (values.data && values.data.length > 0) {
-                        const tagCats = values.data;
-                        const tagSegments = [];
-                        for (const tagCat of tagCats) {
-                            tagSegments.push(
-                                this.newSegment(SegmentType.TagCat, {
-                                    value: decodeTag(tagCat),
-                                    expandable: true,
-                                })
-                            );
-                        }
-                        if (segmentType === SegmentType.TagPlus) {
-                            // For Plus, we want to allow new operators, so put those on the front
-                            tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'and(' }));
-                            tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'not(' }));
-                            tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'or(' }));
-                        }
-                        return tagSegments;
-                    }
-                })
-                .catch((err) => {
-                    log(() => 'getOptionSegments() err = ' + err);
-                    return [];
-                });
-        } else if (segmentType === SegmentType.TagOp) {
-            const tagSegments = [
-                this.newSegment(SegmentType.TagOp, { value: 'REMOVE' }),
-                this.newSegment(SegmentType.TagOp, { value: 'and(' }),
-                this.newSegment(SegmentType.TagOp, { value: 'not(' }),
-                this.newSegment(SegmentType.TagOp, { value: 'or(' }),
-            ];
-            return Promise.resolve(tagSegments);
-        } else if (segmentType === SegmentType.TagVal) {
-            const metricName = encodeTag(SegmentType.MetricName, (this.segments[0] || {}).value);
-            const tagCat = (this.segments[index - 2] || {}).value;
-            if (tagCat === 'select tag') {
-                return Promise.resolve([]);
-            }
-            return this.datasource
-                .metricTagValsQuery(metricName, encodeTag(SegmentType.TagCat, tagCat, false))
-                .then((values) => {
-                    if (values.data && values.data.length > 0) {
-                        const tagVals = values.data;
-                        const tagSegments = [];
+        }
+        return Promise.resolve([]);
+    }
+
+    // TagCat: this queries the tag cat endpoint with the current metric name to get an array of options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getGraphiteCategoryOptions(index, search) {
+        const segmentType = (this.gSegments[index] || {})._type;
+        const metricName = this.queryModel
+            .getGraphiteSegmentPath()
+            .replace(/\.select\smetric\.$/, '.*')
+            .replace(/\.$/, '');
+        return this.datasource
+            .metricTagCatsQuery('and(__name:' + metricName + ')')
+            .then((values) => {
+                if (values.data && values.data.length > 0) {
+                    const tagCats = values.data;
+                    const tagSegments = [];
+                    for (const tagCat of tagCats) {
                         tagSegments.push(
-                            this.newSegment(SegmentType.TagVal, {
-                                value: '*',
+                            this.newSegment(SegmentType.TagCat, {
+                                value: decodeTag(tagCat),
                                 expandable: true,
                             })
                         );
-
-                        _.eachRight(this.templateSrv.variables, (variable) => {
-                            tagSegments.push(
-                                this.newSegment(SegmentType.TagVal, {
-                                    type: 'template',
-                                    value: '$' + variable.name,
-                                    expandable: true,
-                                })
-                            );
-                        });
-
-                        for (const tagVal of tagVals) {
-                            tagSegments.push(
-                                this.newSegment(SegmentType.TagVal, {
-                                    value: decodeTag(tagVal),
-                                    expandable: true,
-                                })
-                            );
-                        }
-                        return tagSegments;
                     }
-                })
-                .catch((err) => {
-                    log(() => 'getOptionSegments() err = ' + err);
-                    return [];
-                });
+                    if (segmentType === SegmentType.TagPlus) {
+                        // For Plus, we want to allow new operators, so put those on the front
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'and(' }));
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'not(' }));
+                        tagSegments.unshift(this.newSegment(SegmentType.TagOp, { value: 'or(' }));
+                    }
+                    return tagSegments;
+                }
+            })
+            .catch((err) => {
+                log(() => 'getOptionSegments() err = ' + err);
+                return [];
+            });
+    }
+
+    // TagVal: this queries the tag val endpoint with the current metric name and tag category to get an array of options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getGraphiteValueOptions(index, search) {
+        const metricName = this.queryModel
+            .getGraphiteSegmentPath()
+            .replace(/\.select\smetric\.$/, '.*')
+            .replace(/\.$/, '');
+        const tagCat = (this.gSegments[index - 2] || {}).value;
+        if (tagCat === 'select tag') {
+            return Promise.resolve([]);
         }
-        return Promise.resolve([]);
+        return this.datasource
+            .metricTagValsQuery('and(__name:' + metricName + ')', encodeTag(SegmentType.TagCat, tagCat, false))
+            .then((values) => {
+                const tagVals = values.data;
+                const tagSegments = [];
+                tagSegments.push(
+                    this.newSegment(SegmentType.TagVal, {
+                        value: '*',
+                        expandable: true,
+                    })
+                );
+                if (tagVals && tagVals.length) {
+                    _.eachRight(this.templateSrv.variables, (variable) => {
+                        tagSegments.push(
+                            this.newSegment(SegmentType.TagVal, {
+                                type: 'template',
+                                value: '$' + variable.name,
+                                expandable: true,
+                            })
+                        );
+                    });
+                    for (const tagVal of tagVals) {
+                        tagSegments.push(
+                            this.newSegment(SegmentType.TagVal, {
+                                value: decodeTag(tagVal),
+                                expandable: true,
+                            })
+                        );
+                    }
+                }
+                return tagSegments;
+            })
+            .catch((err) => {
+                log(() => 'getOptionSegments() err = ' + err);
+                return [];
+            });
+    }
+
+    // TagPlus: this gets the graphite category options here also
+    getGraphitePlusOptions(index, search) {
+        return this.getGraphiteCategoryOptions(index, search);
+    }
+
+    // TagOp: this returns an array of operator options for the next segment
+    //   index: the index of this segment
+    //   search: any search string the user has entered to filter the autocomplete
+    getGraphiteOperatorOptions(index, search) {
+        const tagSegments = [
+            this.newSegment(SegmentType.TagOp, { value: 'REMOVE' }),
+            this.newSegment(SegmentType.TagOp, { value: 'and(' }),
+            this.newSegment(SegmentType.TagOp, { value: 'not(' }),
+            this.newSegment(SegmentType.TagOp, { value: 'or(' }),
+        ];
+        return Promise.resolve(tagSegments);
     }
 
     // this queries the graphite endpoint with the current [incomplete] query path to get an array of options for the next segment
     //   index: the index of this segment
     //   search: any search string the user has entered to filter the autocomplete
-    getGraphiteOptionSegments(index, search) {
+    getGraphiteDefaultOptions(index, search) {
         const isFirstSegment = 0 === index;
         // if we're ignoring UUIDs, then we need to prepend our search with '*.' to skip the first segment (the UUID)
         const ignoreUUIDs = this.datasource.ignoreGraphiteUUIDs();
@@ -445,7 +594,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 // convert values into segment objects
                 let optionSegments = _.map(values.data, (option) => {
                     const uuidRegExp = /^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})./;
-                    const queryRegExp = new RegExp(this.escapeRegExp(query), 'i');
+                    const queryRegExp = new RegExp(_fixRegExp(query), 'i');
                     if (ignoreUUIDs) {
                         option.name = option.name.replace(uuidRegExp, '');
                     }
@@ -469,18 +618,21 @@ export class IrondbQueryCtrl extends QueryCtrl {
             });
     }
 
-    setSegmentType(segment: any, type: SegmentType) {
-        segment._type = type;
-        segment._typeName = typeof SegmentType[type];
-        return segment;
-    }
-
+    // create a UI segment with a passed set of options, and set its type correctly
     newSegment(type: SegmentType, options: any) {
         const segment = this.uiSegmentSrv.newSegment(options);
         return this.setSegmentType(segment, type);
     }
 
-    mapSegment(segment) {
+    // set the correct type properties on a segment object
+    setSegmentType(segment: any, type: SegmentType) {
+        segment._type = type;
+        segment._typeName = SegmentType[type];
+        return segment;
+    }
+
+    // convert a segment config object (from the query model) into a bona fide UI segment
+    convertSegment(segment) {
         let uiSegment;
         if (segment.type === SegmentType.TagOp) {
             uiSegment = this.uiSegmentSrv.newOperator(segment.value);
@@ -491,80 +643,18 @@ export class IrondbQueryCtrl extends QueryCtrl {
         } else if (segment.type === SegmentType.TagSep) {
             uiSegment = this.uiSegmentSrv.newCondition(',');
         } else if (segment.type === SegmentType.TagPlus) {
-            uiSegment = this.buildSelectTagPlusSegment();
+            uiSegment = this.uiSegmentSrv.newPlusButton();
         } else {
             uiSegment = this.uiSegmentSrv.newSegment(segment);
         }
         return this.setSegmentType(uiSegment, segment.type);
     }
 
-    addSelectMetricSegment() {
-        let isGraphite = 'graphite' === this.target.querytype;
-        this.queryModel.addSelectMetricSegment();
-        const segment = this.uiSegmentSrv.newSelectMetric();
-        this.setSegmentType(segment, SegmentType.MetricName);
-        this[isGraphite ? 'gSegments' : 'segments'].push(segment);
-    }
-
-    buildSelectTagPlusSegment() {
-        const tagCatSegment = this.uiSegmentSrv.newPlusButton();
-        this.setSegmentType(tagCatSegment, SegmentType.TagPlus);
-        return tagCatSegment;
-    }
-
-    addSelectTagPlusSegment() {
-        let isGraphite = 'graphite' === this.target.querytype;
-        this[isGraphite ? 'gSegments' : 'segments'].push(this.buildSelectTagPlusSegment());
-    }
-
-    newSelectTagValSegment() {
-        const tagValSegment = this.uiSegmentSrv.newKeyValue('*');
-        this.setSegmentType(tagValSegment, SegmentType.TagVal);
-        return tagValSegment;
-    }
-
-    // if the specified segment is the last segment and it's the metric name, then add a plus segment following it
-    checkForPlusSegment(segmentIndex) {
-        const isLastSegment = segmentIndex === this.segments.length - 1;
-        const isMetricName = (this.segments[segmentIndex] || {})._type === SegmentType.MetricName;
-        if (isLastSegment && isMetricName) {
-            this.addSelectTagPlusSegment();
-        }
-    }
-
-    // check to see if we need to add a "select metric" segment to the graphite segments
-    checkForGraphiteSelectMetricSegment(segmentIndex) {
-        // if this is the first segment, add a select-metric segment and be done
-        if (segmentIndex === 0) {
-            this.addSelectMetricSegment();
-            return Promise.resolve();
-        }
-        // check the metric name so far...if there isn't one, be done
-        const path = this.queryModel.getGraphiteSegmentPathUpTo(segmentIndex + 1);
-        if (!path) {
-            return Promise.resolve();
-        }
-        // since we have a metric name, query to see if there are value options for the next segment (which likely doesn't exist yet)
-        return this.datasource
-            .metricGraphiteQuery(path + '*')
-            .then((values) => {
-                // if we have no value options, remove all subsequent segments (b/c there aren't any values for the following segment(s))
-                if (!values.data.length) {
-                    this.removeSegments(segmentIndex + 1);
-                } else if (segmentIndex === this.gSegments.length - 1) {
-                    this.addSelectMetricSegment();
-                } else {
-                    return this.checkForGraphiteSelectMetricSegment(segmentIndex + 1);
-                }
-            })
-            .catch((err) => {});
-    }
-
     // this sets segment focus for both standard & graphite segments
-    setSegmentFocus(segmentIndex) {
+    setSegmentFocus(index) {
         let isGraphite = 'graphite' === this.target.querytype;
-        _.each(this[isGraphite ? 'gSegments' : 'segments'], (segment, index) => {
-            segment.focus = segmentIndex === index;
+        _.each(this[isGraphite ? 'gSegments' : 'segments'], (segment, this_index) => {
+            segment.focus = index === this_index;
         });
     }
 
@@ -574,86 +664,172 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.panelCtrl.refresh();
     }
 
-    // this is called whenever a standard segment value changes
+    // TagCat: this updates a standard category segment value
+    updateStandardCategorySegmentValue(index, segment) {
+        return this.updateStandardDefaultSegmentValue(index, segment);
+    }
+
+    // TagVal: this updates a standard value segment value
+    updateStandardValueSegmentValue(index, segment) {
+        return this.updateStandardDefaultSegmentValue(index, segment);
+    }
+
+    // TagPlus: this updates a standard plus segment value
     // NOTE: if we're adding or removing segments, do those operations on the
     // queryModel and then build those changes back into queryCtrl with buildSegments()
-    segmentValueChanged(segment, segmentIndex) {
+    updateStandardPlusSegmentValue(index, segment) {
         this.error = null;
-        this.queryModel.updateSegmentValue(segment, segmentIndex);
+        this.queryModel.updateSegmentValue(segment, index);
 
-        // If we changed the start metric, all the filters are invalid, so remove them
-        if (segmentIndex === 0) {
-            this.removeSegments(segmentIndex + 1);
-            // we're removing or changing an operator ('and(', 'or(', 'not(')
-        } else if (segment._type === SegmentType.TagOp) {
-            // We need to remove the entire operator (including every other segment) until our TagEnd.
-            if (segment.value === 'REMOVE') {
-                this.queryModel.removeStandardOperator(segmentIndex);
-            }
-            // else changing an Operator doesn't need to affect any other segments
+        // we're adding something, either an operator or a tag
+        if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
+            this.queryModel.addOperator(index, segment.value);
+            //this.checkForPlusAndSelect();
             this.buildSegments();
+            // Do not build queries or refresh the panel; we do not have a valid category yet, so set focus on the category segment
+            this.setSegmentFocus(index + 3);
+        } else {
+            this.queryModel.addTag(index, segment.value);
+            //this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.setSegmentFocus(index + 1);
             this.buildQueries();
             this.panelCtrl.refresh();
-            return;
-            // we're adding something, either an operator or a tag
-        } else if (segment._type === SegmentType.TagPlus) {
-            if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
-                this.queryModel.addStandardOperator(segmentIndex, segment.value);
-                this.buildSegments();
-                this.setSegmentFocus(segmentIndex + 3);
-                return; // Do not trigger buildQueries(); we do not have a valid category yet, so set focus on the category segment
-            } else {
-                this.queryModel.addStandardTag(segmentIndex, segment.value);
-                // Fall through so buildQueries() gets called below.
-            }
         }
-        // if we didn't remove or change an operator, we need to rebuild
+    }
+
+    // TagOp: this updates a standard operator segment value
+    // NOTE: if we're adding or removing segments, do those operations on the
+    // queryModel and then build those changes back into queryCtrl with buildSegments()
+    updateStandardOperatorSegmentValue(index, segment) {
+        this.error = null;
+        this.queryModel.updateSegmentValue(segment, index);
+
+        // We need to remove the entire operator (including every other segment) until our TagEnd.
+        if (segment.value === 'REMOVE') {
+            this.queryModel.removeOperator(index);
+        }
+        // else changing an Operator doesn't need to affect any other segments
+        this.checkForPlusAndSelect();
         this.buildSegments();
-        if (segment.expandable) {
-            this.checkForPlusSegment(segmentIndex); // add a new plus segment if needed
-        }
-        this.setSegmentFocus(segmentIndex + 1);
         this.buildQueries();
         this.panelCtrl.refresh();
     }
 
-    // this is called whenever a graphite segment value changes
-    graphiteSegmentValueChanged(segment, segmentIndex) {
+    // this updates a standard metric name (or tag category or tag value) segment value
+    // NOTE: if we're adding or removing segments, do those operations on the
+    // queryModel and then build those changes back into queryCtrl with buildSegments()
+    updateStandardDefaultSegmentValue(index, segment) {
+        this.error = null;
+        this.queryModel.updateSegmentValue(segment, index);
+
+        // we changed the start metric, so we remove all the filters b/c they're invalid
+        if (0 === index) {
+            this.removeSegments(index + 1);
+            this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.setSegmentFocus(index + 1);
+        }
+        this.buildQueries();
+        this.panelCtrl.refresh();
+    }
+
+    // TagCat: this updates a graphite category segment value
+    updateGraphiteCategorySegmentValue(index, segment) {
+        return this.updateGraphiteDefaultSegmentValue(index, segment);
+    }
+
+    // TagVal: this updates a graphite value segment value
+    updateGraphiteValueSegmentValue(index, segment) {
+        return this.updateGraphiteDefaultSegmentValue(index, segment);
+    }
+
+    // TagPlus: this updates a graphite plus segment value
+    updateGraphitePlusSegmentValue(index, segment) {
+        this.error = null;
+        this.queryModel.updateSegmentValue(segment, index);
+
+        // we're adding something, either an operator or a tag
+        if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
+            this.queryModel.addOperator(index, segment.value);
+            //this.checkForPlusAndSelect();
+            this.buildSegments();
+            // Do not build queries or refresh the panel; we do not have a valid category yet, so set focus on the category segment
+            this.setSegmentFocus(index + 3);
+        } else {
+            this.queryModel.addTag(index, segment.value);
+            //this.checkForPlusAndSelect();
+            this.buildSegments();
+            this.setSegmentFocus(index + 1);
+            this.buildQueries();
+            this.panelCtrl.refresh();
+        }
+    }
+
+    // TagOp: this updates a graphite operator segment value
+    updateGraphiteOperatorSegmentValue(index, segment) {
+        this.error = null;
+        this.queryModel.updateSegmentValue(segment, index);
+
+        // We need to remove the entire operator (including every other segment) until our TagEnd.
+        if (segment.value === 'REMOVE') {
+            this.queryModel.removeOperator(index);
+        }
+        // else changing an Operator doesn't need to affect any other segments
+        this.checkForPlusAndSelect();
+        this.buildSegments();
+        this.buildQueries();
+        this.panelCtrl.refresh();
+    }
+
+    // this updates a graphite metric name (or tag category or tag value) segment value
+    updateGraphiteDefaultSegmentValue(index, segment) {
         const isMultiSegment = /\./.test(String(segment.value));
 
         this.error = null;
-        this.queryModel.updateSegmentValue(segment, segmentIndex);
-        this.removeSegments(segmentIndex + 1);
+        this.queryModel.updateSegmentValue(segment, index);
+
+        // we changed the first metric segment, so we remove all the filters b/c they're in a different namespace now
+        if (0 === index) {
+            this.removeSegments(index + 1);
+        }
         // if they've entered multiple segments, we need to reconstruct the name segments by using the entire name entered so far
         if (isMultiSegment) {
-            const graphiteName = this.queryModel.getGraphiteSegmentPathUpTo(this.gSegments.length).replace(/\.$/, '');
+            const graphiteName = this.queryModel.getGraphiteSegmentPath().replace(/\.$/, '');
             this.queryModel.convertStandardToGraphite(graphiteName);
-            this.buildSegments(true);
         }
         // "expandable" means it's not the last segment, so there will be another segment dropdown to follow.
-        if (segment.expandable) {
-            this.addSelectMetricSegment();
+        if (segment.expandable && segment._type === SegmentType.MetricName) {
+            this.queryModel.addSelectMetricSegment();
         }
-        this.setSegmentFocus(segmentIndex + 1);
+        this.checkForPlusAndSelect();
+        this.buildSegments();
+        if (segment.expandable) {
+            this.setSegmentFocus(index + 1);
+        }
         this.buildQueries();
         this.panelCtrl.refresh();
     }
 
     // this takes the queryModel segment JSON and builds it into actual segment objects
-    buildSegments(skipPlusCheck = false) {
-        // always rebuild both
-        this.gSegments = _.map(this.queryModel.gSegments, (segment) => {
-            return this.uiSegmentSrv.newSegment(segment);
-        });
-        this.segments = _.map(this.queryModel.segments, (s) => this.mapSegment(s));
-        // check to see if we need a "select metric" or "plus" segment
-        if (!skipPlusCheck) {
-            if ('graphite' === this.target.querytype) {
-                this.checkForGraphiteSelectMetricSegment(Math.max(this.queryModel.gSegments.length, 1) - 1); // Math.max() ensures that we never pass -1 even if gSegments is empty
-            } else {
-                this.checkForPlusSegment(0);
+    buildSegments() {
+        this.gSegments = this.queryModel.gSegments.map((s) => this.convertSegment(s));
+        this.segments = this.queryModel.segments.map((s) => this.convertSegment(s));
+    }
+
+    // check to see if we need a "select metric" or "plus" segment
+    // NOTE: you must run this.buildSegments() after this function
+    checkForPlusAndSelect() {
+        let isGraphite = 'graphite' === this.target.querytype;
+        if (isGraphite) {
+            // check the metric name so far...if there isn't one, add a select-metric segment and be done
+            const path = this.queryModel.getGraphiteSegmentPath();
+            if (!path || '.' === path) {
+                this.queryModel.addSelectMetricSegment();
             }
         }
+        // always add a plus segment if there's not already one (the logic is in the model)
+        this.queryModel.addPlusSegment();
     }
 
     // this takes an index and removes that segment and all following segments
@@ -671,20 +847,20 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // this takes a standard query egress param and chooses the proper CAQL find() function
-    queryFunctionToCaqlFind() {
+    getCAQLFindFunction() {
         if (this.target.paneltype === 'Heatmap' || this.target.hist_transform !== undefined) {
             return 'find:histogram';
         }
         let findFunction = 'find';
         let egressOverride = this.target.egressoverride;
-        if (egressOverride !== 'average') {
+        if ('average' !== egressOverride && 'automatic' !== egressOverride) {
             egressOverride = this.caqlFindFunctions[egressOverride];
             findFunction += ':' + egressOverride;
         }
         return findFunction;
     }
 
-    buildHistogramTransform() {
+    getCAQLHistogramTransform() {
         if (this.target.hist_transform !== undefined) {
             let egressOverride = this.target.egressoverride;
             if (egressOverride === 'automatic') {
@@ -700,7 +876,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
     }
 
-    buildCaqlLabel() {
+    getCAQLLabel() {
         const labeltype = this.target.labeltype;
         let metriclabel = this.target.metriclabel;
         if (labeltype !== 'default') {
@@ -718,72 +894,58 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // this builds a CAQL find() query out of standard query segments
-    buildCAQLFromStandard() {
-        const segments = this.segments.slice();
-        // First element is always metric name
-        const metricName = segments.shift().value;
-        const tagless = segments.length === 1 && segments[0]._type === SegmentType.TagPlus;
-        if (metricName === '*' && tagless) {
-            return '';
-        }
-        let query = this.queryFunctionToCaqlFind() + "('" + metricName + "'";
-        if (tagless) {
-            query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
-            return query;
-        }
-        let firstTag = true;
-        let noComma = false; // because last was a tag:pair
-        for (const segment of segments) {
-            const type = segment._type;
-            if (type === SegmentType.TagPlus) {
-                continue;
-            }
-            if (!noComma && type !== SegmentType.TagEnd && type !== SegmentType.TagSep) {
-                query += ',';
-                if (firstTag) {
-                    query += " '";
-                    firstTag = false;
-                }
-            }
-            if (
-                type === SegmentType.TagOp ||
-                type === SegmentType.TagPair ||
-                type === SegmentType.TagCat ||
-                type === SegmentType.TagSep
-            ) {
-                noComma = true;
-            } else {
-                noComma = false;
-            }
+    /* params:
+     *     metricPrefix (a string to be prepended to the metric name...used to prepend the `[graphite]` index specifier)
+     */
+    buildCAQLFromStandard(metricPrefix = '') {
+        let metric = '*';
+        let filterValues = [];
+        this.queryModel.segments.forEach((segment) => {
+            switch (segment.type) {
+                case SegmentType.MetricName:
+                    metric = segment.value;
+                    break;
 
-            query += encodeTag(type, segment.value);
+                case SegmentType.TagPair:
+                    filterValues.push(':');
+                    break;
+
+                case SegmentType.TagSep:
+                    filterValues.push(',');
+                    break;
+
+                case SegmentType.TagEnd:
+                    filterValues.push(')');
+                    break;
+
+                case SegmentType.TagCat:
+                case SegmentType.TagVal:
+                case SegmentType.TagOp:
+                    filterValues.push(segment.value);
+                    break;
+            }
+        });
+        let filter = filterValues.join('');
+        let query = this.getCAQLFindFunction() + "('" + metricPrefix + metric + "'";
+        if (filter) {
+            query += ", '" + filter + "')" + this.getCAQLHistogramTransform() + this.getCAQLLabel();
+        } else {
+            query += ')' + this.getCAQLHistogramTransform() + this.getCAQLLabel();
         }
-        query += "')" + this.buildHistogramTransform() + this.buildCaqlLabel();
         return query;
     }
 
     // this builds a CAQL find() query out of graphite-style query segments
     buildCAQLFromGraphite() {
-        const graphiteName = this.queryModel
-            .getGraphiteSegmentPathUpTo(this.gSegments.length)
-            .replace(/\.select metric.$/, '.*')
-            .replace(/\.$/, '');
-        const matches = graphiteName.match(/^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})?\.?(.*)$/) || [null, '', ''];
-        const hasUUID = !!matches[1];
-        if (graphiteName === '*' && !hasUUID) {
-            return '';
-        }
-        let query = this.queryFunctionToCaqlFind() + "('" + matches[2] + "'";
-        if (hasUUID) {
-            query += ', "and(__check_uuid:' + matches[1] + ')"';
-        }
-        query += ')' + this.buildHistogramTransform() + this.buildCaqlLabel();
-        return query;
+        this.convertGraphiteToStandard();
+        this.buildSegments();
+        return this.buildCAQLFromStandard('[graphite]');
     }
 
     // this converts standard segments to graphite segments
     convertStandardToGraphite() {
         this.queryModel.convertStandardToGraphite();
+        this.checkForPlusAndSelect();
         this.buildSegments();
         this.buildGraphiteQuery();
     }
@@ -791,16 +953,42 @@ export class IrondbQueryCtrl extends QueryCtrl {
     // this converts graphite segments to standard segments
     convertGraphiteToStandard() {
         this.queryModel.convertGraphiteToStandard();
+        this.checkForPlusAndSelect();
         this.buildSegments();
         this.buildStandardQuery();
     }
 
     // this builds a graphite-style query out of the segments
     buildGraphiteQuery() {
+        // query
         this.target.query = this.target.queryDisplay = this.queryModel
-            .getGraphiteSegmentPathUpTo(this.gSegments.length)
+            .getGraphiteSegmentPath()
             .replace(/\.select metric.$/, '')
             .replace(/\.$/, '');
+        // tag filter
+        let filterValues = [];
+        this.queryModel.gSegments.forEach((segment) => {
+            switch (segment.type) {
+                case SegmentType.TagPair:
+                    filterValues.push(':');
+                    break;
+
+                case SegmentType.TagSep:
+                    filterValues.push(',');
+                    break;
+
+                case SegmentType.TagEnd:
+                    filterValues.push(')');
+                    break;
+
+                case SegmentType.TagCat:
+                case SegmentType.TagVal:
+                case SegmentType.TagOp:
+                    filterValues.push(segment.value);
+                    break;
+            }
+        });
+        this.target.tagFilter = filterValues.join('');
     }
 
     // this builds a standard query out of the segments
@@ -845,27 +1033,5 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.buildStandardQuery();
         }
         this.queryModel.renderQueries(this.panelCtrl.panel.targets);
-    }
-
-    escapeRegExp(regexp) {
-        var specialChars = '[]{}()*?.,';
-        var fixedRegExp = [];
-        for (var i = 0; i < regexp.length; ++i) {
-            var c = regexp.charAt(i);
-            switch (c) {
-                case '?':
-                    fixedRegExp.push('.');
-                    break;
-                case '*':
-                    fixedRegExp.push('.*?');
-                    break;
-                default:
-                    if (specialChars.indexOf(c) >= 0) {
-                        fixedRegExp.push('\\');
-                    }
-                    fixedRegExp.push(c);
-            }
-        }
-        return fixedRegExp.join('');
     }
 }

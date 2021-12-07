@@ -248,8 +248,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     query(options: DataQueryRequest<IrondbQueryInterface>): Promise<DataQueryResponse> {
-        log(() => 'query() options = ' + JSON.stringify(options));
-
         if (!_.isUndefined(this.queryRange) && !_.isEqual(options.range, this.queryRange)) {
             log(
                 () =>
@@ -581,7 +579,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 metricQuery = 'and(__name:' + metricQuery + ')';
             }
             if (q.tagCategory !== '') {
-                return this.metricFindTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
+                return this.metricTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
                     let result_count = results.headers.get('X-Snowth-Search-Result-Count');
                     if (result_count > 1000) {
                         setTimeout(function () {
@@ -591,6 +589,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                         removeResultWarning();
                     }
                     return _.map(results.data, (result) => {
+                        if (/^b(["!]{1}).+\1$/.test(result)) {
+                            result = atob(result.slice(2, result.length - 1));
+                        }
                         return { value: result };
                     });
                 });
@@ -662,14 +663,18 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return !(this.queryPrefix || '').trim();
     }
 
-    metricGraphiteQuery(query: string, doNotFollowLimit: boolean) {
+    metricGraphiteQuery(query: string, doNotFollowLimit: boolean, from?: number, to?: number, tagFilter?: string) {
         const ignoreUUIDs = this.ignoreGraphiteUUIDs();
-        let queryUrl = '/' + this.queryPrefix;
-        queryUrl = queryUrl + '/metrics/find?query=' + (ignoreUUIDs ? '*.' : '') + query + '&activity=0';
+        let queryUrl = '/' + this.queryPrefix + '/metrics/find';
+        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0'];
+        if (tagFilter) {
+            qsParams.push('irondb_tag_filter=' + tagFilter);
+        }
+        queryUrl += '?' + qsParams.join('&');
         return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
     }
 
-    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number = null, to?: number = null) {
+    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number) {
         if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
             return Promise.resolve({ data: [] });
         }
@@ -684,29 +689,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return this.irondbSimpleRequest('GET', queryUrl, false, true);
     }
 
-    // Used by metricFindQuery
-    metricFindTagValsQuery(metricQuery: string, cat: string, from?: number = null, to: number = null) {
+    metricTagValsQuery(metricQuery: string, cat: string, from?: number, to?: number) {
         let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=' + metricQuery;
         if (this.activityTracking && from && to) {
             log(() => 'metricFindTagsQuery() activityWindow = [' + from + ',' + to + ']');
-            queryUrl += '&activity_start_secs=' + _.toInteger(from);
-            queryUrl += '&activity_end_secs=' + _.toInteger(to);
-        }
-        log(() => 'metricFindTagValsQuery() queryUrl = ' + queryUrl);
-        return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
-    }
-
-    metricTagValsQuery(encodedMetricName: string, cat: string, from?: number = null, to: number = null) {
-        let queryUrl =
-            '/find' +
-            this.getAccountId() +
-            '/tag_vals?category=' +
-            cat +
-            '&query=and(__name:' +
-            encodedMetricName +
-            ')';
-        if (this.activityTracking && from && to) {
-            log(() => 'metricTagsValsQuery() activityWindow = [' + from + ',' + to + ']');
             queryUrl += '&activity_start_secs=' + _.toInteger(from);
             queryUrl += '&activity_end_secs=' + _.toInteger(to);
         }
@@ -714,8 +700,8 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
     }
 
-    metricTagCatsQuery(encodedMetricName: string, from?: number = null, to: number = null) {
-        let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=and(__name:' + encodedMetricName + ')&query=';
+    metricTagCatsQuery(metricQuery: string, from?: number, to?: number) {
+        let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=' + metricQuery;
         if (this.activityTracking && from && to) {
             log(() => 'metricTagsCatsQuery() activityWindow = [' + from + ',' + to + ']');
             queryUrl += '&activity_start_secs=' + _.toInteger(from);
@@ -1542,12 +1528,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     buildFetchParamsAsync(cleanOptions, target, start, end) {
-        const rawQuery = this.templateSrv.replace(target['query'], cleanOptions['scopedVars']);
+        const rawQuery = this.checkVariablesEncoding(
+            this.templateSrv.replace(target['query'], cleanOptions['scopedVars'])
+        );
         const isGraphite = 'graphite' === target.querytype;
+        const tagFilter = target['tagFilter'] || '';
         const queryFn = isGraphite ? this.metricGraphiteQuery : this.metricTagsQuery;
 
         return queryFn
-            .call(this, rawQuery, false, start, end)
+            .call(this, rawQuery, false, start, end, tagFilter)
             .then((result) => {
                 result.data = this.filterMetricsByType(target, result.data);
                 for (let i = 0; i < result.data.length; i++) {
@@ -1921,6 +1910,26 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             data: cleanData,
             query: query,
         };
+    }
+
+    // This looks at the variables and checks for variable values which need b64 encoding due to being used as tag values.
+    // (This is rather dumb/brute-force, but since we can't fully parse the query here, it's all we can do.)
+    // We're basically looking at all the current variable values and encoding them if they're preceded by a colon.
+    checkVariablesEncoding(query) {
+        const slashifyCharsRegExp = /([\\\[\]\(\)\:\-\^\$\?\+\*\.])/g;
+        let vars = this.templateSrv.getVariables();
+        vars.forEach((cfg) => {
+            let val = (cfg.current || {}).value;
+            let valRegExp;
+            try {
+                let slashedVal = slashifyCharsRegExp.test(val) ? val.replace(slashifyCharsRegExp, '\\$1') : val;
+                valRegExp = new RegExp(':' + slashedVal, 'g');
+                if (valRegExp.test(query)) {
+                    query = query.replace(valRegExp, ':b"' + btoa(val) + '"');
+                }
+            } catch (e) {}
+        });
+        return query;
     }
 
     // an alert looks like this:
