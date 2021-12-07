@@ -1037,7 +1037,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                             for (let i = 0; i < result['data'].length; i++) {
                                 if ('target' in result && 'refId' in result['target']) {
                                     result['data'][i]['target'] = result['target']['refId'];
-                                } else if (query.refId) {
+                                } else if (query && query.refId) {
                                     result['data'][i]['target'] = query.refId;
                                 }
                                 queryResults['data'].push(result['data'][i]);
@@ -1046,7 +1046,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                         if (result['data'].constructor === Object) {
                             if ('target' in result && 'refId' in result['target']) {
                                 result['data']['target'] = result['target']['refId'];
-                            } else if (query.refId) {
+                            } else if (query && query.refId) {
                                 result['data']['target'] = query.refId;
                             }
                             queryResults['data'].push(result['data']);
