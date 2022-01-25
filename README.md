@@ -46,7 +46,7 @@ These instructions will build and run a Docker container with a Grafana instance
    *    [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
    *    [Go](https://golang.org/doc/install) > 1.13.15-r0
    *    [Mage](https://github.com/magefile/mage) > 1.11.0
-2. Run the following from a priveledged shell:
+2. Run the following from a privileged shell:
    ```shell
    cd /var/lib/grafana/plugins # or the location of your Grafana plugins directory
    git clone https://github.com/circonus-labs/circonus-irondb-datasource/
