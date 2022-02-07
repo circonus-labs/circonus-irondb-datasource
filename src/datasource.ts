@@ -561,25 +561,36 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (typeof query === 'string') {
             // attempt to translate variable.useTags into the new IronDBVariableQuery structure
             q = {
+                queryType:
+                    variable !== undefined && variable.useTags && variable.tagValuesQuery
+                        ? 'tag values'
+                        : 'metric names',
                 metricFindQuery: query,
                 tagCategory: variable !== undefined && variable.useTags ? variable.tagValuesQuery : '',
+                resultsLimit: 100,
             };
         } else {
+            // this should be the new IronDBVariableQuery structure
             q = query;
         }
 
         log(() => 'Options: ' + JSON.stringify(options));
         if (q !== undefined) {
-            log(() => 'metricFindQuery() incoming query = ' + q.metricFindQuery);
-            log(() => 'metricFindQuery() incoming regex = ' + variable.regex);
+            const queryType = (q && q.queryType) || (q.tagCategory ? 'tag values' : 'metric names');
+            const resultsLimit = (q && q.resultsLimit) || 100;
             let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, this.interpolateExpr);
-            log(() => 'metricFindQuery() interpolatedQuery = ' + metricQuery);
-            log(() => 'metricFindQuery() tagCat = ' + q.tagCategory);
-            if (!(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))) {
+
+            if (
+                'graphite style' !== queryType &&
+                !(metricQuery.includes('and(') || metricQuery.includes('or(') || metricQuery.includes('not('))
+            ) {
+                // ensure that non-graphite-style queries are wrapped by an operator
                 metricQuery = 'and(__name:' + metricQuery + ')';
             }
-            if (q.tagCategory !== '') {
-                return this.metricTagValsQuery(metricQuery, q.tagCategory, from, to).then((results) => {
+
+            if ('tag values' === queryType) {
+                // tag values w/ an optional metric filter
+                return this.metricTagValsQuery(metricQuery, q.tagCategory, from, to, resultsLimit).then((results) => {
                     let result_count = results.headers.get('X-Snowth-Search-Result-Count');
                     if (result_count > 1000) {
                         setTimeout(function () {
@@ -589,14 +600,50 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                         removeResultWarning();
                     }
                     return _.map(results.data, (result) => {
-                        if (/^b(["!]{1}).+\1$/.test(result)) {
-                            result = atob(result.slice(2, result.length - 1));
-                        }
-                        return { value: result };
+                        return { value: this.decodeBase64(result) };
                     });
                 });
+            } else if ('tag categories' === queryType) {
+                // tag categories w/ a metric filter
+                return this.metricTagCatsQuery(metricQuery, from, to, resultsLimit).then((results) => {
+                    let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+                    if (result_count > 1000) {
+                        setTimeout(function () {
+                            showResultWarning(result_count);
+                        }, 100);
+                    } else {
+                        removeResultWarning();
+                    }
+                    return _.map(results.data, (result) => {
+                        return { value: this.decodeBase64(result) };
+                    });
+                });
+            } else if ('graphite style' === queryType) {
+                // graphite-style metric names
+                return this.metricGraphiteQuery(metricQuery, false, from, to, '', resultsLimit).then((results) => {
+                    let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+                    if (result_count > 1000) {
+                        setTimeout(function () {
+                            showResultWarning(result_count);
+                        }, 100);
+                    } else {
+                        removeResultWarning();
+                    }
+                    let deduped = [];
+                    results.data.forEach((result) => {
+                        var name = (result.name || '')
+                            .replace(/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\./)
+                            .split('.')
+                            .pop();
+                        if (!deduped.find((obj) => obj.value === name)) {
+                            deduped.push({ value: name });
+                        }
+                    });
+                    return deduped;
+                });
             } else {
-                return this.metricTagsQuery(metricQuery, false, from, to).then((results) => {
+                // metric names
+                return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit).then((results) => {
                     let result_count = results.headers.get('X-Snowth-Search-Result-Count');
                     if (result_count > 1000) {
                         setTimeout(function () {
@@ -653,6 +700,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
     }
 
+    decodeBase64(str) {
+        if (/^b(["!]{1}).+\1$/.test(str)) {
+            str = atob(str.slice(2, str.length - 1));
+        }
+        return str;
+    }
+
     getAccountId() {
         return this.irondbType === 'standalone' ? '/' + this.accountId : '';
     }
@@ -663,7 +717,14 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return !(this.queryPrefix || '').trim();
     }
 
-    metricGraphiteQuery(query: string, doNotFollowLimit: boolean, from?: number, to?: number, tagFilter?: string) {
+    metricGraphiteQuery(
+        query: string,
+        ignoreLimit: boolean,
+        from?: number,
+        to?: number,
+        tagFilter?: string,
+        customLimit?: number
+    ) {
         const ignoreUUIDs = this.ignoreGraphiteUUIDs();
         let queryUrl = '/' + this.queryPrefix + '/metrics/find';
         let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0'];
@@ -671,10 +732,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             qsParams.push('irondb_tag_filter=' + tagFilter);
         }
         queryUrl += '?' + qsParams.join('&');
-        return this.irondbSimpleRequest('GET', queryUrl, false, true, !doNotFollowLimit, true);
+        let followLimit = customLimit ? true : !ignoreLimit;
+        return this.irondbSimpleRequest('GET', queryUrl, false, true, followLimit, true, customLimit);
     }
 
-    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number) {
+    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number, customLimit?: number) {
         if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
             return Promise.resolve({ data: [] });
         }
@@ -686,10 +748,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             queryUrl += '&activity_end_secs=' + _.toInteger(to);
         }
         log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
-        return this.irondbSimpleRequest('GET', queryUrl, false, true);
+        return this.irondbSimpleRequest('GET', queryUrl, false, true, true, false, customLimit);
     }
 
-    metricTagValsQuery(metricQuery: string, cat: string, from?: number, to?: number) {
+    metricTagValsQuery(metricQuery: string, cat: string, from?: number, to?: number, customLimit?: number) {
         let queryUrl = '/find' + this.getAccountId() + '/tag_vals?category=' + cat + '&query=' + metricQuery;
         if (this.activityTracking && from && to) {
             log(() => 'metricFindTagsQuery() activityWindow = [' + from + ',' + to + ']');
@@ -697,10 +759,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             queryUrl += '&activity_end_secs=' + _.toInteger(to);
         }
         log(() => 'metricTagValsQuery() queryUrl = ' + queryUrl);
-        return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
+        return this.irondbSimpleRequest('GET', queryUrl, false, true, true, false, customLimit);
     }
 
-    metricTagCatsQuery(metricQuery: string, from?: number, to?: number) {
+    metricTagCatsQuery(metricQuery: string, from?: number, to?: number, customLimit?: number) {
         let queryUrl = '/find' + this.getAccountId() + '/tag_cats?query=' + metricQuery;
         if (this.activityTracking && from && to) {
             log(() => 'metricTagsCatsQuery() activityWindow = [' + from + ',' + to + ']');
@@ -708,7 +770,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             queryUrl += '&activity_end_secs=' + _.toInteger(to);
         }
         log(() => 'metricTagCatsQuery() queryUrl = ' + queryUrl);
-        return this.irondbSimpleRequest('GET', queryUrl, false, true, false);
+        return this.irondbSimpleRequest('GET', queryUrl, false, true, true, false, customLimit);
     }
 
     testDatasource() {
@@ -761,7 +823,15 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         }
     }
 
-    irondbSimpleRequest(method, url, isCaql = false, isFind = false, followLimit = true, isGraphite = false) {
+    irondbSimpleRequest(
+        method,
+        url,
+        isCaql = false,
+        isFind = false,
+        followLimit = true,
+        isGraphite = false,
+        customLimit?: number
+    ) {
         let baseUrl = this.url;
         const headers = { 'Content-Type': 'application/json' };
 
@@ -776,7 +846,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             headers['X-Circonus-Auth-Token'] = this.apiToken;
             headers['X-Circonus-App-Name'] = this.appName;
         }
-        headers['X-Snowth-Advisory-Limit'] = followLimit ? this.resultsLimit : 100;
+        headers['X-Snowth-Advisory-Limit'] = followLimit ? customLimit || this.resultsLimit : 100;
         if ('standalone' === this.irondbType && !isCaql) {
             if (isGraphite) {
                 baseUrl = baseUrl + '/graphite/' + this.accountId;
@@ -1533,10 +1603,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         );
         const isGraphite = 'graphite' === target.querytype;
         const tagFilter = target['tagFilter'] || '';
-        const queryFn = isGraphite ? this.metricGraphiteQuery : this.metricTagsQuery;
+        const promise = isGraphite
+            ? this.metricGraphiteQuery.call(this, rawQuery, false, start, end, tagFilter)
+            : this.metricTagsQuery.call(this, rawQuery, false, start, end);
 
-        return queryFn
-            .call(this, rawQuery, false, start, end, tagFilter)
+        return promise
             .then((result) => {
                 result.data = this.filterMetricsByType(target, result.data);
                 for (let i = 0; i < result.data.length; i++) {
