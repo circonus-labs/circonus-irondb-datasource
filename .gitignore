@@ -139,3 +139,4 @@ yarn.lock
 
 # Jest
 jest.config.js
+.DS_Store
