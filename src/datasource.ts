@@ -634,7 +634,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                         var name = (result.name || '')
                             .replace(/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\./)
                             .split('.')
-                            .pop();
+                            .pop()
+                            .split(';')
+                            .shift();
                         if (!deduped.find((obj) => obj.value === name)) {
                             deduped.push({ value: name });
                         }
