@@ -83,13 +83,16 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
     }
 
     render() {
+        // don't use this query prop b/c sometimes it's initialized erroneously as
+        // an empty string (e.g. when the datasource is changed, for some reason)
         let { query, onChange } = this.props;
         let { queryTypeOption, metricFindQuery, tagCategory, resultsLimitOption } = this.state;
 
-        const isMetricNamesType = 'metric names' === query.queryType || (!query.queryType && !query.tagCategory),
-            isTagCatsType = 'tag categories' === query.queryType,
-            isTagValsType = 'tag values' === query.queryType || (!query.queryType && query.tagCategory),
-            isGraphiteType = 'graphite style' === query.queryType;
+        const isMetricNamesType =
+                'metric names' === this.query.queryType || (!this.query.queryType && !this.query.tagCategory),
+            isTagCatsType = 'tag categories' === this.query.queryType,
+            isTagValsType = 'tag values' === this.query.queryType || (!this.query.queryType && this.query.tagCategory),
+            isGraphiteType = 'graphite style' === this.query.queryType;
 
         const saveQuery = () => {
             let q = Object.assign({}, this.query);
@@ -130,6 +133,12 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
             });
             saveQuery();
         };
+
+        // re-save it if it's initialized erroneously as an empty string
+        // (e.g. when the datasource is changed, for some reason)
+        if (!query && this.query.metricFindQuery) {
+            saveQuery();
+        }
 
         const customSelectStyle = {
             width: '364px',
