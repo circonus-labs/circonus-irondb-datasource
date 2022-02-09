@@ -35,6 +35,10 @@ const RESULTS_LIMIT_OPTIONS: Array<SelectableValue<number>> = [
         value: 1000,
         label: '1000',
     },
+    {
+        value: 2000,
+        label: '2000',
+    },
 ];
 
 interface VariableQueryProps {
