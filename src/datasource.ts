@@ -810,7 +810,12 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (typeof error !== 'string') {
             if (error.data) {
                 if (error.data.message) {
-                    let message = JSON.parse(error.data.message);
+                    var message;
+                    try {
+                        message = JSON.parse(error.data.message);
+                    } catch (error) {
+                        log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
+                    }
                     if (message.user_error) {
                         throw message.user_error.message + ', in query: ' + message.arguments.q;
                     } else if (error.statusText === 'Not Found') {
