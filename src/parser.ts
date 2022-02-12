@@ -15,7 +15,7 @@ Parser.prototype = {
     start: function () {
         try {
             return this.functionCall() || this.metricExpression();
-        } catch (e) {
+        } catch (e: any) {
             return {
                 type: 'error',
                 message: e.message,
