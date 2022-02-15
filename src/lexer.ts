@@ -9,6 +9,7 @@ import _ from 'lodash';
 // http://www.fileformat.info/info/unicode/category/Lo/list.htm
 // http://www.fileformat.info/info/unicode/category/Nl/list.htm
 
+// prettier-ignore
 var unicodeLetterTable = [
     170, 170, 181, 181, 186, 186, 192, 214, 216, 246, 248, 705, 710, 721, 736, 740, 748, 748, 750, 750, 880, 884, 886,
     887, 890, 893, 902, 902, 904, 906, 908, 908, 910, 929, 931, 1013, 1015, 1153, 1162, 1319, 1329, 1366, 1369, 1369,
