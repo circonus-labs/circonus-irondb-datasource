@@ -805,23 +805,30 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             });
     }
 
-    throwerr(err) {
-        log(() => 'throwerr() err = ' + err);
-        if (err.data && err.data.error) {
-            throw new Error('Circonus IRONdb Error: ' + err.data.error);
-        } else if (err.data && err.data.user_error) {
-            const name = err.data.method || 'IRONdb';
-            let suffix = '';
-            if (err.data.user_error.query) {
-                suffix = ' in"' + err.data.user_error.query + '"';
+    throwerr(error: any) {
+        log(() => 'throwerr() err = ' + JSON.stringify(error));
+        if (typeof error !== 'string') {
+            if (error.data) {
+                if (error.data.message) {
+                    var message;
+                    try {
+                        message = JSON.parse(error.data.message);
+                    } catch (error) {
+                        log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
+                    }
+                    if (message.user_error) {
+                        throw message.user_error.message + ', in query: ' + message.arguments.q;
+                    } else if (error.statusText === 'Not Found') {
+                        throw 'Circonus IRONdb Error: ' + error.statusText;
+                    } else if (error.statusText && error.status > 0) {
+                        throw 'Network Error: ' + error.statusText + '(' + error.status + ')';
+                    }
+                }
+            } else {
+                throw String(error);
             }
-            throw new Error(name + ' error: ' + err.data.user_error.message + suffix);
-        } else if (err.statusText === 'Not Found') {
-            throw new Error('Circonus IRONdb Error: ' + err.statusText);
-        } else if (err.statusText && err.status > 0) {
-            throw new Error('Network Error: ' + err.statusText + '(' + err.status + ')');
         } else {
-            throw new Error('Error: ' + (err ? err.toString() : 'unknown'));
+            throw error ? error.toString() : 'unknown';
         }
     }
 
