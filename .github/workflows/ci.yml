@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - master
+      - CS-206-build-automation
   pull_request:
     branches:
       - master
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-focal
     steps:
       - uses: actions/checkout@v2
 
