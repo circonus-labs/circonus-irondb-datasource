@@ -140,3 +140,7 @@ yarn.lock
 # Jest
 jest.config.js
 .DS_Store
+
+# Release files
+circonus-irondb-datasource
+preview-*.tar.gz
