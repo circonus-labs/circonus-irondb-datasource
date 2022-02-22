@@ -74,3 +74,9 @@ jobs:
         with:
           version: latest
           args: buildAll
+
+      # Only make preview release on push of new ref to master
+      - name: Make preview release
+        if: ${{ github.event.push.create == true }}
+        run: ./.github/scripts/make-release.sh preview
+        shell: bash
