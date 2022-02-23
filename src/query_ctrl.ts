@@ -96,14 +96,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     };
     // prettier-ignore
     histogramTransforms = {
-    count:          ' | histogram:count()',
-    average:        ' | histogram:mean()',
-    stddev:         ' | histogram:stddev()',
-    derive:         ' | histogram:rate()',
-    derive_stddev:  '', // FIXME
-    counter:        ' | histogram:rate()',
-    counter_stddev: '', // FIXME
-  };
+        count:          ' | histogram:count()',
+        average:        ' | histogram:mean()',
+        stddev:         ' | histogram:stddev()',
+        derive:         ' | histogram:rate()',
+        derive_stddev:  '', // FIXME
+        counter:        ' | histogram:rate()',
+        counter_stddev: '', // FIXME
+    };
     segments: any[];
     gSegments: any[];
 
@@ -171,7 +171,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // This changes the query type between CAQL/Standard/Graphite
-    toggleEditorMode() {
+    changeEditorMode() {
         if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
             // CAQL -> Standard
             this.buildQueries();
@@ -230,7 +230,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     queryTypeValueChanged() {
-        this.toggleEditorMode();
+        this.changeEditorMode();
         this.panelCtrl.refresh();
     }
 
