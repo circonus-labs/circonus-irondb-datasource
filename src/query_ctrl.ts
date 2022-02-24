@@ -967,8 +967,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         // query
         this.target.query = this.target.queryDisplay = this.queryModel
             .getGraphiteSegmentPath()
-            .replace(/\.select metric.$/, '')
-            .replace(/\.$/, '');
+            .replace(/\.select\smetric.$/, '')
+            .replace(/\.$/, '')
+            .replace(/^select\smetric$/, ''); // this order matters, to both strip off a trailing period and do it before this last one
         // tag filter
         let filterValues = [];
         this.queryModel.gSegments.forEach((segment) => {
