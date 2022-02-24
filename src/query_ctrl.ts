@@ -174,9 +174,13 @@ export class IrondbQueryCtrl extends QueryCtrl {
     changeEditorMode() {
         if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
             // CAQL -> Standard
+            this.checkForPlusAndSelect();
+            this.buildSegments();
             this.buildQueries();
         } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
             // CAQL -> Graphite
+            this.checkForPlusAndSelect();
+            this.buildSegments();
             this.buildQueries();
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
             // Standard -> CAQL
