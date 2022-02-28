@@ -75,8 +75,12 @@ jobs:
           version: latest
           args: buildAll
 
-      # Only make preview release on push of new ref to master
-      - name: Make preview release
-        if: ${{ github.event.push.created }}
+      - name: Make preview release asset
         run: ./.github/scripts/make-release.sh preview
         shell: bash
+
+      - name: Publish preview release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.ref == 'refs/heads/master' }}
+        with:
+          files: preview-*.tar.gz
