@@ -81,6 +81,6 @@ jobs:
 
       - name: Publish preview release
         uses: softprops/action-gh-release@v1
-        if: ${{ github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref == 'refs/heads/CS-206-build-automation' }}
         with:
           files: preview-*.tar.gz
