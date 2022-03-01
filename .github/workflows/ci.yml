@@ -80,7 +80,11 @@ jobs:
         shell: bash
 
       - name: Publish preview release
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         if: ${{ github.ref == 'refs/heads/CS-206-build-automation' }}
         with:
-          files: preview-*.tar.gz
+          artifacts: cid-preview-*.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit: ${{ github.sha }}
+          tag: preview-${{ push.head_commit.timestamp }}
+          prerelease: true
