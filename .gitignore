@@ -143,4 +143,4 @@ jest.config.js
 
 # Release files
 circonus-irondb-datasource
-preview-*.tar.gz
+cid-preview-*.tar.gz
