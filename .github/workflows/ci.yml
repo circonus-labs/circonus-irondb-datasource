@@ -86,5 +86,5 @@ jobs:
           artifacts: cid-preview-*.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
           commit: ${{ github.sha }}
-          tag: tags/preview-${{ github.sha }}
+          tag: preview-${{ github.sha }}
           prerelease: true
