@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - CS-206-build-automation
   pull_request:
     branches:
       - master
@@ -81,7 +80,7 @@ jobs:
 
       - name: Publish preview release
         uses: ncipollo/release-action@v1
-        if: ${{ github.ref == 'refs/heads/CS-206-build-automation' }}
+        if: ${{ github.ref == 'refs/heads/master' }}
         with:
           artifacts: cid-preview-*.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
