@@ -96,14 +96,14 @@ export class IrondbQueryCtrl extends QueryCtrl {
     };
     // prettier-ignore
     histogramTransforms = {
-    count:          ' | histogram:count()',
-    average:        ' | histogram:mean()',
-    stddev:         ' | histogram:stddev()',
-    derive:         ' | histogram:rate()',
-    derive_stddev:  '', // FIXME
-    counter:        ' | histogram:rate()',
-    counter_stddev: '', // FIXME
-  };
+        count:          ' | histogram:count()',
+        average:        ' | histogram:mean()',
+        stddev:         ' | histogram:stddev()',
+        derive:         ' | histogram:rate()',
+        derive_stddev:  '', // FIXME
+        counter:        ' | histogram:rate()',
+        counter_stddev: '', // FIXME
+    };
     segments: any[];
     gSegments: any[];
 
@@ -171,12 +171,16 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     // This changes the query type between CAQL/Standard/Graphite
-    toggleEditorMode() {
+    changeEditorMode() {
         if (this.target.lastQueryType === 'caql' && this.target.querytype === 'basic') {
             // CAQL -> Standard
+            this.checkForPlusAndSelect();
+            this.buildSegments();
             this.buildQueries();
         } else if (this.target.lastQueryType === 'caql' && this.target.querytype === 'graphite') {
             // CAQL -> Graphite
+            this.checkForPlusAndSelect();
+            this.buildSegments();
             this.buildQueries();
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
             // Standard -> CAQL
@@ -230,7 +234,7 @@ export class IrondbQueryCtrl extends QueryCtrl {
     }
 
     queryTypeValueChanged() {
-        this.toggleEditorMode();
+        this.changeEditorMode();
         this.panelCtrl.refresh();
     }
 
@@ -963,8 +967,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         // query
         this.target.query = this.target.queryDisplay = this.queryModel
             .getGraphiteSegmentPath()
-            .replace(/\.select metric.$/, '')
-            .replace(/\.$/, '');
+            .replace(/\.select\smetric.$/, '')
+            .replace(/\.$/, '')
+            .replace(/^select\smetric$/, ''); // this order matters, to both strip off a trailing period and do it before this last one
         // tag filter
         let filterValues = [];
         this.queryModel.gSegments.forEach((segment) => {

@@ -327,7 +327,8 @@ export default class IrondbQuery {
         this.error = null;
 
         log(() => 'parseTarget() target = ' + JSON.stringify(this.target));
-        let metricName = this.target.query;
+        let targetQuery = this.target.query || '';
+        let metricName = 'caql' === this.target.querytype ? '' : targetQuery;
         // Strip 'and(__name:)' from metric name
         metricName = metricName.slice(11, -1) || '*';
         const tags = metricName.split(',');
@@ -346,7 +347,8 @@ export default class IrondbQuery {
         const typeMap = { segment: SegmentType.MetricName };
 
         // parse the query into segments
-        var parser = new Parser(this.target.query || '');
+        let targetQuery = this.target.query || '';
+        var parser = new Parser('caql' === this.target.querytype ? '' : targetQuery);
         var astNode = parser.getAst();
         if (astNode === null) {
             this.gSegments.push({ type: SegmentType.TagPlus });
@@ -424,6 +426,9 @@ export default class IrondbQuery {
     convertStandardToGraphite(metricName = '') {
         let nameSegments = [];
         let filterSegments = [];
+        const segLen = this.segments.length;
+        const seg0 = this.segments[0] || {};
+        const seg1 = this.segments[1] || {};
 
         if (metricName) {
             // process a passed metricName
@@ -433,6 +438,10 @@ export default class IrondbQuery {
                 .map(function (piece) {
                     return { type: SegmentType.MetricName, value: piece };
                 });
+        } else if (2 === segLen && seg0.type === SegmentType.MetricName && seg1.type === SegmentType.TagPlus) {
+            // if the source segments are only [*][+] then convert to [select metric][+]
+            this.addSelectMetricSegment();
+            this.addPlusSegment();
         } else {
             // split segments into name & filter segments
             this.segments.forEach((segment) => {

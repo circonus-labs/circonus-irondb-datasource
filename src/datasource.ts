@@ -1027,10 +1027,24 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 const ends_now = Date.now() - end * 1000 < 1000; // if the range ends within 1s, it's "now"
                 start -= interval;
                 end = ends_now && this.truncateNow ? end - end_shift : end + interval; // sometimes we want to drop the last interval b/c that data is frequently incomplete
-                options.url = options.url + '/caql_v1?format=DF4&start=' + start.toFixed(3);
-                options.url = options.url + '&end=' + end.toFixed(3);
-                options.url = options.url + '&period=' + interval;
-                options.url = options.url + '&q=' + encodeURIComponent(caqlQueryMP);
+                options.url = options.url + '/caql_v1';
+                let req_data = {
+                    start: start.toFixed(3),
+                    end: end.toFixed(3),
+                    period: interval,
+                    format: 'DF4',
+                    q: caqlQueryMP,
+                };
+                if (caqlQueryMP.length > 2000) {
+                    options.method = 'POST';
+                    options.data = JSON.stringify(req_data);
+                } else {
+                    options.url +=
+                        '?' +
+                        Object.keys(req_data)
+                            .map((key) => key + '=' + encodeURIComponent(req_data[key]))
+                            .join('&');
+                }
                 options.headers = headers;
                 options.start = start;
                 options.end = end;
