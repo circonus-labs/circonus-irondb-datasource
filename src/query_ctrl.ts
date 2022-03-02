@@ -127,6 +127,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         } else {
             this.target.querytype = this.datasource.allowGraphite ? 'graphite' : 'basic';
         }
+        if ('caql' === this.target.querytype) {
+            this.target.lastCAQL = this.target.query;
+        }
         this.target.lastQueryType = this.target.lastQueryType || this.target.querytype;
         this.target.local_filter = this.target.local_filter || '';
         this.target.local_filter_match = this.target.local_filter_match || 'all';
@@ -184,7 +187,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.buildQueries();
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'caql') {
             // Standard -> CAQL
-            this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
+            let isEmpty = 'and(__name:*)' === this.target.query;
+            if (this.target.lastCAQL && isEmpty) {
+                this.target.query = this.target.queryDisplay = this.target.lastCAQL;
+            } else {
+                this.target.query = this.target.queryDisplay = this.buildCAQLFromStandard();
+            }
         } else if (this.target.lastQueryType === 'basic' && this.target.querytype === 'graphite') {
             // Standard -> Graphite
             this.convertStandardToGraphite();
@@ -193,7 +201,12 @@ export class IrondbQueryCtrl extends QueryCtrl {
             this.buildGraphiteQuery();
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'caql') {
             // Graphite -> CAQL
-            this.target.query = this.target.queryDisplay = this.buildCAQLFromGraphite();
+            let isEmpty = '' === this.target.query || '*' === this.target.query || '*.*' === this.target.query;
+            if (this.target.lastCAQL && isEmpty) {
+                this.target.query = this.target.queryDisplay = this.target.lastCAQL;
+            } else {
+                this.target.query = this.target.queryDisplay = this.buildCAQLFromGraphite();
+            }
         } else if (this.target.lastQueryType === 'graphite' && this.target.querytype === 'basic') {
             // Graphite -> Standard
             this.convertGraphiteToStandard();
@@ -206,6 +219,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
         this.panelCtrl.refresh();
         this.target.lastQueryType = this.target.querytype;
+        if ('caql' === this.target.querytype) {
+            this.target.lastCAQL = this.target.query;
+        }
     }
 
     alertStateValueChanged() {
