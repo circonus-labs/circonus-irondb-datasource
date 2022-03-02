@@ -75,6 +75,7 @@ jobs:
           args: buildAll
 
       - name: Make preview release asset
+        if: ${{ github.ref == 'refs/heads/master' }}
         run: ./.github/scripts/make-release.sh preview
         shell: bash
 
