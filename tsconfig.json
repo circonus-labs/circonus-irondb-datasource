@@ -1,5 +1,5 @@
 {
-    "extends": "./node_modules/@grafana/toolkit/src/config/tsconfig.plugin.json",
+    "extends": "@grafana/toolkit/src/config/tsconfig.plugin.json",
     "include": ["src", "types"],
     "compilerOptions": {
         "rootDir": "./src",
@@ -9,8 +9,6 @@
         "noImplicitReturns": false,
         "noImplicitThis": false,
         "noUnusedLocals": false,
-        "strictNullChecks": false,
-        "pretty": true,
-        "sourceMap": true
+        "strictNullChecks": false
     }
 }
