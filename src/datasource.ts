@@ -816,7 +816,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     } catch (error) {
                         log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
                     }
-                    if (message.user_error) {
+                    if (message && message.user_error) {
                         throw message.user_error.message + ', in query: ' + message.arguments.q;
                     } else if (error.statusText === 'Not Found') {
                         throw 'Circonus IRONdb Error: ' + error.statusText;
