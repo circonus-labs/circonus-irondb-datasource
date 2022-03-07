@@ -258,7 +258,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             );
             if (this.useCaching) {
                 log(() => 'query() clearing cache');
-                const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+                const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
                 requestCache.clear();
             }
         }
@@ -314,7 +314,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             );
             if (this.useCaching) {
                 log(() => 'query() clearing cache');
-                const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+                const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
                 requestCache.clear();
             }
         }
@@ -550,7 +550,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 );
                 if (this.useCaching) {
                     log(() => 'query() clearing cache');
-                    const requestCache = (this.datasourceRequest as unknown) as Memoized<(options: any) => any>;
+                    const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
                     requestCache.clear();
                 }
             }
