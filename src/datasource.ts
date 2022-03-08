@@ -807,28 +807,34 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     throwerr(error: any) {
         log(() => 'throwerr() err = ' + JSON.stringify(error));
+
         if (typeof error !== 'string') {
-            if (error.data) {
-                if (error.data.message) {
-                    var message;
-                    try {
-                        message = JSON.parse(error.data.message);
-                    } catch (error) {
-                        log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
-                    }
-                    if (message && message.user_error) {
+            if (error.data && error.data.message) {
+                var message
+                try {
+                    message = JSON.parse(error.data.message);
+                } catch {
+                    throw String(error.status + ': ' + error.statusText)
+                }
+                if (message.user_error) {
+                    if (message.arguments && message.arguments.q) {
                         throw message.user_error.message + ', in query: ' + message.arguments.q;
-                    } else if (error.statusText === 'Not Found') {
-                        throw 'Circonus IRONdb Error: ' + error.statusText;
-                    } else if (error.statusText && error.status > 0) {
-                        throw 'Network Error: ' + error.statusText + '(' + error.status + ')';
+                    } else {
+                        throw message.user_error
                     }
                 }
-            } else {
-                throw String(error);
+                else {
+                    throw JSON.stringify(message)
+                }
             }
-        } else {
-            throw error ? error.toString() : 'unknown';
+            else {
+                throw JSON.stringify(error)
+            }
+        } else if (typeof error === 'string'){
+            throw JSON.stringify(error)
+        }
+        else {
+            throw JSON.stringify(error)
         }
     }
 
@@ -1126,27 +1132,27 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     })
                     .then((result) => {
                         const query = result.query;
-                        if (result['data'].constructor === Array) {
-                            for (let i = 0; i < result['data'].length; i++) {
-                                if ('target' in result && 'refId' in result['target']) {
-                                    result['data'][i]['target'] = result['target']['refId'];
-                                } else if (query && query.refId) {
-                                    result['data'][i]['target'] = query.refId;
+                            if (result['data'].constructor === Array) {
+                                for (let i = 0; i < result['data'].length; i++) {
+                                    if ('target' in result && 'refId' in result['target']) {
+                                        result['data'][i]['target'] = result['target']['refId'];
+                                    } else if (query && query.refId) {
+                                        result['data'][i]['target'] = query.refId;
+                                    }
+                                    queryResults['data'].push(result['data'][i]);
                                 }
-                                queryResults['data'].push(result['data'][i]);
                             }
-                        }
-                        if (result['data'].constructor === Object) {
-                            if ('target' in result && 'refId' in result['target']) {
-                                result['data']['target'] = result['target']['refId'];
-                            } else if (query && query.refId) {
-                                result['data']['target'] = query.refId;
+                            if (result['data'].constructor === Object) {
+                                if ('target' in result && 'refId' in result['target']) {
+                                    result['data']['target'] = result['target']['refId'];
+                                } else if (query && query.refId) {
+                                    result['data']['target'] = query.refId;
+                                }
+                                queryResults['data'].push(result['data']);
                             }
-                            queryResults['data'].push(result['data']);
-                        }
-                        if (null != result['t']) {
-                            queryResults['t'] = result['t'];
-                        }
+                            if (null != result['t']) {
+                                queryResults['t'] = result['t'];
+                            }
                         return queryResults;
                     })
             )
