@@ -45,9 +45,8 @@ Read more about IRONdb here:
 These instructions will build and run a Docker container with a Grafana instance on port 3000. There will be a pre-configured data source connected to the hosted Circonus API with a graph and alert.
 
 1. [Install Docker](https://docs.docker.com/get-docker/)
-2. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
 3. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
-4. `git clone https://github.com/circonus-labs/circonus-irondb-datasource/`
+4. `git clone https://github.com/circonus-labs/circonus-irondb-datasource/; cd circonus-irondb-datasource`
 5. `yarn install; yarn build; mage`
 6. Execute `./docker/docker-up.sh`
 7. Navigate to <http://localhost:3000/> to access.
