@@ -12,12 +12,10 @@ These instructions will build and run a Docker container with a Grafana instance
 1. [Install Docker](https://docs.docker.com/get-docker/)
 2. [Obtain a Grafana Cloud API Key](https://grafana.com/docs/grafana-cloud/reference/create-api-key/),  needed to sign the plugin.
 3. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
-4. `export GRAFANA_API_KEY=<From step 2>`
-5. `export CIRCONUS_API_KEY=<From step 3>`
-7. `yarn install; yarn build; mage`
-8. `git clone https://github.com/circonus-labs/circonus-irondb-datasource/`
-9. Execute `./docker/docker-up.sh -g $GRAFANA_API_KEY -c $CIRCONUS_API_KEY`
-10. Navigate to <http://localhost:3000/> to access.
+4. `git clone https://github.com/circonus-labs/circonus-irondb-datasource/`
+5. `yarn install; yarn build; mage`
+6. Execute `./docker/docker-up.sh -g $GRAFANA_API_KEY -c $CIRCONUS_API_KEY`
+7. Navigate to <http://localhost:3000/> to access.
 
 ## Installation
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
