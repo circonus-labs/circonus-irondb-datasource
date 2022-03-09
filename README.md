@@ -15,18 +15,18 @@ Read more about IRONdb here:
 
 2. Unzip into plugins directory.
 
-3. Run the following commands in your shell to sign the plugin(node js is required):
+3. Run the following commands in your shell to sign the plugin (node js is required):
     ```shell
-        export GRAFANA_API_KEY=<YOUR_API_KEY>
-        npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana
+        export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY> 
+        npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
     ```
 
 ### From GitHub
 1. Please install the following prerequisites:
-   *    [Node.js](https://nodejs.org/en/download/) > 14.04
-   *    [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
-   *    [Go](https://golang.org/doc/install) > 1.16
-   *    [Mage](https://github.com/magefile/mage) > 1.11.0
+   * [Node.js](https://nodejs.org/en/download/) > 14.04
+   * [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
+   * [Go](https://golang.org/doc/install) > 1.16
+   * [Mage](https://github.com/magefile/mage) > 1.11.0
 2. Run the following from a privileged shell:
    ```shell
    cd /var/lib/grafana/plugins # or the location of your Grafana plugins directory
@@ -36,8 +36,8 @@ Read more about IRONdb here:
    yarn install
    yarn build
    mage -v
-   export GRAFANA_API_KEY=<Obtained from: https://grafana.com/docs/grafana-cloud/reference/create-api-key/>
-   npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana
+   export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY>
+   npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
    sudo systemctl start grafana-server # restart if already running
    ```
 
@@ -89,23 +89,14 @@ For this processed data to be displayed on the heatmap panel as the sample above
 **How to configure a template variable for IRONdb**
 
 1. From a dashboard, click `Settings` in the top right.
-  
 1. On the left hand side, select the `Variables` section.
-  
 1. Click `+New` and choose a name for your new variable.
-  
 1. Select the proper data source: `IRONdb`.
-  
 1. Under `Query`, enter the metric you wish to use in this variable (without tags), **or** enter the fully formed tag query, ala: `and(__name:foo,or(bar:baz,quux:*))`.  Note that this query can contain references to other variables (see example below)
-  
 1. If you enable `Include All Option`, enter `*` for the `Custom all value`.
-  
 1. Click `Enabled` under `Value groups/tags` to enable tags support.
-  
 1. Enter the tag category you wish to use in your variable under `Tag values query`.  See example below.
-  
 1. If you successfully completed the prior steps, `Preview of values` should now auto-complete the tag values.
-  
 1. Finish setup by clicking `Add` and then `Save`.
 
 Example:
