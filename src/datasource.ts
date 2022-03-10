@@ -25,6 +25,7 @@ import {
     ArrayVector,
     DataFrame,
     Field,
+    FieldConfig,
     FieldType,
     formatLabels,
     Labels,
@@ -135,16 +136,16 @@ export interface IrondbQueryInterface extends DataQuery {
 
 export interface IrondbOptions extends DataSourceJsonData {
     accountId?: number;
-    irondbType: string;
-    resultsLimit: string;
-    caqlMinPeriod: string;
+    irondbType: string; // 'standalone' | 'hosted' -- specifies whether a standalone or hosted IRONdb instance is the target of this datasource
+    resultsLimit: string; // Any limit on the number of search results items that are fetched
+    caqlMinPeriod: string; // A default min_period directive to be used in all CAQL queries unless a different min_period is specified in the query itself
     apiToken?: string;
-    truncateNow?: boolean;
-    minTruncation?: string;
-    useCaching?: boolean;
-    activityTracking?: boolean;
-    allowGraphite: boolean;
-    queryPrefix: string;
+    truncateNow?: boolean; // Whether to truncate the last value when viewing a time range ending in 'now'
+    minTruncation?: string; // When paired with truncateNow, this is the minimum truncation performed (in seconds); it's useful when viewing high-resolution data
+    useCaching?: boolean; // Whether to use client-side caching of database requests
+    activityTracking?: boolean; // Whether to use IRONdb metric activity tracking when making requests
+    allowGraphite: boolean; // Whether to show UI elements to allow the use of graphite-style queries
+    queryPrefix: string; // When using graphite-style queries, this is any pre-set query prefix needed for the IRONdb setup in use
 }
 
 export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface, IrondbOptions> {
@@ -1912,32 +1913,31 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             }
 
             let timeField = getTimeField();
-            timeField['refId'] = query.refId;
-            const numericValueField = {
-                name: TIME_SERIES_VALUE_FIELD_NAME,
-                type: FieldType.number,
-                config: {
-                    displayName: dname,
-                },
-                refId: query.refId,
-                labels: labels,
-                values: new ArrayVector<number>(),
-            };
+            timeField['config']['interval'] = period * 1000;
+
+            let numberField = getNumberField();
+            numberField['config']['displayName'] = dname;
+            numberField['labels'] = labels;
 
             log(() => 'convertIrondbDf4DataToGrafana() Labels: ' + JSON.stringify(labels));
+            // loop through all the points
             for (let i = 0; i < data[si].length; i++) {
-                if (data[si][i] === null) {
-                    continue;
-                }
+                // if this point is before the start, skip it
                 const ts = (st + i * period) * 1000;
                 if (ts < query.start * 1000) {
                     continue;
                 }
-
-                if (data[si][i].constructor === Number) {
+                // if it's null, skip it
+                if (null === data[si][i]) {
+                    continue;
+                }
+                // if it's a number, proceed
+                if (Number === data[si][i].constructor) {
                     timeField.values.add(ts);
-                    numericValueField.values.add(data[si][i]);
-                } else if (data[si][i].constructor === Object) {
+                    numberField.values.add(data[si][i]);
+                }
+                // if it's an object, process it for a heatmap
+                if (Object === data[si][i].constructor) {
                     for (let vstr in data[si][i]) {
                         const cnt = data[si][i][vstr];
                         const v = parseFloat(vstr);
@@ -1956,10 +1956,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     }
                 }
             }
-            if (numericValueField.values.length > 0) {
+            if (timeField.values.length) {
                 dataFrames.push({
-                    length: timeField.values.length,
-                    fields: [timeField, numericValueField],
+                    //length: timeField.values.length,
+                    refId: query.refId,
+                    fields: [timeField, numberField],
                 });
             }
         }
