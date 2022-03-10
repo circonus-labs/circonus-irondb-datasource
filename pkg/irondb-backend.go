@@ -68,10 +68,16 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		if err != nil {
 			return nil, err
 		}
+
+		queryURL, err := jsonp.GetString(cfg, "URL")
+		if err != nil {
+			return nil, err
+		}
+
 		td.circ, err = circ.New(&circ.Config{
 			TokenKey: key,
 			TokenApp: "circonus-irondb-datasource",
-			URL:      jsonp.GetString(cfg, "URL"),
+			URL:      queryURL,
 		})
 		if err != nil {
 			return nil, err
