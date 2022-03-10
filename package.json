@@ -6,20 +6,30 @@
         "build": "grafana-toolkit plugin:build",
         "test": "grafana-toolkit plugin:test",
         "dev": "grafana-toolkit plugin:dev",
-        "watch": "grafana-toolkit plugin:dev --watch"
+        "watch": "grafana-toolkit plugin:dev --watch",
+        "sign": "grafana-toolkit plugin:sign",
+        "start": "yarn watch"
     },
     "author": "Circonus",
     "license": "BSD-3-clause",
     "dependencies": {
-        "memoizee": "^0.4.14"
+        "memoizee": "^0.4.14",
+        "@grafana/data": "latest",
+        "@grafana/toolkit": "latest",
+        "@grafana/ui": "latest",
+        "@grafana/runtime": "latest"
     },
     "devDependencies": {
-        "@grafana/data": "^7.2.0",
-        "@grafana/toolkit": "^7.2.0",
-        "@grafana/ui": "^7.2.0",
         "@types/grafana": "github:CorpGlory/types-grafana.git",
+        "@types/lodash": "latest",
         "@types/memoizee": "^0.4.2",
         "@types/mustache": "latest",
         "mustache": "latest"
+    },
+    "resolutions": {
+      "rxjs": ">=7.3.0"
+    },
+    "engines": {
+      "node": ">=14"
     }
 }

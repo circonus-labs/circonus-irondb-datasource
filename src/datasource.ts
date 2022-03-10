@@ -19,7 +19,7 @@ import {
 } from './irondb_query';
 
 import { IronDBVariableQuery } from './types';
-import { VariableQueryEditor as IronDBVariableQueryEditor } from './VariableQueryEditor';
+// import { VariableQueryEditor as IronDBVariableQueryEditor } from './VariableQueryEditor';
 
 import {
     ArrayVector,
