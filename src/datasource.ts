@@ -29,6 +29,7 @@ import {
     FieldType,
     formatLabels,
     Labels,
+    MutableDataFrame,
     MutableField,
     ScopedVars,
     TIME_SERIES_TIME_FIELD_NAME,
@@ -1919,6 +1920,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             numberField['config']['displayName'] = dname;
             numberField['labels'] = labels;
 
+            const frame = new MutableDataFrame({
+                refId: query.refId,
+                fields: [timeField, numberField],
+            });
+
             log(() => 'convertIrondbDf4DataToGrafana() Labels: ' + JSON.stringify(labels));
             // loop through all the points
             for (let i = 0; i < data[si].length; i++) {
@@ -1927,17 +1933,12 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 if (ts < query.start * 1000) {
                     continue;
                 }
-                // if it's null, skip it
-                if (null === data[si][i]) {
-                    continue;
-                }
-                // if it's a number, proceed
-                if (Number === data[si][i].constructor) {
-                    timeField.values.add(ts);
-                    numberField.values.add(data[si][i]);
+                // if it's null or a number, proceed
+                if (null === data[si][i] || (data[si][i] && Number === data[si][i].constructor)) {
+                    frame.add({ Time: ts, Value: data[si][i] });
                 }
                 // if it's an object, process it for a heatmap
-                if (Object === data[si][i].constructor) {
+                if (data[si][i] && Object === data[si][i].constructor) {
                     for (let vstr in data[si][i]) {
                         const cnt = data[si][i][vstr];
                         const v = parseFloat(vstr);
@@ -1957,11 +1958,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 }
             }
             if (timeField.values.length) {
-                dataFrames.push({
-                    //length: timeField.values.length,
-                    refId: query.refId,
-                    fields: [timeField, numberField],
-                });
+                dataFrames.push(frame);
             }
         }
         return {
