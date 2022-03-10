@@ -157,6 +157,8 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 			if err != jsonp.KeyPathNotFoundError {
 				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
 			}
+
+			minPeriod = "60"
 		}
 
 		query = "#min_period=" + minPeriod + " " + query
