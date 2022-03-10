@@ -135,6 +135,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.local_filter_match = this.target.local_filter_match || 'all';
         this.target.alert_count_query_type = this.target.alert_count_query_type || 'instant';
         this.target.alert_id = this.target.alert_id || '';
+
+        // It is very important that the JSON passed into the backend here
+        // correctly sets this min_period field value. It should be nothing if
+        // the query already contains #min_period=, otherwise, it should use the
+        // panel value, if set, or the datasource value if no panel value is set.
         this.target.min_period =
             this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
         this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);

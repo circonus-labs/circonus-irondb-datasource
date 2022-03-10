@@ -68,7 +68,17 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		if err != nil {
 			return nil, err
 		}
-		td.circ, err = circ.New(&circ.Config{TokenKey: key})
+
+		queryURL, err := jsonp.GetString(cfg, "URL")
+		if err != nil {
+			return nil, err
+		}
+
+		td.circ, err = circ.New(&circ.Config{
+			TokenKey: key,
+			TokenApp: "circonus-irondb-datasource",
+			URL:      queryURL,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -139,6 +149,25 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	if err != nil {
 		return nil, err
 	}
+
+	// If needed include min_period setting in the CAQL query.
+	if !strings.HasPrefix(query, "#min_period=") {
+		// It is very important that the JSON passed into the backend by the JS
+		// correctly sets this min_period field value. It should be nothing if
+		// the query already contains #min_period=, otherwise, it should use the
+		// panel value, if set, or the datasource value if no panel value is set.
+		minPeriod, err := jsonp.GetString(q.JSON, "min_period")
+		if err != nil {
+			if err != jsonp.KeyPathNotFoundError {
+				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
+			}
+		} else {
+			if minPeriod != "" {
+				query = "#min_period=" + minPeriod + " " + query
+			}
+		}
+	}
+
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
 	return td.caqlAPI(ctx, q, query)
@@ -272,6 +301,6 @@ func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instance
 }
 
 func (s *instanceSettings) Dispose() {
-	// Called before creatinga a new instance to allow plugin authors
+	// Called before creating a new instance to allow plugin authors
 	// to cleanup.
 }
