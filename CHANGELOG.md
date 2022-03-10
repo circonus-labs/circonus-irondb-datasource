@@ -1,4 +1,9 @@
 
+## 0.9.5
+
+ * Fixes the alerting backend so that the min_period value for generated CAQL
+ queries is correctly using the setting or default from the UI.
+
 ## 0.9.4
 
  * Fix labels for untagged metrics
