@@ -158,7 +158,9 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
 			}
 		} else {
-			query = "#min_period=" + minPeriod + " " + query
+			if minPeriod != "" {
+				query = "#min_period=" + minPeriod + " " + query
+			}
 		}
 	}
 
