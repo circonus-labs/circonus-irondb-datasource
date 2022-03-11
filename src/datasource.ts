@@ -809,23 +809,37 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
     throwerr(error: any) {
         log(() => 'throwerr() err = ' + JSON.stringify(error));
-        if (typeof error !== 'string') {
-            if (error.data) {
-                if (error.data.message) {
-                    var message;
-                    try {
-                        message = JSON.parse(error.data.message);
-                    } catch (error) {
-                        log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
-                    }
-                    if (message.user_error) {
-                        throw message.user_error.message + ', in query: ' + message.arguments.q;
-                    } else if (error.statusText === 'Not Found') {
-                        throw 'Circonus IRONdb Error: ' + error.statusText;
-                    } else if (error.statusText && error.status > 0) {
-                        throw 'Network Error: ' + error.statusText + '(' + error.status + ')';
-                    }
+        // If we're here, there's a few different types of situations we need to address.
+        // 1.  A http-connection level error, which won't really have much
+        // 2.  A direct to IRONdb error JSON object
+        // 3.  A API error JSON object, which wraps up the IRONdb one inside of data.message
+        if (typeof error === 'object') {
+            if (error.data && typeof error.data === 'object' && error.data.message) {
+                var message;
+                try {
+                    message = JSON.parse(error.data.message || error.data);
+                } catch (error) {
+                    log(() => 'throwerr() failed to parse json from error.data.message. error: ' + error);
                 }
+                if (message && message.user_error) {
+                    // This is from the API, which wraped the IRONdb message in the JSON
+                    throw message.user_error.message + ', in query: ' + message.arguments.q;
+                } else if (error.statusText === 'Not Found') {
+                    throw 'Circonus IRONdb Error: ' + error.statusText;
+                } else if (typeof error.data.message === 'string') {
+                    // IRONdb will sometimes return errors with messages avilable here
+                    throw error.data.message;
+                } else if (error.statusText && error.status > 0) {
+                    throw 'Network Error: ' + error.statusText + '(' + error.status + ')';
+                }
+            } else if (
+                error.data &&
+                error.data.user_error &&
+                typeof error.data.user_error === 'object' &&
+                error.data.user_error.message
+            ) {
+                // IRONdb direct 520 errors will look like this
+                throw error.data.user_error.message + ', in query: ' + error.data.arguments.q;
             } else {
                 throw String(error);
             }
