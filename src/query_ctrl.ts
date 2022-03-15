@@ -950,6 +950,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         if (filter) {
             query += ", '" + filter + "')" + this.getCAQLHistogramTransform() + this.getCAQLLabel();
         } else {
+            if ('*' === metric) {
+                query += ', limit=10';
+            }
             query += ')' + this.getCAQLHistogramTransform() + this.getCAQLLabel();
         }
         return query;
