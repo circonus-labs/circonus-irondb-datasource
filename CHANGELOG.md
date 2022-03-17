@@ -1,4 +1,12 @@
 
+## 0.9.6
+
+ * Corrects an issue caused by grafana not including the URL for the data source
+ in the configuration JSON.
+ * Improves the logging performed by the IRONdb alerting back end. Errors
+ parsing JSON passed to the back end will now log better descriptions of the
+ problem along with the erroneous JSON.
+
 ## 0.9.5
 
  * Fixes the alerting backend so that the min_period value for generated CAQL
