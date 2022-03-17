@@ -74,12 +74,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			return nil, fmt.Errorf("apiToken missing from configuration JSON: %w", err)
 		}
 
-		queryURL, err := jsonp.GetString(cfg, "URL")
-		if err != nil {
-			log.DefaultLogger.Error("key URL missing from configuration JSON",
-				"error", err, "config", string(cfg))
-			return nil, fmt.Errorf("URL missing from configuration JSON: %w", err)
-		}
+		queryURL := req.PluginContext.DataSourceInstanceSettings.URL
 
 		td.circ, err = circ.New(&circ.Config{
 			TokenKey: key,
