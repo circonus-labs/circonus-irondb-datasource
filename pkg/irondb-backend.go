@@ -57,21 +57,28 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		cfg := req.PluginContext.DataSourceInstanceSettings.JSONData
 		dbType, err := jsonp.GetString(cfg, "irondbType")
 		if err != nil {
-			return nil, err
+			log.DefaultLogger.Error("key irondbType missing from configuration JSON: %s", err.Error())
+			log.DefaultLogger.Error("invalid configuration JSON: %s", string(cfg))
+			return nil, fmt.Errorf("irondbType missing from configuration JSON: %w", err)
 		}
 
 		if dbType != "hosted" {
+			log.DefaultLogger.Error("only dbType `hosted` is currently supported")
 			return nil, fmt.Errorf("only `hosted` is currently supported")
 		}
 
 		key, err := jsonp.GetString(cfg, "apiToken")
 		if err != nil {
-			return nil, err
+			log.DefaultLogger.Error("key apiToken missing from configuration JSON: %s", err.Error())
+			log.DefaultLogger.Error("invalid configuration JSON: %s", string(cfg))
+			return nil, fmt.Errorf("apiToken missing from configuration JSON: %w", err)
 		}
 
 		queryURL, err := jsonp.GetString(cfg, "URL")
 		if err != nil {
-			return nil, err
+			log.DefaultLogger.Error("key URL missing from configuration JSON: %s", err.Error())
+			log.DefaultLogger.Error("invalid configuration JSON: %s", string(cfg))
+			return nil, fmt.Errorf("URL missing from configuration JSON: %w", err)
 		}
 
 		td.circ, err = circ.New(&circ.Config{
@@ -80,7 +87,8 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			URL:      queryURL,
 		})
 		if err != nil {
-			return nil, err
+			log.DefaultLogger.Error("unable to create circonus go-apiclient: %s", err.Error())
+			return nil, fmt.Errorf("unable to create circonus go-apiclient: %w", err)
 		}
 
 		// CIRC-6967 -- truncate last data sample if _end within 1s of now
@@ -97,7 +105,9 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	for _, q := range req.Queries {
 		qtype, err := jsonp.GetString(q.JSON, "querytype")
 		if err != nil {
-			return nil, err
+			log.DefaultLogger.Error("key querytype missing from query JSON: %s", err.Error())
+			log.DefaultLogger.Error("invalid query JSON: %s", string(q.JSON))
+			return nil, fmt.Errorf("querytype missing from query JSON: %w", err)
 		}
 
 		var response *backend.DataResponse
@@ -105,14 +115,19 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		case "caql":
 			response, err = td.caqlQuery(ctx, q)
 			if err != nil {
-				return nil, err
+				log.DefaultLogger.Error("unable to execute CAQL query: %s", err.Error())
+				log.DefaultLogger.Error("error in CAQL query: %s", q)
+				return nil, fmt.Errorf("unable to execute CAQL query: %w", err)
 			}
 		case "basic":
 			response, err = td.basicQuery(ctx, q)
 			if err != nil {
-				return nil, err
+				log.DefaultLogger.Error("unable to execute basic query: %s", err.Error())
+				log.DefaultLogger.Error("error in basic query: %s", q)
+				return nil, fmt.Errorf("unable to execute basic query: %w", err)
 			}
 		default:
+			log.DefaultLogger.Error("unsupported query type %s, try (caql, basic)", qtype)
 			return nil, fmt.Errorf("unsupported query type %s, try (caql, basic)", qtype)
 		}
 		rv.Responses[q.RefID] = *response
@@ -128,17 +143,20 @@ func (td *SampleDatasource) query(ctx context.Context, query backend.DataQuery) 
 func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
 	basic, err := jsonp.GetString(q.JSON, "query")
 	if err != nil {
-		return nil, err
+		log.DefaultLogger.Error("key query missing from basic query: %s", err.Error())
+		return nil, fmt.Errorf("key query missing from basic query: %w", err)
 	}
 
 	iq := IrondbQuery{Basic: basic}
 	err = iq.ParseBasic()
 	if err != nil {
-		return nil, err
+		log.DefaultLogger.Error("unable to parse basic query: %s", err.Error())
+		return nil, fmt.Errorf("unable to parse basic query: %w", err)
 	}
 	query, err := iq.ToCaql()
 	if err != nil {
-		return nil, err
+		log.DefaultLogger.Error("unable to convert basic query to CAQL: %s", err.Error())
+		return nil, fmt.Errorf("unable to convert basic query to CAQL: %w", err)
 	}
 
 	return td.caqlAPI(ctx, q, query)
@@ -147,7 +165,8 @@ func (td *SampleDatasource) basicQuery(ctx context.Context, q backend.DataQuery)
 func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
 	query, err := jsonp.GetString(q.JSON, "query")
 	if err != nil {
-		return nil, err
+		log.DefaultLogger.Error("key query missing from CAQL query: %s", err.Error())
+		return nil, fmt.Errorf("key query missing from CAQL query: %w", err)
 	}
 
 	// If needed include min_period setting in the CAQL query.
@@ -159,6 +178,7 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 		minPeriod, err := jsonp.GetString(q.JSON, "min_period")
 		if err != nil {
 			if err != jsonp.KeyPathNotFoundError {
+				log.DefaultLogger.Error("unable to parse CAQL query min_period: %s", err.Error())
 				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
 			}
 		} else {
@@ -215,15 +235,20 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 
 	respdata, err := td.circ.Get(path.String())
 	if err != nil {
-		return nil, err
+		log.DefaultLogger.Error("error returned from circonus API: %s", err.Error())
+		log.DefaultLogger.Error("error in circonus API request: %s", path.String())
+		return nil, fmt.Errorf("error returned from circonus API: %w", err)
 	}
 
 	var resp DF4Response
 	if err := json.Unmarshal(respdata, &resp); err != nil {
-		return nil, err
+		log.DefaultLogger.Error("unable to unmarshal response data: %s", err.Error())
+		log.DefaultLogger.Error("error in response data: %s", string(respdata))
+		return nil, fmt.Errorf("unable to unmarshal response data: %w", err)
 	}
 
 	if resp.Version != "DF4" {
+		log.DefaultLogger.Error("invalid response version (%s)", resp.Version)
 		return nil, fmt.Errorf("invalid response version (%s)", resp.Version)
 	}
 
