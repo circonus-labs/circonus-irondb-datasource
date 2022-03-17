@@ -101,9 +101,11 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	for _, q := range req.Queries {
 		qtype, err := jsonp.GetString(q.JSON, "querytype")
 		if err != nil {
-			log.DefaultLogger.Error("key querytype missing from query JSON",
-				"error", err, "query", string(q.JSON))
-			return nil, fmt.Errorf("querytype missing from query JSON: %w", err)
+			log.DefaultLogger.Error("key querytype missing from query JSON "+
+				"- non-IRONdb dashboard pointed at datasource?",
+				"error", err, "query", string(q.JSON), "ref_id", q.RefID)
+			return nil, fmt.Errorf("querytype missing from query JSON: %w "+
+				"- non-IRONdb dashboard pointed at datasource?", err)
 		}
 
 		var response *backend.DataResponse
