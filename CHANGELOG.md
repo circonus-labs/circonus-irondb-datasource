@@ -1,4 +1,10 @@
 
+## 0.9.8
+
+ * Implements support for graphite type queries in the alerting backend.
+
+## 0.9.7
+
 ## 0.9.6
 
  * Corrects an issue caused by grafana not including the URL for the data source
