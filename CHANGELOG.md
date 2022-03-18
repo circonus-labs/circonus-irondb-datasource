@@ -1,4 +1,10 @@
 
+## 0.9.10
+
+ * Update release build actions.
+
+## 0.9.9
+
 ## 0.9.8
 
  * Implements support for graphite type queries in the alerting backend.
