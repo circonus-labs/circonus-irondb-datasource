@@ -124,6 +124,13 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 					"error", err, "query", q)
 				return nil, fmt.Errorf("unable to execute basic query: %w", err)
 			}
+		case "graphite":
+			response, err = td.graphiteQuery(ctx, q)
+			if err != nil {
+				log.DefaultLogger.Error("unable to execute graphite query",
+					"error", err, "query", q)
+				return nil, fmt.Errorf("unable to execute graphite query: %w", err)
+			}
 		default:
 			log.DefaultLogger.Error("unsupported query type, try (caql, basic)",
 				"qtype", qtype)
@@ -193,6 +200,72 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
 	return td.caqlAPI(ctx, q, query)
+}
+
+// TranslateResponse values represent a response from the IRONdb graphite
+// translator service
+type TranslateResponse struct {
+	Input string `json:"input"`
+	CAQL  string `json:"caql"`
+	Error string `json:"error"`
+}
+
+// TranslateRequest values represent a request to the IRONdb graphite
+// translator service
+type TranslateRequest struct {
+	Query string `json:"q"`
+}
+
+func (td *SampleDatasource) graphiteQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
+	query, err := jsonp.GetString(q.JSON, "query")
+	if err != nil {
+		log.DefaultLogger.Error("key query missing from graphite query",
+			"error", err, "query", string(q.JSON))
+		return nil, fmt.Errorf("key query missing from graphite query: %w", err)
+	}
+
+	// Convert the graphite query to CAQL using IRONdb graphite_translate.
+	graphiteURL := &url.URL{Path: "irondb/extension/lua/public/graphite_translate"}
+	query = strings.ReplaceAll(query, " ", "")
+	t := TranslateRequest{Query: query}
+
+	reqBody, err := json.Marshal(t)
+	if err != nil {
+		log.DefaultLogger.Error("unable to marshal graphite translate request",
+			"error", err, "request", graphiteURL.String(), "body", string(reqBody))
+		return nil, fmt.Errorf("unable to marshal graphite translate request: %w", err)
+	}
+
+	respData, err := td.circ.Post(graphiteURL.String(), reqBody)
+	if err != nil {
+		log.DefaultLogger.Error("error returned from graphite translate",
+			"error", err, "request", graphiteURL.String(), "body", string(reqBody))
+		return nil, fmt.Errorf("error returned from graphite translate: %w", err)
+	}
+
+	var resp TranslateResponse
+	if err := json.Unmarshal(respData, &resp); err != nil {
+		log.DefaultLogger.Error("unable to unmarshal graphite translate response",
+			"error", err, "response", string(respData))
+		return nil, fmt.Errorf("unable to unmarshal graphite translate response: %w", err)
+	}
+
+	if resp.CAQL == "" {
+		err := fmt.Errorf("unable to translate graphite query: null CAQL response")
+		log.DefaultLogger.Error(err.Error(), "error", err, "response", string(respData))
+		return nil, err
+	}
+
+	if resp.Error != "" {
+		err := fmt.Errorf(resp.Error)
+		log.DefaultLogger.Error("error translating graphite query",
+			"error", err, "response", string(respData))
+		return nil, fmt.Errorf("error translating graphite query: %w", err)
+	}
+
+	log.DefaultLogger.Info("graphiteQuery", "graphite", query, "caql", resp.CAQL)
+
+	return td.caqlAPI(ctx, q, resp.CAQL)
 }
 
 type DF4Response struct {
