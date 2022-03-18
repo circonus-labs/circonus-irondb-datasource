@@ -1,6 +1,7 @@
 
 ## 0.9.11
 
+ * The alerting backend will now process queries in parallel.
  * Update plugin.json to use newer grafanaDependency setting.
 
 ## 0.9.10
