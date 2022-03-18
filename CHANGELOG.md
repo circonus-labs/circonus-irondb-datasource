@@ -1,4 +1,8 @@
 
+## 0.9.11
+
+ * Update plugin.json to use newer grafanaDependency setting.
+
 ## 0.9.10
 
  * Update release build actions.
