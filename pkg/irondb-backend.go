@@ -122,9 +122,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 					Error: fmt.Errorf("querytype missing from query JSON: %w "+
 						"- non-IRONdb dashboard pointed at datasource?", err),
 				}
-			}
-
-			if response == nil {
+			} else {
 				switch qtype {
 				case "caql":
 					response, err = td.caqlQuery(ctx, *q)
