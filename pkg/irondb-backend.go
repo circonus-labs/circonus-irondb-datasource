@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	jsonp "github.com/buger/jsonparser"
@@ -98,47 +99,76 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 	}
 
 	rv := backend.NewQueryDataResponse()
-	for _, q := range req.Queries {
-		qtype, err := jsonp.GetString(q.JSON, "querytype")
-		if err != nil {
-			log.DefaultLogger.Error("key querytype missing from query JSON "+
-				"- non-IRONdb dashboard pointed at datasource?",
-				"error", err, "query", string(q.JSON), "ref_id", q.RefID)
-			return nil, fmt.Errorf("querytype missing from query JSON: %w "+
-				"- non-IRONdb dashboard pointed at datasource?", err)
-		}
+	rmut := sync.Mutex{}
+	wg := sync.WaitGroup{}
 
-		var response *backend.DataResponse
-		switch qtype {
-		case "caql":
-			response, err = td.caqlQuery(ctx, q)
-			if err != nil {
-				log.DefaultLogger.Error("unable to execute CAQL query",
-					"error", err, "query", q)
-				return nil, fmt.Errorf("unable to execute CAQL query: %w", err)
+	for _, q := range req.Queries {
+		wg.Add(1)
+		go func(q *backend.DataQuery) {
+			defer wg.Done()
+
+			if q == nil {
+				return
 			}
-		case "basic":
-			response, err = td.basicQuery(ctx, q)
+
+			var response *backend.DataResponse
+
+			qtype, err := jsonp.GetString(q.JSON, "querytype")
 			if err != nil {
-				log.DefaultLogger.Error("unable to execute basic query",
-					"error", err, "query", q)
-				return nil, fmt.Errorf("unable to execute basic query: %w", err)
+				log.DefaultLogger.Error("key querytype missing from query JSON "+
+					"- non-IRONdb dashboard pointed at datasource?",
+					"error", err, "query", string(q.JSON), "ref_id", q.RefID)
+				response = &backend.DataResponse{
+					Error: fmt.Errorf("querytype missing from query JSON: %w "+
+						"- non-IRONdb dashboard pointed at datasource?", err),
+				}
+			} else {
+				switch qtype {
+				case "caql":
+					response, err = td.caqlQuery(ctx, *q)
+					if err != nil {
+						log.DefaultLogger.Error("unable to execute CAQL query",
+							"error", err, "query", q)
+						response = &backend.DataResponse{
+							Error: fmt.Errorf("unable to execute CAQL query: %w", err),
+						}
+					}
+				case "basic":
+					response, err = td.basicQuery(ctx, *q)
+					if err != nil {
+						log.DefaultLogger.Error("unable to execute basic query",
+							"error", err, "query", q)
+						response = &backend.DataResponse{
+							Error: fmt.Errorf("unable to execute basic query: %w", err),
+						}
+					}
+				case "graphite":
+					response, err = td.graphiteQuery(ctx, *q)
+					if err != nil {
+						log.DefaultLogger.Error("unable to execute graphite query",
+							"error", err, "query", q)
+						response = &backend.DataResponse{
+							Error: fmt.Errorf("unable to execute graphite query: %w", err),
+						}
+					}
+				default:
+					log.DefaultLogger.Error("unsupported query type, try (caql, basic)",
+						"qtype", qtype)
+					response = &backend.DataResponse{
+						Error: fmt.Errorf("unsupported query type %s, try (caql, basic)", qtype),
+					}
+				}
 			}
-		case "graphite":
-			response, err = td.graphiteQuery(ctx, q)
-			if err != nil {
-				log.DefaultLogger.Error("unable to execute graphite query",
-					"error", err, "query", q)
-				return nil, fmt.Errorf("unable to execute graphite query: %w", err)
-			}
-		default:
-			log.DefaultLogger.Error("unsupported query type, try (caql, basic)",
-				"qtype", qtype)
-			return nil, fmt.Errorf("unsupported query type %s, try (caql, basic)", qtype)
-		}
-		rv.Responses[q.RefID] = *response
-		td.qrs[q.RefID] = *response
+
+			rmut.Lock()
+			rv.Responses[q.RefID] = *response
+			td.qrs[q.RefID] = *response
+			rmut.Unlock()
+		}(&q)
 	}
+
+	wg.Wait()
+
 	return rv, nil
 }
 
