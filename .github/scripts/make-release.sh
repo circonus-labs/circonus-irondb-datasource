@@ -26,6 +26,7 @@ else
     release_name="cid-$name"
 fi
 
-mv dist circonus-irondb-datasource
-tar -czf ${release_name}.tar.gz circonus-irondb-datasource
+mkdir circonus-irondb-datasource 
+mv dist circonus-irondb-datasource/
+tar -czf ${release_name}.tar.gz ./circonus-irondb-datasource
 echo "Created ${release_name}.tar.gz"
