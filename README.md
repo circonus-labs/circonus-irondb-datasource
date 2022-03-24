@@ -1,4 +1,4 @@
-# IRONdb Datasource
+# Circonus IRONdb Datasource for Grafana
 
 This is the plugin for IRONdb 0.17.1 and newer. It is evolving and we continue to track its API.
 
