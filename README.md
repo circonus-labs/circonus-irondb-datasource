@@ -138,3 +138,10 @@ yarn build
 # Test
 yarn test
 ```
+
+# Publishing A New Release
+
+git tag v1.1.1
+git push origin v1.1.1
+
+v1.1.1 should be replaced with the actual version number desired to release to.  This push will trigger the release version of the github action that packages point-releases on merges to master.
