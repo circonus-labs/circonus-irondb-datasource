@@ -209,10 +209,7 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 
 	// If needed include min_period setting in the CAQL query.
 	if !strings.HasPrefix(query, "#min_period=") {
-		// It is very important that the JSON passed into the backend by the JS
-		// correctly sets this min_period field value. It should be nothing if
-		// the query already contains #min_period=, otherwise, it should use the
-		// panel value, if set, or the datasource value if no panel value is set.
+		// Does the panel have a min_period set?
 		minPeriod, err := jsonp.GetString(q.JSON, "min_period")
 		if err != nil {
 			if err != jsonp.KeyPathNotFoundError {
@@ -220,6 +217,7 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 					"error", err)
 				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
 			}
+			// Not set
 		} else {
 			if minPeriod != "" {
 				query = "#min_period=" + minPeriod + " " + query
