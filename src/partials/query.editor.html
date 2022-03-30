@@ -179,7 +179,7 @@
     <div ng-if="(ctrl.target.querytype === 'caql') && ctrl.hasCAQLMinPeriod()" class="gf-form gf-form--grow">
       <div class="gf-form-inline">
         <div class="gf-form">
-            <label class="gf-form-label width-6 query-keyword">Min Period</label>
+            <label class="gf-form-label width-6 query-keyword">Force Min Period</label>
         </div>
         <div class="gf-form gf-form--grow">
             <input id="min_period" class="gf-form-input" type="text" ng-model='ctrl.target.min_period' ng-keyup="ctrl.minPeriodKeyUp($event)" ng-blur="ctrl.updateMinPeriodValue($event)" placeholder="60"></input>

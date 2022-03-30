@@ -46,7 +46,25 @@
           <p>For hosted installations, this defaults to "<strong>reconnoiter.</strong>".</p>
           <p>For access to any metric in the system, leave it blank.</p>
         </info-popover></span>
-      <input class="gf-form-input width-20" type="text" ng-model='ctrl.current.jsonData.queryPrefix' ng-init="ctrl.current.jsonData.queryPrefix" ng-keyup="ctrl.queryPrefixKeyUp($event)" ng-blur="ctrl.updateQueryPrefixValue($event)"></input>
+      <input class="gf-form-input width-20" type="text" 
+        ng-model='ctrl.current.jsonData.queryPrefix' 
+        ng-init="ctrl.current.jsonData.queryPrefix" 
+        ng-keyup="ctrl.queryPrefixKeyUp($event)" 
+        ng-blur="ctrl.updateQueryPrefixValue($event)"></input>
+    </div>
+  </div>
+  <div class="gf-form-inline">
+    <div class="gf-form">
+      <span class="gf-form-label width-13">CAQL Min Periods
+        <info-popover mode="right-normal">
+          <p>By default CAQL works on 60 second data or higher, as dictated by the size of the view window. Most queries do not need a min_period directive. Some queries may need a custom min_period for performance on large window ranges, or more granular ingestion rates. Additional min_period options can be added here to make them available for use in the panel dropdown. Enter the desired additional periods in seconds, separated by commas.</p>
+          <p>Min_periods can also be manually specified by prefixing with the #min_period directive. See <a href="https://docs.circonus.com/caql/reference/#directives" target="_blank">the docs</a> for more info.</p>
+        </info-popover></span>
+      <input class="gf-form-input width-20" type="text" 
+        ng-model='ctrl.current.jsonData.caqlMinPeriod' 
+        ng-init="ctrl.current.jsonData.caqlMinPeriod" 
+        ng-keyup="ctrl.caqlMinPeriodKeyUp($event)" 
+        ng-blur="ctrl.updateCaqlMinPeriodValue($event)"></input><span style="margin-left:0.25em;line-height:2.1429;">seconds</span>
     </div>
   </div>
   <div class="gf-form-inline">
@@ -61,20 +79,6 @@
         ng-init="ctrl.current.jsonData.resultsLimit" 
         ng-keyup="ctrl.resultsLimitKeyUp($event)" 
         ng-blur="ctrl.updateResultsLimitValue($event)"></input>
-    </div>
-  </div>
-  <div class="gf-form-inline">
-    <div class="gf-form">
-      <span class="gf-form-label width-13">CAQL Min Period
-        <info-popover mode="right-normal">
-          <p>By default CAQL works on 60 second data. For data ingested at higher frequency, you can add a different default period here to use in your queries (enter the period of your data in seconds).</p>
-          <p>You may override the default in individual queries by prefixing them with the #min_period directive. See <a href="https://docs.circonus.com/caql/reference/#directives" target="_blank">the docs</a> for more info.</p>
-        </info-popover></span>
-      <input class="gf-form-input width-5" type="text" 
-        ng-model='ctrl.current.jsonData.caqlMinPeriod' 
-        ng-init="ctrl.current.jsonData.caqlMinPeriod" 
-        ng-keyup="ctrl.caqlMinPeriodKeyUp($event)" 
-        ng-blur="ctrl.updateCaqlMinPeriodValue($event)"></input><span style="margin-left:0.25em;line-height:2.1429;">seconds</span>
     </div>
   </div>
   <div class="gf-form-inline">
