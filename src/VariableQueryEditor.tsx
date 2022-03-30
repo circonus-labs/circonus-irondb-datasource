@@ -39,6 +39,10 @@ const RESULTS_LIMIT_OPTIONS: Array<SelectableValue<number>> = [
         value: 2000,
         label: '2000',
     },
+    {
+        value: 5000,
+        label: '5000',
+    },
 ];
 
 interface VariableQueryProps {
@@ -96,7 +100,8 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
                 'metric names' === this.query.queryType || (!this.query.queryType && !this.query.tagCategory),
             isTagCatsType = 'tag categories' === this.query.queryType,
             isTagValsType = 'tag values' === this.query.queryType || (!this.query.queryType && this.query.tagCategory),
-            isGraphiteType = 'graphite style' === this.query.queryType;
+            isGraphiteType = 'graphite style' === this.query.queryType,
+            limitIsLarge = this.query.resultsLimit > 1000;
 
         const saveQuery = () => {
             let q = Object.assign({}, this.query);
@@ -147,6 +152,15 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
         const customSelectStyle = {
             width: '364px',
         };
+        const customSelectWarningStyle = {
+            position: 'absolute' as 'absolute', // cast string to type 'absolute',
+            top: '0.25rem',
+            left: '375px',
+            width: '300px',
+            fontSize: '90%',
+            lineHeight: '1',
+            opacity: '0.5',
+        };
         return (
             <div>
                 <div className="gf-form" style={customSelectStyle}>
@@ -189,11 +203,17 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
                     <span className="gf-form-label width-10">Results Limit</span>
                     <Select
                         aria-label="Select results limit"
+                        className="width-15"
                         isSearchable={false}
                         options={RESULTS_LIMIT_OPTIONS}
                         onChange={updateResultsLimit}
                         value={resultsLimitOption}
                     />
+                    {limitIsLarge && (
+                        <div style={customSelectWarningStyle}>
+                            Large variable lists can cause performance problems on dashboards. Use with care.
+                        </div>
+                    )}
                 </div>
             </div>
         );
