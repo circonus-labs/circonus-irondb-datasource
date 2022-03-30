@@ -1,7 +1,7 @@
 <query-editor-row query-ctrl="ctrl" can-collapse="true" has-text-edit-mode="false">
     <div class="gf-form-inline">
         <div class="gf-form">
-            <label class="gf-form-label width-6 query-keyword">Query Type</label>
+            <label class="gf-form-label width-8 query-keyword">Query Type</label>
         </div>
         <div role="menuitem" class="gf-form" style="align-self:flex-start;">
             <gf-form-dropdown name="querytype" model="ctrl.target.querytype" on-change="ctrl.queryTypeValueChanged()" css-class="gf-size-auto"
@@ -12,7 +12,7 @@
     </div>
     <div class="gf-form-inline">
       <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form">
-        <label class="gf-form-label width-6 query-keyword">Series</label>
+        <label class="gf-form-label width-8 query-keyword">Series</label>
       </div>
       <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
         <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.queryDisplay" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.caqlValueChanged()"></textarea>
@@ -20,7 +20,7 @@
       <div ng-if="ctrl.target.querytype === 'alerts' || ctrl.target.querytype === 'alert_counts'" class="gf-form gf-form--grow">
           <div class="gf-form-inline">
             <div class="gf-form">
-                <label class="gf-form-label width-6 query-keyword">Alert ID</label>
+                <label class="gf-form-label width-8 query-keyword">Alert ID</label>
             </div>
             <div class="gf-form gf-form--grow">
                 <input id="alert_metric_id" class="gf-form-input" type="text" ng-model='ctrl.target.alert_id' ng-blur="ctrl.updateAlertId()" placeholder="123456"></input>
@@ -28,13 +28,13 @@
           </div>
           <div class="gf-form-inline">
             <div class="gf-form">
-              <label class="gf-form-label width-6 query-keyword">Alert query</label>
+              <label class="gf-form-label width-8 query-keyword">Alert query</label>
             </div>
             <div class="gf-form gf-form--grow">
               <input id="alert_metric_query" class="gf-form-input" type="text" ng-model='ctrl.target.query' ng-blur="ctrl.updateAlertQuery()" placeholder="(metric:available)(active:1)"></input>
             </div>
             <div class="gf-form">
-              <label class="gf-form-label width-6 query-keyword">Local filter</label>
+              <label class="gf-form-label width-8 query-keyword">Local filter</label>
             </div>
             <div role="menuitem" class="gf-form" style="align-self:flex-start;">
               <gf-form-dropdown name="alert_local_filter_match" model="ctrl.target.local_filter_match" on-change="ctrl.localFilterMatchValueChanged()" css-class="gf-size-auto"
@@ -48,7 +48,7 @@
           </div>
           <div class="gf-form-inline" ng-if="ctrl.target.querytype === 'alert_counts'">
               <div class="gf-form">
-                  <label class="gf-form-label width-6 query-keyword">Query Type</label>
+                  <label class="gf-form-label width-8 query-keyword">Query Type</label>
               </div>
               <div role="menuitem" class="gf-form" style="align-self:flex-start;">
                   <gf-form-dropdown name="alert_count_query_type" model="ctrl.target.alert_count_query_type" on-change="ctrl.alertCountQueryTypeValueChanged()" css-class="gf-size-auto"
@@ -124,7 +124,7 @@
     </div>
     <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format !== 'heatmap'" class="gf-form">
       <div class="gf-form">
-        <label class="gf-form-label width-6 query-keyword">Label</label>
+        <label class="gf-form-label width-8 query-keyword">Label</label>
       </div>
       <div role="menuitem" class="gf-form" style="align-self:flex-start;">
         <gf-form-dropdown name="labeltype" model="ctrl.target.labeltype" on-change="ctrl.labelTypeValueChanged()" css-class="gf-size-auto"
@@ -141,13 +141,13 @@
     </div>
     <div ng-if="ctrl.target.querytype==='alert_counts'" class="gf-form gf-form--grow">
         <div class="gf-form">
-            <label class="gf-form-label width-6 query-keyword">Label</label>
+            <label class="gf-form-label width-8 query-keyword">Label</label>
         </div>
         <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
     </div>
     <div ng-if="(ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite') && ctrl.target.format !== 'heatmap'" class="gf-form">
       <div class="gf-form">
-        <label class="gf-form-label width-6 query-keyword">Value Type</label>
+        <label class="gf-form-label width-8 query-keyword">Value Type</label>
       </div>
       <div role="menuitem" class="gf-form" style="align-self:flex-start;">
         <gf-form-dropdown name="egressoverride" model="ctrl.target.egressoverride" on-change="ctrl.egressValueChanged()" css-class="gf-size-auto"
@@ -161,7 +161,7 @@
     </div>
     <div class="gf-form">
       <div class="gf-form">
-        <label class="gf-form-label width-6 query-keyword">Resolution</label>
+        <label class="gf-form-label width-8 query-keyword">Resolution</label>
       </div>
       <div role="menuitem" class="gf-form" style="align-self:flex-start;">
         <gf-form-dropdown name="rolluptype" model="ctrl.target.rolluptype" on-change="ctrl.rollupTypeValueChanged()" css-class="gf-size-auto"
@@ -169,26 +169,30 @@
           lookup-text="true">
         </gf-form-dropdown>
       </div>
-      <div ng-if="ctrl.target.rolluptype!=='automatic'" class="gf-form gf-form--grow">
+      <div ng-if="ctrl.target.rolluptype !== 'automatic'" class="gf-form gf-form--grow">
         <input id="metricrollup" class="gf-form-input" type="text" ng-model='ctrl.target.metricrollup' ng-keyup="ctrl.metricRollupKeyUp($event)" ng-blur="ctrl.updateMetricRollupValue()" placeholder="rollup period"></input>
       </div>
       <div class="gf-form gf-form--grow">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
     </div>
-    <div ng-if="(ctrl.target.querytype === 'caql') && ctrl.hasCAQLMinPeriod()" class="gf-form gf-form--grow">
-      <div class="gf-form-inline">
+    <div class="gf-form" ng-if="ctrl.target.querytype === 'caql'">
         <div class="gf-form">
-            <label class="gf-form-label width-6 query-keyword">Min Period</label>
+            <label class="gf-form-label width-8 query-keyword">Force Min Period</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="min_period" model="ctrl.target.min_period" on-change="ctrl.minPeriodChanged()" css-class="gf-size-auto"
+                              get-options="ctrl.minPeriodOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
         </div>
         <div class="gf-form gf-form--grow">
-            <input id="min_period" class="gf-form-input" type="text" ng-model='ctrl.target.min_period' ng-keyup="ctrl.minPeriodKeyUp($event)" ng-blur="ctrl.updateMinPeriodValue($event)" placeholder="60"></input>
+            <div class="gf-form-label gf-form-label--grow"></div>
         </div>
-      </div>
     </div>
     <div class="gf-form">
         <div class="gf-form">
-            <label class="gf-form-label width-6 query-keyword">Format</label>
+            <label class="gf-form-label width-8 query-keyword">Format</label>
         </div>
         <div role="menuitem" class="gf-form" style="align-self:flex-start;">
             <gf-form-dropdown name="format" model="ctrl.target.format" on-change="ctrl.formatChanged()" css-class="gf-size-auto"

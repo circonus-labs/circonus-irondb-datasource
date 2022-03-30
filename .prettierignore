@@ -1,0 +1,3 @@
+# Ignore all TS & TSX files:
+*.ts
+*.tsx

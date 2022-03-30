@@ -53,23 +53,6 @@ const log = Log('IrondbDatasource');
 
 import { map } from 'rxjs/operators';
 
-const DURATION_UNITS_DEFAULT = 's';
-const DURATION_UNITS = {
-    ms: 1,
-    s: 1000,
-    m: 1000 * 60,
-    h: 1000 * 60 * 60,
-    d: 1000 * 60 * 60 * 24,
-};
-
-function parseDurationMs(duration: string): number {
-    const matches = duration.toLocaleLowerCase().match(/^([0-9]+)(ms|s|m|h|d)?$/);
-    if (!matches) {
-        throw new Error('Invalid time duration: ' + duration);
-    }
-    return parseInt(matches[1], 10) * DURATION_UNITS[matches[2] || DURATION_UNITS_DEFAULT];
-}
-
 const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
 const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
 const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map((a) => a * 60);
@@ -120,6 +103,22 @@ const HISTOGRAM_TRANSFORMS = {
     counter_stddev: 'counter_stddev',
 };
 
+const DURATION_UNITS_DEFAULT = 's';
+const DURATION_UNITS = {
+    ms: 1,
+    s: 1000,
+    m: 1000 * 60,
+    h: 1000 * 60 * 60,
+    d: 1000 * 60 * 60 * 24,
+};
+export function parseDurationMS(duration: string): number {
+    const matches = duration.toLocaleLowerCase().match(/^([0-9]+)(ms|s|m|h|d)?$/);
+    if (!matches) {
+        throw new Error('Invalid time duration: ' + duration);
+    }
+    return parseInt(matches[1], 10) * DURATION_UNITS[matches[2] || DURATION_UNITS_DEFAULT];
+}
+
 export interface IrondbQueryInterface extends DataQuery {
     expr: string;
     format?: string;
@@ -139,7 +138,7 @@ export interface IrondbOptions extends DataSourceJsonData {
     accountId?: number;
     irondbType: string; // 'standalone' | 'hosted' -- specifies whether a standalone or hosted IRONdb instance is the target of this datasource
     resultsLimit: string; // Any limit on the number of search results items that are fetched
-    caqlMinPeriod: string; // A default min_period directive to be used in all CAQL queries unless a different min_period is specified in the query itself
+    caqlMinPeriod: string; // DO NOT USE HERE: this is only for query editing
     apiToken?: string;
     truncateNow?: boolean; // Whether to truncate the last value when viewing a time range ending in 'now'
     minTruncation?: string; // When paired with truncateNow, this is the minimum truncation performed (in seconds); it's useful when viewing high-resolution data
@@ -156,7 +155,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     accountId: number;
     irondbType: string;
     resultsLimit: string;
-    caqlMinPeriod: string;
+    caqlMinPeriod: string; // DO NOT USE HERE: this is only for query editing
     truncateNow: boolean;
     minTruncation: string;
     useCaching: boolean;
@@ -1017,14 +1016,13 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     irondbOptions['scopedVars']
                 );
                 const minPeriod = (irondbOptions['caql']['names'][i].leaf_data || {}).min_period;
-                const caqlQueryMP =
-                    (minPeriod && !/^#min_period=/.test(caqlQuery) ? '#min_period=' + minPeriod + ' ' : '') + caqlQuery; // prefix with min_period if min_period isn't in the query already
+                const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? '#min_period=' + minPeriod + ' ' : '') + caqlQuery; // prefix with the target's min_period if min_period isn't in the query already
                 // render start, end, & period
                 let start = irondbOptions['caql']['start'];
                 let end = irondbOptions['caql']['end'];
-                const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2})\s/i);
+                const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2}?)\s/i);
                 const minPeriodDirective = minPeriodMatches
-                    ? Math.round(parseDurationMs(minPeriodMatches[1]) / 1000)
+                    ? Math.round(parseDurationMS(minPeriodMatches[1]) / 1000)
                     : null;
                 const calculatedInterval = this.getRollupSpan(
                     irondbOptions,
@@ -1503,7 +1501,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             log(() => `getRollupSpan() defaulting to automatic`);
         }
         if (rolluptype === 'exact') {
-            const exactMs = parseDurationMs(metricrollup);
+            const exactMs = parseDurationMS(metricrollup);
             const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
             log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
             if (exactDatapoints > options.maxDataPoints * IrondbDatasource.MAX_EXACT_DATAPOINTS_THRESHOLD) {
@@ -1517,7 +1515,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 minimumMs = IrondbDatasource.MIN_DURATION_MS_CAQL;
             }
             if (rolluptype === 'minimum') {
-                minimumMs = parseDurationMs(metricrollup);
+                minimumMs = parseDurationMS(metricrollup);
                 log(() => `getRollupSpan() minimumMs = ${minimumMs}`);
             }
             let intervalMs = options.intervalMs;
@@ -1732,7 +1730,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                         metricrollup: target.metricrollup,
                         format: target.format,
                         refId: target.refId,
-                        min_period: target.min_period || this.caqlMinPeriod,
+                        min_period: target.min_period || '',
                     },
                 });
                 cleanOptions['refId'] = target.refId;

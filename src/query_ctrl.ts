@@ -3,6 +3,7 @@ import Log from './log';
 import IrondbQuery from './irondb_query';
 /* eslint-disable-next-line no-duplicate-imports */
 import { SegmentType, taglessName, decodeTag, encodeTag } from './irondb_query';
+import { parseDurationMS } from './datasource';
 import { QueryCtrl } from 'grafana/app/plugins/sdk';
 // import appEvents from 'grafana/app/core/app_events';
 import './css/query_editor.css';
@@ -85,6 +86,11 @@ export class IrondbQueryCtrl extends QueryCtrl {
         { value: 'table', text: 'Table' },
         { value: 'heatmap', text: 'Heatmap' },
     ];
+    minPeriodOptions = [
+        { value: '', text: 'none' },
+        { value: '60s', text: '60s' },
+        { value: '300s', text: '300s' },
+    ];
     caqlFindFunctions = {
         count: 'count',
         average: 'average',
@@ -135,13 +141,33 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.local_filter_match = this.target.local_filter_match || 'all';
         this.target.alert_count_query_type = this.target.alert_count_query_type || 'instant';
         this.target.alert_id = this.target.alert_id || '';
-
-        // It is very important that the JSON passed into the backend here
-        // correctly sets this min_period field value. It should be nothing if
-        // the query already contains #min_period=, otherwise, it should use the
-        // panel value, if set, or the datasource value if no panel value is set.
-        this.target.min_period =
-            this.target.min_period || (this.hasCAQLMinPeriod() ? this.datasource.caqlMinPeriod : '');
+        // ensure min_period has the 's' suffix (before it was a bare integer)
+        this.target.min_period = this.target.min_period || '';
+        this.target.min_period += /[a-zA-Z]$/.test(this.target.min_period) ? '' : 's';
+        // check min_period options
+        if (this.datasource.caqlMinPeriod) {
+            let periods = this.datasource.caqlMinPeriod.trim().split(',');
+            // add any from the datasource config which aren't present already
+            periods.forEach((p) => {
+                if (/^\d+[a-zA-Z]?$/.test(p)) {
+                    p += /[a-zA-Z]$/.test(p) ? '' : 's';
+                    if (!this.minPeriodOptions.some((opt) => { return opt.value === p; })) {
+                        this.minPeriodOptions.push({ value:p, text:p });
+                    }
+                }
+            });
+            // add the current value if it's an old, odd value
+            if (!this.minPeriodOptions.some((opt) => { return opt.value === this.target.min_period; })) {
+                this.minPeriodOptions.push({ value:this.target.min_period, text:this.target.min_period });
+            }
+            // sort
+            this.minPeriodOptions.sort((a,b) => {
+                var ad = parseDurationMS(a.value || '0'),
+                    bd = parseDurationMS(b.value || '0');
+                return ad < bd ? -1 : ad > bd ? 1 : 0;
+            });
+        }
+        // proceed
         this.queryModel = new IrondbQuery(this.datasource, this.target, templateSrv);
         this.checkForPlusAndSelect();
         this.buildSegments();
@@ -327,27 +353,8 @@ export class IrondbQueryCtrl extends QueryCtrl {
         }
     }
 
-    minPeriodKeyUp(event) {
-        const self = this;
-        const element = event.currentTarget;
-        if (event.keyCode === 13) {
-            setTimeout(() => {
-                self.target.min_period = element.value;
-                self.updateMinPeriodValue(event);
-            }, 0);
-        }
-    }
-
-    updateMinPeriodValue(event) {
-        const element = event.currentTarget;
-        if (this.target.min_period === '' || isNaN(parseInt(this.target.min_period, 10))) {
-            element.value = this.target.min_period = this.datasource.caqlMinPeriod;
-        }
+    minPeriodChanged() {
         this.panelCtrl.refresh();
-    }
-
-    hasCAQLMinPeriod() {
-        return _.isString(this.datasource.caqlMinPeriod) && !isNaN(parseInt(this.datasource.caqlMinPeriod, 10));
     }
 
     egressValueChanged() {
