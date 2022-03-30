@@ -59,12 +59,8 @@ export class IrondbConfigCtrl {
 
     updateCaqlMinPeriodValue(event) {
         const element = event.currentTarget;
-        const trimmed_cmp = (this.current.jsonData.caqlMinPeriod || '').trim();
-        if (trimmed_cmp && !/\D/.test(trimmed_cmp)) {
-            element.value = this.current.jsonData.caqlMinPeriod = trimmed_cmp;
-        } else {
-            element.value = this.current.jsonData.caqlMinPeriod = '';
-        }
+        const trimmed = (this.current.jsonData.caqlMinPeriod || '').replace(/[^\d,smhd]/g, '');
+        element.value = this.current.jsonData.caqlMinPeriod = trimmed;
     }
 
     minTruncationKeyUp(event) {
