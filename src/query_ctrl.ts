@@ -143,7 +143,9 @@ export class IrondbQueryCtrl extends QueryCtrl {
         this.target.alert_id = this.target.alert_id || '';
         // ensure min_period has the 's' suffix (before it was a bare integer)
         this.target.min_period = this.target.min_period || '';
-        this.target.min_period += /[a-zA-Z]$/.test(this.target.min_period) ? '' : 's';
+        if (this.target.min_period) {
+            this.target.min_period += /[a-zA-Z]$/.test(this.target.min_period) ? '' : 's';
+        }
         // check min_period options
         if (this.datasource.caqlMinPeriod) {
             let periods = this.datasource.caqlMinPeriod.trim().split(',');
