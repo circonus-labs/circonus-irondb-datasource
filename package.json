@@ -13,10 +13,10 @@
     "author": "Circonus",
     "license": "BSD-3-clause",
     "dependencies": {
-        "@grafana/data": "8.4.7",
-        "@grafana/runtime": "8.4.7",
-        "@grafana/toolkit": "8.4.7",
-        "@grafana/ui": "8.4.7",
+        "@grafana/data": "8.5.3",
+        "@grafana/runtime": "8.5.3",
+        "@grafana/toolkit": "8.5.3",
+        "@grafana/ui": "8.5.3",
         "memoizee": "^0.4.14"
     },
     "devDependencies": {
