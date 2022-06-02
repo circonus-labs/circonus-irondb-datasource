@@ -1,4 +1,8 @@
 
+## 0.9.16
+
+ * Fixed a bug where values of zero weren't being plotted from CAQL data.
+
 ## 0.9.15
 
  * re-synchronizing package metadata

@@ -1946,7 +1946,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     continue;
                 }
                 // if it's null or a number, proceed
-                if (null === data[si][i] || (data[si][i] && Number === data[si][i].constructor)) {
+                if (null === data[si][i] || ((null != data[si][i]) && (Number === data[si][i].constructor))) {
                     frame.add({ Time: ts, Value: data[si][i] });
                 }
                 // if it's an object, process it for a heatmap
