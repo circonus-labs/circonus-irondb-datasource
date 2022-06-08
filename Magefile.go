@@ -5,7 +5,7 @@ package main
 
 import (
 	// mage:import
-	"encoding/json"
+	json "encoding/json"
 	build "github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/magefile/mage/mg"
 	"io/ioutil"
@@ -13,6 +13,7 @@ import (
 	"strings"
 )
 
+// readFileAsBytes is a helper function to read a filepath as bytes
 func readFileAsBytes(filePath string) ([]byte, error) {
 	byteValue, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -21,6 +22,8 @@ func readFileAsBytes(filePath string) ([]byte, error) {
 	return byteValue, nil
 }
 
+// pluginJson matches the structure of the dist/plugin.json file before
+// it's version field value is replaced if this is a release
 type pluginJson struct {
 	Type       string `json:"type"`
 	Name       string `json:"name"`
@@ -54,25 +57,17 @@ type pluginJson struct {
 	Annotations bool `json:"annotations"`
 }
 
+// IrondbDsBuildConfig holds config for the circonus-irondb-datasource build
 type IrondbDsBuildConfig struct {
-	b build.Build // mg.Namespace
+	B build.Build // mg.Namespace
+	PluginJsonPath string // path to the plugin.json file
 }
 
-func (ids *IrondbDsBuildConfig) setTargets() {
-	mg.Deps(ids.b.Linux, ids.b.Windows, ids.b.Darwin, ids.b.DarwinARM64, ids.b.LinuxARM64, ids.b.LinuxARM)
-}
-
-// replaceVersion replaces the version of the dist/plugin.json file
-// with the value of the PLUGIN_VERSION environment variable if it exists
-func (p *pluginJson) replaceVersion() {
-	version := os.Getenv("PLUGIN_VERSION")
-	if strings.HasPrefix(p.Info.Version, "v") && version != "" {
-			updatePluginVersion(version)
-	}
-}
-
-func updatePluginVersion(version string) {
-	f, e := readFileAsBytes("dist/plugin.json")
+// updatePluginVersion updates the plugin.json version field value with
+// the value of the environment variable PLUGIN_VERSION for tags that start with
+// v
+func (ids *IrondbDsBuildConfig) updatePluginVersion() {
+	f, e := readFileAsBytes(ids.PluginJsonPath)
 	if e != nil {
 		panic(e.Error())
 	}
@@ -81,13 +76,22 @@ func updatePluginVersion(version string) {
 	if err != nil {
 		panic(err.Error())
 	}
-	p.replaceVersion()
+	version := os.Getenv("PLUGIN_VERSION")
+	if strings.HasPrefix(p.Info.Version, "v") && version != "" {
+			p.Info.Version = version
+	}
 	file, _ := json.MarshalIndent(p, "", " ")
-	_ = ioutil.WriteFile("dist/plugin.json", file, 0644)
+	_ = ioutil.WriteFile(ids.PluginJsonPath, file, 0644)
+}
+
+// setTargets sets the platform builds
+func (ids *IrondbDsBuildConfig) setTargets() {
+	mg.Deps(ids.B.Linux, ids.B.Windows, ids.B.Darwin, ids.B.DarwinARM64, ids.B.LinuxARM64, ids.B.LinuxARM)
 }
 
 func BuildRelease() {
 	i := IrondbDsBuildConfig{}
+	i.updatePluginVersion()
 	i.setTargets()
 }
 
