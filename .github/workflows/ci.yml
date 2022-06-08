@@ -74,8 +74,8 @@ jobs:
           version: latest
           args: buildRelease
         env:
-          PLUGIN_VERSION: Mona
-          
+          PLUGIN_VERSION: ${GITHUB_REF#refs/*/}
+
       - name: Make preview release asset
         if: ${{ github.ref == 'refs/heads/master' }}
         run: ./.github/scripts/make-release.sh preview

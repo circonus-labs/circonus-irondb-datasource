@@ -74,7 +74,7 @@ jobs:
           version: latest
           args: buildRelease
         env:
-          PLUGIN_VERSION: Mona
+          PLUGIN_VERSION: ${GITHUB_REF#refs/*/}
 
       - name: Make release asset
         if: ${{ github.ref == 'refs/heads/master' }}

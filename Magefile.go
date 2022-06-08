@@ -10,6 +10,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 func readFileAsBytes(filePath string) ([]byte, error) {
@@ -61,6 +62,15 @@ func (ids *IrondbDsBuildConfig) setTargets() {
 	mg.Deps(ids.b.Linux, ids.b.Windows, ids.b.Darwin, ids.b.DarwinARM64, ids.b.LinuxARM64, ids.b.LinuxARM)
 }
 
+// replaceVersion replaces the version of the dist/plugin.json file
+// with the value of the PLUGIN_VERSION environment variable if it exists
+func (p *pluginJson) replaceVersion() {
+	version := os.Getenv("PLUGIN_VERSION")
+	if strings.HasPrefix(p.Info.Version, "v") && version != "" {
+			updatePluginVersion(version)
+	}
+}
+
 func updatePluginVersion(version string) {
 	f, e := readFileAsBytes("dist/plugin.json")
 	if e != nil {
@@ -71,16 +81,12 @@ func updatePluginVersion(version string) {
 	if err != nil {
 		panic(err.Error())
 	}
-	p.Info.Version = version
+	p.replaceVersion()
 	file, _ := json.MarshalIndent(p, "", " ")
 	_ = ioutil.WriteFile("dist/plugin.json", file, 0644)
 }
 
 func BuildRelease() {
-	version := os.Getenv("PLUGIN_VERSION")
-	if version != "" {
-		updatePluginVersion(version)
-	}
 	i := IrondbDsBuildConfig{}
 	i.setTargets()
 }
