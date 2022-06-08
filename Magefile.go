@@ -58,7 +58,7 @@ type IrondbDsBuildConfig struct {
 }
 
 func (ids *IrondbDsBuildConfig) setTargets() {
-	mg.Deps(ids.b.Linux) //, ids.b.Windows, ids.b.Darwin, ids.b.DarwinARM64, ids.b.LinuxARM64, ids.b.LinuxARM)
+	mg.Deps(ids.b.Linux, ids.b.Windows, ids.b.Darwin, ids.b.DarwinARM64, ids.b.LinuxARM64, ids.b.LinuxARM)
 }
 
 func updatePluginVersion(version string) {
