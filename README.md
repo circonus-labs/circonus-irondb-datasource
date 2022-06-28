@@ -56,7 +56,9 @@ These instructions will build and run a Docker container with a Grafana instance
 
 1. Create a new datasource and select IRONdb from the `Type` drop down.
 
-2. Change the IRONdb configuration options at the bottom of the datasource configuration page.
+2. Update the "HTTP" section with the HTTP connection details for your cluster, or `https://api.circonus.com` if you are using the Circonus API.
+
+3. Change the IRONdb configuration options at the bottom of the datasource configuration page.
 ![](img/irondb-datasource-configuration.png)
 
 ### IRONdb Type
