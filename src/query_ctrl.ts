@@ -162,6 +162,15 @@ export class IrondbQueryCtrl extends QueryCtrl {
             if (!this.minPeriodOptions.some((opt) => { return opt.value === this.target.min_period; })) {
                 this.minPeriodOptions.push({ value:this.target.min_period, text:this.target.min_period });
             }
+            // check for invalid periods
+            for (let op=this.minPeriodOptions.length-1; op>=0; --op) {
+                try {
+                    parseDurationMS(this.minPeriodOptions[op].value || '0');
+                }
+                catch (e) {
+                    this.minPeriodOptions.splice(op, 1);
+                }
+            }
             // sort
             this.minPeriodOptions.sort((a,b) => {
                 var ad = parseDurationMS(a.value || '0'),
