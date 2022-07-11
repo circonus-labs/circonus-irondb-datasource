@@ -1,4 +1,10 @@
 
+## 0.9.19
+
+ * Fixed a bug where the API client used by the datasource could retry on
+ response errors multiple times, potentially causing a large number of
+ API requests to be generated.
+
 ## 0.9.16
 
  * Fixed a bug where values of zero weren't being plotted from CAQL data.

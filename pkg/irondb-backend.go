@@ -78,9 +78,10 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 		queryURL := req.PluginContext.DataSourceInstanceSettings.URL
 
 		td.circ, err = circ.New(&circ.Config{
-			TokenKey: key,
-			TokenApp: "circonus-irondb-datasource",
-			URL:      queryURL,
+			TokenKey:   key,
+			TokenApp:   "circonus-irondb-datasource",
+			URL:        queryURL,
+			MaxRetries: 0, // Do not retry 5XX error as doing so could lead to a flood of API requests.
 		})
 		if err != nil {
 			log.DefaultLogger.Error("unable to create circonus go-apiclient",
