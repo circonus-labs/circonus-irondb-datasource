@@ -83,7 +83,7 @@ func (td *SampleDatasource) QueryData(ctx context.Context, req *backend.QueryDat
 			URL:      queryURL,
 			// Do not allow the API client to automatically retry on 5XX errors.
 			// Grafana is responsible for retry behavior.
-			MaxRetries: 0,
+			DisableRetries: true,
 		})
 		if err != nil {
 			log.DefaultLogger.Error("unable to create circonus go-apiclient",
