@@ -1,6 +1,7 @@
 
 ## 0.9.19
 
+ * Updates dependencies to latest versions.
  * Fixed a bug where the API client used by the datasource could retry on
  response errors multiple times, potentially causing a large number of
  API requests to be generated.
