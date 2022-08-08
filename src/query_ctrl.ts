@@ -635,16 +635,20 @@ export class IrondbQueryCtrl extends QueryCtrl {
                 // strip tags from the name
                 values.data = this.datasource.stripTags(values.data);
                 // convert values into segment objects
-                let optionSegments = _.map(values.data, (option) => {
+                let optionSegments = [];
+                (values.data || []).forEach((option) => {
                     const uuidRegExp = /^(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})./;
                     const queryRegExp = new RegExp(_fixRegExp(query), 'i');
                     if (ignoreUUIDs) {
                         option.name = option.name.replace(uuidRegExp, '');
                     }
-                    return this.uiSegmentSrv.newSegment({
-                        value: option.name.replace(queryRegExp, ''), // strip out the query path before this segment to only show this last segment value
-                        expandable: !option.leaf,
-                    });
+                    const reducedName = option.name.replace(queryRegExp, ''); // strip out the query path before this segment to only show this last segment value
+                    if ('' !== reducedName) {
+                        optionSegments.push(this.uiSegmentSrv.newSegment({
+                            value: reducedName,
+                            expandable: !option.leaf,
+                        }));
+                    }
                 });
                 // de-dupe options if there are any
                 if (optionSegments.length) {
