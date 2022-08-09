@@ -124,4 +124,11 @@
       tooltip="IRONdb supports graphite-style queries, albeit without any tag support.">
     </gf-form-switch>
   </div>
+  <div class="gf-form-inline">
+    <gf-form-switch class="gf-form"
+      label-class="width-13" switch-class="width-5"
+      label="Hide CAQL Warnings" checked="ctrl.current.jsonData.hideCAQLWarnings"
+      tooltip="In some cases CAQL will return data along with a warning that the data may be incomplete, due to limits or data unavailability. Grafana does not expose a way to surface these warnings, so we treat it like an error which does not show the incomplete data. Enable this setting to display the data and silently discard the warning.">
+    </gf-form-switch>
+  </div>
 </div>

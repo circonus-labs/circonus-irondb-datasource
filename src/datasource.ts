@@ -145,6 +145,7 @@ export interface IrondbOptions extends DataSourceJsonData {
     useCaching?: boolean; // Whether to use client-side caching of database requests
     activityTracking?: boolean; // Whether to use IRONdb metric activity tracking when making requests
     allowGraphite: boolean; // Whether to show UI elements to allow the use of graphite-style queries
+    hideCAQLWarnings: boolean; // Whether to hide CAQL warnings and show the data, instead of throwing errors to show the warnings
     queryPrefix: string; // When using graphite-style queries, this is any pre-set query prefix needed for the IRONdb setup in use
 }
 
@@ -161,6 +162,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     useCaching: boolean;
     activityTracking: boolean;
     allowGraphite: boolean;
+    hideCAQLWarnings: boolean;
     queryPrefix: string;
     url: any;
     apiToken: string;
@@ -240,6 +242,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         this.minTruncation = instanceSettings.jsonData.minTruncation || '0';
         this.activityTracking = instanceSettings.jsonData.activityTracking;
         this.allowGraphite = instanceSettings.jsonData.allowGraphite;
+        this.hideCAQLWarnings = instanceSettings.jsonData.hideCAQLWarnings;
         this.queryPrefix = instanceSettings.jsonData.queryPrefix;
         this.url = instanceSettings.url;
         this.supportAnnotations = false;
@@ -1122,6 +1125,11 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             queries.map((query, i, queries) =>
                 this.datasourceRequest(query)
                     .then((result) => {
+                        const warning = ((result.data || {}).head || {}).warning;
+                        if (query.isCaql && warning && !this.hideCAQLWarnings) {
+                            throw ('Warning: '+ result.data.head.warning + ' - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.');
+                        }
+
                         log(() => 'irondbRequest() query = ' + JSON.stringify(query));
                         log(() => 'irondbRequest() result = ' + JSON.stringify(result));
                         if (!_.isUndefined(query.isAlert)) {

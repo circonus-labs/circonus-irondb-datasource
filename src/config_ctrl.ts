@@ -19,6 +19,7 @@ export class IrondbConfigCtrl {
         this.current.jsonData.activityTracking = _.defaultTo(this.current.jsonData.activityTracking, true);
         //
         this.current.jsonData.allowGraphite = _.defaultTo(this.current.jsonData.allowGraphite, false);
+        this.current.jsonData.hideCAQLWarnings = _.defaultTo(this.current.jsonData.hideCAQLWarnings, false);
         this.current.jsonData.queryPrefixDefault = '';
         this.current.jsonData.queryPrefix =
             this.current.jsonData.queryPrefix || this.current.jsonData.queryPrefixDefault;
