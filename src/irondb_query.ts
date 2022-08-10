@@ -793,7 +793,8 @@ export default class IrondbQuery {
                     }
                     // decrement the reference count and proceed with the replacement
                     t.refCount--;
-                    return t.query;
+                    // replace any CAQL directive first
+                    return ('caql' === t.querytype) ? t.query.replace(/^#\w+=?\w*\s/, '') : t.query;
                 }
             );
             // end this cycle if nothing was replaced
