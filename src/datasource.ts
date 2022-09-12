@@ -734,7 +734,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     ) {
         const ignoreUUIDs = this.ignoreGraphiteUUIDs();
         let queryUrl = '/' + this.queryPrefix + '/metrics/find';
-        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0'];
+        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0', 'include_type=1'];
         if (tagFilter) {
             qsParams.push('irondb_tag_filter=' + tagFilter);
         }
