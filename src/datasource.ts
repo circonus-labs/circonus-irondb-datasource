@@ -1574,7 +1574,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         let leaf_metric_name = (result[i]['leaf_data'] || {}).name;
 
         // get the metric type
-        let types = (('heatmap' === target.format ? 'histogram' : result[i]['type']) || 'numeric').split(',');
+        let types = (('heatmap' === target.format ? 'histogram' : (result[i]['metric_type'] || result[i]['type'])) || 'numeric').split(',');
         let this_type;
         while (!this_type) {
             this_type = types.pop();
