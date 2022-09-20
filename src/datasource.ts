@@ -498,30 +498,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         });
     }
 
-    interpolateExpr(value: string | string[] = [], variable: any) {
-        // if no multi or include all do not regexEscape
-        if (!variable.multi && !variable.includeAll) {
-            return value;
-        }
-
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (value.length === 1) {
-            return value[0];
-        }
-
-        let q = '';
-        for (let i = 0; i < value.length; i++) {
-            if (i > 0) {
-                q = q + ',';
-            }
-            q = q + value[i];
-            i = i + 1;
-        }
-        return q;
-    }
 
     // This is used to load variable values (in the dashboard config variable setup
     // and also whenever refreshing variable values when viewing a dashboard.
@@ -582,7 +558,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         if (q !== undefined) {
             const queryType = (q && q.queryType) || (q.tagCategory ? 'tag values' : 'metric names');
             const resultsLimit = (q && q.resultsLimit) || 100;
-            let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, this.interpolateExpr);
+            //let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, this.processVariableValue);
+            let self = this;
+            let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, (value: string | string[] = [], variable: any) => { return self.processVariableValue(value, variable); });
 
             if (
                 'graphite style' !== queryType &&
@@ -707,8 +685,18 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     }
 
     decodeBase64(str) {
-        if (/^b(["!]{1}).+\1$/.test(str)) {
+        var is_encoded = /^b(["!]{1}).+\1$/.test(str);
+        if (is_encoded) {
             str = atob(str.slice(2, str.length - 1));
+        }
+        return str;
+    }
+
+    encodeBase64(str) {
+        var is_encoded           = /^b(["!]{1}).+\1$/.test(str),
+            has_disallowed_chars = /[^`+A-Za-z0-9!@#\$%^&"'\/\?\._\*-]/.test(str);
+        if (!is_encoded && has_disallowed_chars) {
+            str = 'b"'+ btoa(str) +'"';
         }
         return str;
     }
@@ -1468,6 +1456,32 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         });
     }
 
+    // process a variable value during the nested variable replacement process
+    processVariableValue(value: string | string[] = [], variable: any) {
+        // if no multi or include all do not regexEscape
+        if (!variable.multi && !variable.includeAll) {
+            return this.encodeBase64(value);
+        }
+
+        if (typeof value === 'string') {
+            return this.encodeBase64(value);
+        }
+
+        if (value.length === 1) {
+            return this.encodeBase64(value[0]);
+        }
+
+        let q = '';
+        for (let i = 0; i < value.length; i++) {
+            if (i > 0) {
+                q = q + ',';
+            }
+            q = q + value[i];
+            i = i + 1;
+        }
+        return q;
+    }
+
     static readonly MAX_DATAPOINTS_THRESHOLD = 1.5;
     static readonly MAX_EXACT_DATAPOINTS_THRESHOLD = 1.5;
     static readonly MIN_DURATION_MS_FETCH = 1;
@@ -2035,9 +2049,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             let valRegExp;
             try {
                 let slashedVal = slashifyCharsRegExp.test(val) ? val.replace(slashifyCharsRegExp, '\\$1') : val;
-                valRegExp = new RegExp(':' + slashedVal, 'g');
+                valRegExp = new RegExp(':'+ slashedVal, 'g');
                 if (valRegExp.test(query)) {
-                    query = query.replace(valRegExp, ':b"' + btoa(val) + '"');
+                    query = query.replace(valRegExp, ':'+ this.encodeBase64(val));
                 }
             } catch (e) {}
         });
