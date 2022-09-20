@@ -1,4 +1,14 @@
 
+## 0.9.24
+
+ * Eliminates the need for a call to the graphite_translate IRONdb extension
+ in the alerting backend for Graphite style queries.
+ * Ensures that all CAQL queries issued via the API /caql endpoint by the
+ alerting backend contain a #min_period prefix if a min_period value has been
+ defined for the Grafana query object.
+ * Adds handling for the possibility of null or non-numeric data values being
+ returned to the alerting backend by its calls to the API /caql endpoint.
+
 ## 0.9.19
 
  * Updates dependencies to latest versions.

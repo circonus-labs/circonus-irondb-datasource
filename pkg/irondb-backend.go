@@ -210,41 +210,9 @@ func (td *SampleDatasource) caqlQuery(ctx context.Context, q backend.DataQuery) 
 		return nil, fmt.Errorf("key query missing from CAQL query: %w", err)
 	}
 
-	// If needed include min_period setting in the CAQL query.
-	if !strings.HasPrefix(query, "#min_period=") {
-		// Does the panel have a min_period set?
-		minPeriod, err := jsonp.GetString(q.JSON, "min_period")
-		if err != nil {
-			if err != jsonp.KeyPathNotFoundError {
-				log.DefaultLogger.Error("unable to parse CAQL query min_period",
-					"error", err)
-				return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
-			}
-			// Not set
-		} else {
-			if minPeriod != "" {
-				query = "#min_period=" + minPeriod + " " + query
-			}
-		}
-	}
-
 	log.DefaultLogger.Info("caqlQuery", "caql", query)
 
 	return td.caqlAPI(ctx, q, query)
-}
-
-// TranslateResponse values represent a response from the IRONdb graphite
-// translator service
-type TranslateResponse struct {
-	Input string `json:"input"`
-	CAQL  string `json:"caql"`
-	Error string `json:"error"`
-}
-
-// TranslateRequest values represent a request to the IRONdb graphite
-// translator service
-type TranslateRequest struct {
-	Query string `json:"q"`
 }
 
 func (td *SampleDatasource) graphiteQuery(ctx context.Context, q backend.DataQuery) (*backend.DataResponse, error) {
@@ -255,55 +223,32 @@ func (td *SampleDatasource) graphiteQuery(ctx context.Context, q backend.DataQue
 		return nil, fmt.Errorf("key query missing from graphite query: %w", err)
 	}
 
-	// Convert the graphite query to CAQL using IRONdb graphite_translate.
-	graphiteURL := &url.URL{Path: "irondb/extension/lua/public/graphite_translate"}
-	query = strings.ReplaceAll(query, " ", "")
-	t := TranslateRequest{Query: query}
-
-	reqBody, err := json.Marshal(t)
-	if err != nil {
-		log.DefaultLogger.Error("unable to marshal graphite translate request",
-			"error", err, "request", graphiteURL.String(), "body", string(reqBody))
-		return nil, fmt.Errorf("unable to marshal graphite translate request: %w", err)
+	tagFilter, err := jsonp.GetString(q.JSON, "tagFilter")
+	if err != nil && err != jsonp.KeyPathNotFoundError {
+		log.DefaultLogger.Error("unable to get tagFilter for graphite query",
+			"error", err, "query", string(q.JSON))
+		return nil, fmt.Errorf("unable to get tagFilter for graphite query: %w", err)
 	}
 
-	respData, err := td.circ.Post(graphiteURL.String(), reqBody)
-	if err != nil {
-		log.DefaultLogger.Error("error returned from graphite translate",
-			"error", err, "request", graphiteURL.String(), "body", string(reqBody))
-		return nil, fmt.Errorf("error returned from graphite translate: %w", err)
+	// Convert the graphite query to an equivalent CAQL query.
+	caqlQ := "graphite:find('" + strings.ReplaceAll(query, " ", "") + "'"
+
+	if tagFilter != "" {
+		caqlQ += ",'" + tagFilter + "'"
 	}
 
-	var resp TranslateResponse
-	if err := json.Unmarshal(respData, &resp); err != nil {
-		log.DefaultLogger.Error("unable to unmarshal graphite translate response",
-			"error", err, "response", string(respData))
-		return nil, fmt.Errorf("unable to unmarshal graphite translate response: %w", err)
-	}
+	caqlQ += ")"
 
-	if resp.CAQL == "" {
-		err := fmt.Errorf("unable to translate graphite query: null CAQL response")
-		log.DefaultLogger.Error(err.Error(), "error", err, "response", string(respData))
-		return nil, err
-	}
+	log.DefaultLogger.Info("graphiteQuery", "graphite", query, "caql", caqlQ)
 
-	if resp.Error != "" {
-		err := fmt.Errorf(resp.Error)
-		log.DefaultLogger.Error("error translating graphite query",
-			"error", err, "response", string(respData))
-		return nil, fmt.Errorf("error translating graphite query: %w", err)
-	}
-
-	log.DefaultLogger.Info("graphiteQuery", "graphite", query, "caql", resp.CAQL)
-
-	return td.caqlAPI(ctx, q, resp.CAQL)
+	return td.caqlAPI(ctx, q, caqlQ)
 }
 
 type DF4Response struct {
-	Version string      `json:"version"`
-	Data    [][]float64 `json:"data"`
-	Meta    []DF4Meta   `json:"meta"`
-	Head    DF4Head     `json:"head"`
+	Version string          `json:"version"`
+	Data    [][]interface{} `json:"data"`
+	Meta    []DF4Meta       `json:"meta"`
+	Head    DF4Head         `json:"head"`
 }
 
 type DF4Head struct {
@@ -319,6 +264,19 @@ type DF4Meta struct {
 }
 
 func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, query string) (*backend.DataResponse, error) {
+	// If needed include min_period setting in the CAQL query.
+	if !strings.HasPrefix(query, "#min_period=") {
+		minPeriod, err := jsonp.GetString(q.JSON, "min_period")
+		if err != nil && err != jsonp.KeyPathNotFoundError {
+			log.DefaultLogger.Error("unable to parse CAQL query min_period", "error", err)
+			return nil, fmt.Errorf("unable to parse CAQL query min_period: %w", err)
+		}
+
+		if minPeriod != "" {
+			query = "#min_period=" + minPeriod + " " + query
+		}
+	}
+
 	// https://docs.circonus.com/circonus/api/#/CAQL
 	qp := url.Values{}
 	qp.Set("query", query)
@@ -371,8 +329,13 @@ func (td *SampleDatasource) caqlAPI(_ context.Context, q backend.DataQuery, quer
 		ts := resp.Head.Start
 		for _, sample := range resp.Data[id] {
 			times = append(times, time.Unix(int64(ts), 0))
-			values = append(values, sample)
 			ts += resp.Head.Period
+
+			if val, ok := sample.(float64); ok {
+				values = append(values, val)
+			} else {
+				values = append(values, 0)
+			}
 		}
 		tags := make(map[string]string)
 		for _, tag := range meta.Tags {
