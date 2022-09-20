@@ -1,5 +1,5 @@
 
-## 0.9.23
+## 0.9.24
 
  * Eliminates the need for a call to the graphite_translate IRONdb extension
  in the alerting backend for Graphite style queries.
