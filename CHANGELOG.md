@@ -1,3 +1,7 @@
+## 0.9.25
+
+ * Now when histogram streams are found by Graphite-style searches, their data
+ is displayed, even on line graphs which aren't set to heatmap rendering.
 
 ## 0.9.24
 
@@ -8,6 +12,25 @@
  defined for the Grafana query object.
  * Adds handling for the possibility of null or non-numeric data values being
  returned to the alerting backend by its calls to the API /caql endpoint.
+
+## 0.9.23
+
+ * Fix base64 encoding of variable values when used inside other variable
+ queries.
+
+## 0.9.22
+
+ * When substituting CAQL queries inside other CAQL queries, remove directives
+ from sub-queries.
+
+## 0.9.21
+
+ * Now when CAQL warnings are returned, they're thrown as UI errors by default;
+ there's a datasource configuration setting to hide these errors.
+
+## 0.9.20
+
+ * Fix Graphite-style autocomplete results when an empty leaf is returned.
 
 ## 0.9.19
 
