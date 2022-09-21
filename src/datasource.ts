@@ -101,6 +101,7 @@ const HISTOGRAM_TRANSFORMS = {
     derive_stddev: 'derive_stddev',
     counter: 'rate',
     counter_stddev: 'counter_stddev',
+    histogram: 'none',
 };
 
 const DURATION_UNITS_DEFAULT = 's';
@@ -272,7 +273,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             return this.$q.when({ data: [] });
         }
 
-        return Promise.all([this.buildIrondbParams(options)])
+        return Promise.all([this.buildIrondbParamsAsync(options)])
             .then((irondbOptions) => {
                 if (_.isEmpty(irondbOptions[0])) {
                     return this.$q.when({ data: [] });
@@ -721,7 +722,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
     ) {
         const ignoreUUIDs = this.ignoreGraphiteUUIDs();
         let queryUrl = '/' + this.queryPrefix + '/metrics/find';
-        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0'];
+        let qsParams = ['query=' + (ignoreUUIDs ? '*.' : '') + query, 'activity=0', 'include_type=1'];
         if (tagFilter) {
             qsParams.push('irondb_tag_filter=' + tagFilter);
         }
@@ -1568,15 +1569,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return lookup[egressType] || 'default';
     }
 
-    filterMetricsByType(target, data) {
-        // Don't mix text metrics with numeric and histogram results
-        const metricFilter = 'text';
-        return _.filter(data, (metric) => {
-            const metricTypes = ((metric || {}).type || '').split(',');
-            return !_.includes(metricTypes, metricFilter);
-        });
-    }
-
     stripTags(data) {
         // remove any tags from the name b/c it won't work if they're on there...
         // graphite-style finding results in names like this if they have tags:
@@ -1595,13 +1587,24 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         let leaf_uuid = (result[i]['leaf_data'] || {}).uuid;
         let leaf_metric_name = (result[i]['leaf_data'] || {}).name;
 
+        // get the metric type
+        let types = (('heatmap' === target.format ? 'histogram' : (result[i]['metric_type'] || result[i]['type'] || result[i]['leaf_data']['metric_type'] || result[i]['leaf_data']['type'])) || 'numeric').split(',');
+        let this_type;
+        while (!this_type) {
+            this_type = types.pop();
+        }
+
         result[i]['leaf_data'] = {
             egress_function: 'average',
             uuid: leaf_uuid || result[i]['uuid'],
             metric_name: leaf_metric_name,
+            metrictype: this_type,
             paneltype: result[i]['target']['paneltype'],
             target: target,
         };
+        if ('histogram' === this_type) {
+            target.egressoverride = 'histogram';
+        }
         if (target.egressoverride !== 'average') {
             if (target.egressoverride === 'automatic') {
                 if (isStatsdCounter(leafName)) {
@@ -1627,7 +1630,6 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             result[i]['leaf_data'].rolluptype = target.rolluptype;
             result[i]['leaf_data'].metricrollup = target.metricrollup;
         }
-        result[i]['leaf_data'].metrictype = 'heatmap' === target.format ? 'histogram' : result[i]['type'] || 'numeric';
         return { leaf_name: leafName, leaf_data: result[i]['leaf_data'] };
     }
 
@@ -1668,18 +1670,22 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
 
         return promise
             .then((result) => {
-                result.data = this.filterMetricsByType(target, result.data);
-                for (let i = 0; i < result.data.length; i++) {
-                    result.data[i]['target'] = target;
-                }
+                // filter out text metrics
+                result.data = _.filter(result.data, (metric) => {
+                    const metricTypes = ((metric || {}).type || '').split(',');
+                    return !_.includes(metricTypes, 'text');
+                });
+                result.data.forEach((d) => {
+                    d['target'] = target;
+                });
                 return result.data;
             })
             .then((result) => {
-                for (let i = 0; i < result.length; i++) {
+                result.forEach((r, i) => {
                     cleanOptions['std']['names'].push(
                         this.buildFetchStream(target, result, i, cleanOptions['scopedVars'])
                     );
-                }
+                });
                 return cleanOptions;
             });
     }
@@ -1769,17 +1775,10 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                 return cleanOptions;
             })
             .catch((err) => {
-                log(() => 'buildIrondbParams() err = ' + JSON.stringify(err));
+                log(() => 'buildIrondbParamsAsync() err = ' + JSON.stringify(err));
                 if (err.status !== 0 || err.status >= 300) {
                 }
             });
-    }
-
-    buildIrondbParams(options) {
-        const self = this;
-        return new Promise((resolve, reject) => {
-            resolve(self.buildIrondbParamsAsync(options));
-        });
     }
 
     convertIrondbDf4DataToGrafana(result, query) {
