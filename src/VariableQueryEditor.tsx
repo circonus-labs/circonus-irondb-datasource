@@ -20,6 +20,10 @@ const QUERY_TYPE_OPTIONS: Array<SelectableValue<string>> = [
         value: 'graphite style',
         label: 'Graphite-Style Metric Names',
     },
+    {
+        value: 'last value',
+        label: 'Last Metric Value',
+    },
 ];
 
 const RESULTS_LIMIT_OPTIONS: Array<SelectableValue<number>> = [
@@ -98,10 +102,11 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
 
         const isMetricNamesType =
                 'metric names' === this.query.queryType || (!this.query.queryType && !this.query.tagCategory),
-            isTagCatsType = 'tag categories' === this.query.queryType,
-            isTagValsType = 'tag values' === this.query.queryType || (!this.query.queryType && this.query.tagCategory),
-            isGraphiteType = 'graphite style' === this.query.queryType,
-            limitIsLarge = this.query.resultsLimit > 1000;
+            isTagCatsType   = 'tag categories' === this.query.queryType,
+            isTagValsType   = 'tag values' === this.query.queryType || (!this.query.queryType && this.query.tagCategory),
+            isGraphiteType  = 'graphite style' === this.query.queryType,
+            isLastValueType = 'last value' === this.query.queryType,
+            limitIsLarge    = this.query.resultsLimit > 1000;
 
         const saveQuery = () => {
             let q = Object.assign({}, this.query);
@@ -172,9 +177,16 @@ export class VariableQueryEditor extends PureComponent<VariableQueryProps, State
                         onChange={updateQueryType}
                         value={queryTypeOption}
                     />
+                    {isLastValueType && (
+                        <div style={customSelectWarningStyle}>
+                            Last Metric Value queries automatically exclude histogram metrics.
+                        </div>
+                    )}
                 </div>
                 <div className="gf-form">
-                    {isMetricNamesType && <span className="gf-form-label width-10">Metric Search Query</span>}
+                    {(isMetricNamesType || isLastValueType) && (
+                        <span className="gf-form-label width-10">Metric Search Query</span>
+                    )}
                     {(isTagCatsType || isTagValsType) && (
                         <span className="gf-form-label width-10">Metric Search Filter</span>
                     )}
