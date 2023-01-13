@@ -626,6 +626,22 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
                     });
                     return deduped;
                 });
+            } else if ('last value' === queryType) {
+                // last metric values
+                return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit, true).then((results) => {
+                    let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+                    if (result_count > 1000) {
+                        setTimeout(function () {
+                            showResultWarning(result_count);
+                        }, 100);
+                    } else {
+                        removeResultWarning();
+                    }
+                    return _.map(results.data, (result) => {
+                        let latest = (result.latest.text || result.latest.numeric || []).slice(-1)[0];
+                        return { value: latest[1] || '' };
+                    });
+                });
             } else {
                 // metric names
                 return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit).then((results) => {
@@ -731,7 +747,7 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
         return this.irondbSimpleRequest('GET', queryUrl, false, true, followLimit, true, customLimit);
     }
 
-    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number, customLimit?: number) {
+    metricTagsQuery(query: string, allowEmptyWildcard = false, from?: number, to?: number, customLimit?: number, requestLatest = false) {
         if (query === '' || query === undefined || (!allowEmptyWildcard && query === 'and(__name:*)')) {
             return Promise.resolve({ data: [] });
         }
@@ -741,6 +757,9 @@ export default class IrondbDatasource extends DataSourceApi<IrondbQueryInterface
             log(() => 'metricTagsQuery() activityWindow = [' + from + ',' + to + ']');
             queryUrl += '&activity_start_secs=' + _.toInteger(from);
             queryUrl += '&activity_end_secs=' + _.toInteger(to);
+        }
+        if (requestLatest) {
+            queryUrl += '&latest=2';
         }
         log(() => 'metricTagsQuery() queryUrl = ' + queryUrl);
         return this.irondbSimpleRequest('GET', queryUrl, false, true, true, false, customLimit);

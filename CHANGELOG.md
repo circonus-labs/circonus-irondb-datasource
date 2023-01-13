@@ -1,3 +1,9 @@
+## 0.9.26
+
+ * A new variable query type is available: "Last Metric Value" which will 
+ support text metric values. This allows you to show text metric values in
+ text panel widgets.
+
 ## 0.9.25
 
  * Now when histogram streams are found by Graphite-style searches, their data
