@@ -1,3 +1,8 @@
+## 0.9.27
+
+* Added anonymized usage statistics so we can prioritize development time based
+on feature usage.
+
 ## 0.9.26
 
  * A new variable query type is available: "Last Metric Value" which will 
