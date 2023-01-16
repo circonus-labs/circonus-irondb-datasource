@@ -23,6 +23,7 @@ export class IrondbConfigCtrl {
         this.current.jsonData.queryPrefixDefault = '';
         this.current.jsonData.queryPrefix =
             this.current.jsonData.queryPrefix || this.current.jsonData.queryPrefixDefault;
+        this.current.jsonData.disableUsageStatistics = _.defaultTo(this.current.jsonData.disableUsageStatistics, false);
     }
 
     resultsLimitKeyUp(event) {
