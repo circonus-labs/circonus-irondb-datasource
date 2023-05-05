@@ -117,6 +117,10 @@ export class IrondbQueryCtrl extends QueryCtrl {
     constructor($scope, $injector, private uiSegmentSrv, private templateSrv) {
         super($scope, $injector);
 
+        // debounce the autocomplete methods
+        this.getStandardCategoryOptions = _.debounce(this.getStandardCategoryOptions, 300, { leading: false });
+        this.getStandardValueOptions    = _.debounce(this.getStandardValueOptions, 300, { leading: false });
+
         _.defaultsDeep(this.target, this.defaults);
         this.target.egressoverride = this.target.egressoverride || 'average';
         this.target.metriclabel = this.target.metriclabel || '';

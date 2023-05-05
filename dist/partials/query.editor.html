@@ -1,0 +1,207 @@
+<query-editor-row query-ctrl="ctrl" can-collapse="true" has-text-edit-mode="false">
+    <div class="gf-form-inline">
+        <div class="gf-form">
+            <label class="gf-form-label width-8 query-keyword">Query Type</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="querytype" model="ctrl.target.querytype" on-change="ctrl.queryTypeValueChanged()" css-class="gf-size-auto"
+                              get-options="ctrl.getQueryTypeOptions()"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+    </div>
+    <div class="gf-form-inline">
+      <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form">
+        <label class="gf-form-label width-8 query-keyword">Series</label>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'caql'" class="gf-form gf-form--grow">
+        <textarea rows="3" class="gf-form-input" ng-model="ctrl.target.queryDisplay" spellcheck="false" placeholder="find('foo','and(host:bar)') | stats:sum()" ng-model-onblur ng-change="ctrl.caqlValueChanged()"></textarea>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'alerts' || ctrl.target.querytype === 'alert_counts'" class="gf-form gf-form--grow">
+          <div class="gf-form-inline">
+            <div class="gf-form">
+                <label class="gf-form-label width-8 query-keyword">Alert ID</label>
+            </div>
+            <div class="gf-form gf-form--grow">
+                <input id="alert_metric_id" class="gf-form-input" type="text" ng-model='ctrl.target.alert_id' ng-blur="ctrl.updateAlertId()" placeholder="123456"></input>
+            </div>
+          </div>
+          <div class="gf-form-inline">
+            <div class="gf-form">
+              <label class="gf-form-label width-8 query-keyword">Alert query</label>
+            </div>
+            <div class="gf-form gf-form--grow">
+              <input id="alert_metric_query" class="gf-form-input" type="text" ng-model='ctrl.target.query' ng-blur="ctrl.updateAlertQuery()" placeholder="(metric:available)(active:1)"></input>
+            </div>
+            <div class="gf-form">
+              <label class="gf-form-label width-8 query-keyword">Local filter</label>
+            </div>
+            <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+              <gf-form-dropdown name="alert_local_filter_match" model="ctrl.target.local_filter_match" on-change="ctrl.localFilterMatchValueChanged()" css-class="gf-size-auto"
+                                get-options="ctrl.localFilterMatchOptions"
+                                lookup-text="true">
+              </gf-form-dropdown>
+            </div>
+            <div class="gf-form gf-form--grow">
+              <input id="alert_local_filter" class="gf-form-input" type="text" ng-model='ctrl.target.local_filter' ng-blur="ctrl.updateAlertLocalFilter()" placeholder="tag:cluster:core-central*,acknowleged:false"></input>
+            </div>
+          </div>
+          <div class="gf-form-inline" ng-if="ctrl.target.querytype === 'alert_counts'">
+              <div class="gf-form">
+                  <label class="gf-form-label width-8 query-keyword">Query Type</label>
+              </div>
+              <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+                  <gf-form-dropdown name="alert_count_query_type" model="ctrl.target.alert_count_query_type" on-change="ctrl.alertCountQueryTypeValueChanged()" css-class="gf-size-auto"
+                                    get-options="ctrl.alertCountQueryTypeOptions"
+                                    lookup-text="true">
+                  </gf-form-dropdown>
+              </div>
+          </div>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'basic'" class="gf-form gf-form-inline">
+        <div ng-repeat="segment in ctrl.segments" role="menuitem" class="gf-form">
+          <div ng-switch="segment._typeName">
+            <div ng-switch-when="TagPair" class="irondb-tag-pair mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{segment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagEnd" class="irondb-tag-end join-r join-l">
+                <div class="gf-form-label"><b>{{segment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{segment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':segment.value!='select tag'}">
+                <metric-segment segment="segment" get-options="ctrl.getStandardCategoryOptions( $index, $query )" on-change="ctrl.updateStandardCategorySegmentValue( $index, segment )"/>
+            </div>
+            <div ng-switch-when="TagVal" class="irondb-tag-val mash-l join-r join-l">
+                <metric-segment segment="segment" get-options="ctrl.getStandardValueOptions( $index, $query )" on-change="ctrl.updateStandardValueSegmentValue( $index, segment )"/>
+            </div>
+            <div ng-switch-when="TagPlus" class="irondb-tag-plus join-r join-l">
+                <metric-segment segment="segment" get-options="ctrl.getStandardPlusOptions( $index, $query )" on-change="ctrl.updateStandardPlusSegmentValue( $index, segment )"/>
+            </div>
+            <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r join-l">
+                <metric-segment segment="segment" get-options="ctrl.getStandardOperatorOptions( $index, $query )" on-change="ctrl.updateStandardOperatorSegmentValue( $index, segment )"/>
+            </div>
+            <div ng-switch-default class="join-l">
+                <metric-segment segment="segment" get-options="ctrl.getStandardDefaultOptions( $index, $query )" on-change="ctrl.updateStandardDefaultSegmentValue( $index, segment )"/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'graphite'" class="gf-form gf-form-inline">
+        <div ng-repeat="gSegment in ctrl.gSegments" role="menuitem" class="gf-form">
+          <div ng-switch="gSegment._typeName">
+            <div ng-switch-when="TagPair" class="irondb-tag-pair mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagEnd" class="irondb-tag-end join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagSep" class="irondb-tag-sep mash-r mash-l join-r join-l">
+                <div class="gf-form-label"><b>{{gSegment.value}}</b></div>
+            </div>
+            <div ng-switch-when="TagCat" class="mash-r join-r join-l" ng-class="{'irondb-tag-cat':gSegment.value!='select tag'}">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteCategoryOptions( $index, $query )" on-change="ctrl.updateGraphiteCategorySegmentValue( $index, gSegment )"/>
+            </div>
+            <div ng-switch-when="TagVal" class="irondb-tag-val mash-l join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteValueOptions( $index, $query )" on-change="ctrl.updateGraphiteValueSegmentValue( $index, gSegment )"/>
+            </div>
+            <div ng-switch-when="TagPlus" class="irondb-tag-plus join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphitePlusOptions( $index, $query )" on-change="ctrl.updateGraphitePlusSegmentValue( $index, gSegment )"/>
+            </div>
+            <div ng-switch-when="TagOp" class="irondb-tag-op mash-r join-r join-l">
+                <metric-segment segment="gSegment" get-options="ctrl.getGraphiteOperatorOptions( $index, $query )" on-change="ctrl.updateGraphiteOperatorSegmentValue( $index, gSegment )"/>
+            </div>
+            <div ng-switch-default class="join-l">
+              <metric-segment segment="gSegment" get-options="ctrl.getGraphiteDefaultOptions( $index, $query )" on-change="ctrl.updateGraphiteDefaultSegmentValue( $index, gSegment )"/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div ng-if="ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite'" class="gf-form gf-form--grow ml-1">
+        <div class="gf-form-label gf-form-label--grow"></div>
+      </div>
+    </div>
+    <div ng-if="ctrl.target.querytype === 'basic' && ctrl.target.format !== 'heatmap'" class="gf-form">
+      <div class="gf-form">
+        <label class="gf-form-label width-8 query-keyword">Label</label>
+      </div>
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="labeltype" model="ctrl.target.labeltype" on-change="ctrl.labelTypeValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.labelTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div ng-if="ctrl.target.labeltype==='custom'" class="gf-form gf-form--grow">
+        <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-keyup="ctrl.metricLabelKeyUp($event)" ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
+      </div>
+      <div class="gf-form gf-form--grow">
+        <div class="gf-form-label gf-form-label--grow"></div>
+      </div>
+    </div>
+    <div ng-if="ctrl.target.querytype==='alert_counts'" class="gf-form gf-form--grow">
+        <div class="gf-form">
+            <label class="gf-form-label width-8 query-keyword">Label</label>
+        </div>
+        <input id="metriclabel" class="gf-form-input" type="text" ng-model='ctrl.target.metriclabel' ng-blur="ctrl.updateMetricLabelValue()" placeholder="label"></input>
+    </div>
+    <div ng-if="(ctrl.target.querytype === 'basic' || ctrl.target.querytype === 'graphite') && ctrl.target.format !== 'heatmap'" class="gf-form">
+      <div class="gf-form">
+        <label class="gf-form-label width-8 query-keyword">Value Type</label>
+      </div>
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="egressoverride" model="ctrl.target.egressoverride" on-change="ctrl.egressValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.egressTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div class="gf-form gf-form--grow">
+        <div class="gf-form-label gf-form-label--grow"></div>
+      </div>
+    </div>
+    <div class="gf-form">
+      <div class="gf-form">
+        <label class="gf-form-label width-8 query-keyword">Resolution</label>
+      </div>
+      <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+        <gf-form-dropdown name="rolluptype" model="ctrl.target.rolluptype" on-change="ctrl.rollupTypeValueChanged()" css-class="gf-size-auto"
+          get-options="ctrl.rollupTypeOptions"
+          lookup-text="true">
+        </gf-form-dropdown>
+      </div>
+      <div ng-if="ctrl.target.rolluptype !== 'automatic'" class="gf-form gf-form--grow">
+        <input id="metricrollup" class="gf-form-input" type="text" ng-model='ctrl.target.metricrollup' ng-keyup="ctrl.metricRollupKeyUp($event)" ng-blur="ctrl.updateMetricRollupValue()" placeholder="rollup period"></input>
+      </div>
+      <div class="gf-form gf-form--grow">
+        <div class="gf-form-label gf-form-label--grow"></div>
+      </div>
+    </div>
+    <div class="gf-form" ng-if="ctrl.target.querytype === 'caql'">
+        <div class="gf-form">
+            <label class="gf-form-label width-8 query-keyword">Force Min Period</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="min_period" model="ctrl.target.min_period" on-change="ctrl.minPeriodChanged()" css-class="gf-size-auto"
+                              get-options="ctrl.minPeriodOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+        <div class="gf-form gf-form--grow">
+            <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+    </div>
+    <div class="gf-form">
+        <div class="gf-form">
+            <label class="gf-form-label width-8 query-keyword">Format</label>
+        </div>
+        <div role="menuitem" class="gf-form" style="align-self:flex-start;">
+            <gf-form-dropdown name="format" model="ctrl.target.format" on-change="ctrl.formatChanged()" css-class="gf-size-auto"
+                              get-options="ctrl.formatOptions"
+                              lookup-text="true">
+            </gf-form-dropdown>
+        </div>
+        <div class="gf-form gf-form--grow">
+            <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+    </div>
+</query-editor-row>

@@ -1,3 +1,7 @@
+## 0.9.28
+
+* Adjusted frequency of autocomplete requests to improve performance.
+
 ## 0.9.27
 
 * Added anonymized usage statistics so we can prioritize development time based
