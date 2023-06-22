@@ -1,35 +1,34 @@
 {
-    "type": "datasource",
-    "name": "IRONdb",
-    "id": "circonus-irondb-datasource",
-    "backend": true,
-    "executable": "irondb-backend",
-    "alerting": true,
-
-    "info": {
-        "description": "Datasource plugin to pull data from an IRONdb installation.",
-        "author": {
-            "name": "Circonus",
-            "url": "https://www.circonus.com/irondb/"
-        },
-        "keywords": ["circonus", "irondb", "time series"],
-        "logos": {
-            "small": "img/irondb-logo.svg",
-            "large": "img/irondb-logo.svg"
-        },
-        "links": [
-            { "name": "Project site", "url": "https://www.circonus.com/irondb/" },
-            { "name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE" }
-        ],
-        "version": "0.9.28",
-        "updated": "2023-05-05"
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "Circonus",
+  "id": "circonus-irondb-datasource",
+  "metrics": true,
+  "backend": true,
+  "alerting": true,
+  "annotations": true,
+  "executable": "gpx_circonus_datasource",
+  "info": {
+    "description": "A data source for accessing Circonus metric and alert data.",
+    "author": {
+      "name": "Circonus",
+      "url": "https://www.circonus.com"
     },
-
-    "dependencies": {
-        "grafanaDependency": "7.x.x",
-        "plugins": []
+    "keywords": ["datasource", "circonus", "irondb", "time series"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
     },
-
-    "metrics": true,
-    "annotations": true
+    "links": [
+      { "name": "Project site", "url": "https://www.circonus.com" },
+      { "name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE" }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=9.5.2",
+    "plugins": []
+  }
 }

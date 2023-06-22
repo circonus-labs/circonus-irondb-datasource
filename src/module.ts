@@ -1,13 +1,11 @@
-import IrondbDatasource from './datasource';
-import { IrondbQueryCtrl } from './query_ctrl';
-import { IrondbConfigCtrl } from './config_ctrl';
-import { AnnotationQueryEditor } from './annotation_query_ctrl';
-import { VariableQueryEditor } from './VariableQueryEditor';
+import { DataSourcePlugin } from '@grafana/data';
+import DataSource from './datasource';
+import { ConfigEditor } from './components/ConfigEditor';
+import { QueryEditor } from './components/QueryEditor';
+import { CirconusQuery, CirconusDataSourceOptions } from './types';
 
-export {
-    IrondbDatasource as Datasource,
-    IrondbQueryCtrl as QueryCtrl,
-    IrondbConfigCtrl as ConfigCtrl,
-    AnnotationQueryEditor as AnnotationsQueryCtrl,
-    VariableQueryEditor as VariableQueryEditor,
-};
+export const plugin = new DataSourcePlugin<DataSource, CirconusQuery, CirconusDataSourceOptions>(DataSource)
+  .setConfigEditor(ConfigEditor)
+  .setQueryEditor(QueryEditor);
+  // setVariableQueryEditor()
+  // setAnnotationQueryCtrl

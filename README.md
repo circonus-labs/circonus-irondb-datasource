@@ -1,150 +1,134 @@
-# IRONdb Datasource
+# Grafana data source plugin template
 
-This is the plugin for IRONdb 0.17.1 and newer. It is evolving and we continue to track its API.
+This template is a starting point for building a Data Source Plugin for Grafana.
 
-Read more about IRONdb here:
+## What are Grafana data source plugins?
 
-[https://www.circonus.com/irondb/](https://www.circonus.com/irondb/)
+Grafana supports a wide range of data sources, including Prometheus, MySQL, and even Datadog. There’s a good chance you can already visualize metrics from the systems you have set up. In some cases, though, you already have an in-house metrics solution that you’d like to add to your Grafana dashboards. Grafana Data Source Plugins enables integrating such solutions with Grafana.
 
-## Installation
-* The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
-* "Grafana now [requires backend plugins to be signed](https://grafana.com/docs/grafana/latest/installation/upgrading/#backend-plugins)." Or you can [turn off signature checks](https://grafana.com/docs/grafana/latest/plugins/plugin-signatures/#allow-unsigned-plugins). If you aren't sure which option is right for you, ask your security department. If you think you don't have one of those, congratulations, *you* are the security department. Read through the information linked above and choose the relevant section below.
+## Getting started
 
-### From Releases
-1. Download the desired [release version](https://github.com/circonus-labs/circonus-irondb-datasource/releases).
+### Backend
 
-2. Unzip into plugins directory.
+1. Update [Grafana plugin SDK for Go](https://grafana.com/docs/grafana/latest/developers/plugins/backend/grafana-plugin-sdk-for-go/) dependency to the latest minor version:
 
-3. Run the following commands in your shell to sign the plugin (node js is required):
-    ```shell
-        export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY> 
-        npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
-    ```
-
-### From GitHub
-1. Please install the following prerequisites:
-   * [Node.js](https://nodejs.org/en/download/) > 14.04
-   * [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
-   * [Go](https://golang.org/doc/install) > 1.16
-   * [Mage](https://github.com/magefile/mage) > 1.11.0
-2. Run the following from a privileged shell:
-   ```shell
-   cd /var/lib/grafana/plugins # or the location of your Grafana plugins directory
-   git clone https://github.com/circonus-labs/circonus-irondb-datasource/
-   cd circonus-irondb-datasource
-   npm install --global yarn
-   yarn install
-   yarn build
-   mage -v
-   export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY>
-   npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
-   sudo systemctl start grafana-server # restart if already running
+   ```bash
+   go get -u github.com/grafana/grafana-plugin-sdk-go
+   go mod tidy
    ```
-   
-   #### Docker Quick Start From Github
-These instructions will build and run a Docker container with a Grafana instance on port 3000. There will be a pre-configured data source connected to the hosted Circonus API with a graph and alert.
 
-1. [Install Docker](https://docs.docker.com/get-docker/)
-3. [Obtain Circonus API Token](https://docs.circonus.com/circonus/integrations/api/api-tokens/), needed to connect to the hosted Circonus API.
-4. `git clone https://github.com/circonus-labs/circonus-irondb-datasource/`
-5. `cd circonus-irondb-datasource`
-6. `yarn install; yarn build; mage`
-7. Execute `./docker/docker-up.sh` (`.\docker\docker-up.ps1` for Windows)
-8. Navigate to <http://localhost:3000/> to access.
+2. Build backend plugin binaries for Linux, Windows and Darwin:
 
-## Configuration
+   ```bash
+   mage -v
+   ```
 
-1. Create a new datasource and select IRONdb from the `Type` drop down.
+3. List all available Mage targets for additional commands:
 
-2. Update the "HTTP" section with the HTTP connection details for your cluster, or `https://api.circonus.com` if you are using the Circonus API.
+   ```bash
+   mage -l
+   ```
+### Frontend
 
-3. Change the IRONdb configuration options at the bottom of the datasource configuration page.
-![](img/irondb-datasource-configuration.png)
+1. Install dependencies
 
-### IRONdb Type
-* Standalone: An IRONdb cluster accessible directly, requires entry of Account ID.
-* Hosted: An IRONdb instance hosted by Circonus, requires entry of API token.
- 
-### Account ID
-The Account ID associated with the account to pull metrics from.
+   ```bash
+   yarn run install
+   ```
 
-### API Token
-The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://www.circonus.com/](https://www.circonus.com/) in the "User Profile" section.
+2. Build plugin in development mode and run in watch mode
 
-## Usage
+   ```bash
+   yarn run dev
+   ```
 
-1. Create a new panel and set the datasource to name selected in the IRONdb datasource configuration.
+3. Build plugin in production mode
 
-### Normal Queries
-For normal queries, use the metric browser to navigate the metric hierarchy of your IRONdb instance or type queries manually using the *Toggle Edit Mode* menu item to the right.
-![](img/irondb-graph-metric-browser.png)
+   ```bash
+   yarn run build
+   ```
 
-### CAQL Queries
-[CAQL queries](https://login.circonus.com/resources/docs/user/CAQL.html) must be entered manually by selecting the *CAQL* checkbox or switching manually to the editor mode.
-![](img/irondb-graph-caql-editor.png)
+4. Run the tests (using Jest)
 
-### Histograms
-Histograms currently require a special checkbox to be selected in order for the returned data to be processed correctly.
-![](img/irondb-graph-metric-browser.png)
-Once selected, histogram data processing will be utilized for any returned data related to the specific metric.
+   ```bash
+   # Runs the tests and watches for changes, requires git init first
+   yarn run test
 
-### Heatmaps
-Using the histogram checkbox to process returned data allows for histograms to be displayed on the heatmap panel type.
+   # Exits after running all the tests
+   yarn run test:ci
+   ```
 
-![](img/irondb-heatmap-sample.png)
+5. Spin up a Grafana instance and run the plugin inside it (using Docker)
 
-For this processed data to be displayed on the heatmap panel as the sample above, select *Time Series Buckets* as the Data Format to be used on the Heatmap panel.
+   ```bash
+   yarn run server
+   ```
 
-![](img/irondb-heatmap-tsbuckets.png)
+6. Run the E2E tests (using Cypress)
 
-### Template Variables
+   ```bash
+   # Spins up a Grafana instance first that we tests against
+   yarn run server
 
-**How to configure a template variable for IRONdb**
+   # Starts the tests
+   yarn run e2e
+   ```
 
-1. From a dashboard, click `Settings` in the top right.
-1. On the left hand side, select the `Variables` section.
-1. Click `+New` and choose a name for your new variable.
-1. Select the proper data source: `IRONdb`.
-1. Under `Query`, enter the metric you wish to use in this variable (without tags), **or** enter the fully formed tag query, ala: `and(__name:foo,or(bar:baz,quux:*))`.  Note that this query can contain references to other variables (see example below)
-1. If you enable `Include All Option`, enter `*` for the `Custom all value`.
-1. Click `Enabled` under `Value groups/tags` to enable tags support.
-1. Enter the tag category you wish to use in your variable under `Tag values query`.  See example below.
-1. If you successfully completed the prior steps, `Preview of values` should now auto-complete the tag values.
-1. Finish setup by clicking `Add` and then `Save`.
+7. Run the linter
 
-Example:
+   ```bash
+   yarn run lint
 
-![](img/irondb-variable-config.png)
+   # or
 
-In this example, we are creating a variable called `namespace` using the query `and(__name:used,cluster:$cluster)` which contains a reference to another variable (not pictured).  We are then pulling the values out of a tag also called `namespace` (you can see the preview values).
+   yarn run lint:fix
+   ```
 
-In this way you can make dependent variables that change in a hierarchy based on prior chosen variables.
-  
-Your new template variable should now appear in the query builder!
 
-# Development
+# Distributing your plugin
 
-The build process requires node, npm, yarn, typescrypt, and tslint
+When distributing a Grafana plugin either within the community or privately the plugin must be signed so the Grafana application can verify its authenticity. This can be done with the `@grafana/sign-plugin` package.
 
-On Cent7 setup:
+_Note: It's not necessary to sign a plugin during development. The docker development environment that is scaffolded with `@grafana/create-plugin` caters for running the plugin without a signature._
 
-```
-# One time setup
-sudo yum install node bzip2
-sudo npm install -g typescript tslint
-yarn
+## Initial steps
 
-# Build
-yarn build
+Before signing a plugin please read the Grafana [plugin publishing and signing criteria](https://grafana.com/docs/grafana/latest/developers/plugins/publishing-and-signing-criteria/) documentation carefully.
 
-# Test
-yarn test
-```
+`@grafana/create-plugin` has added the necessary commands and workflows to make signing and distributing a plugin via the grafana plugins catalog as straightforward as possible.
 
-# Publishing A New Release
+Before signing a plugin for the first time please consult the Grafana [plugin signature levels](https://grafana.com/docs/grafana/latest/developers/plugins/sign-a-plugin/#plugin-signature-levels) documentation to understand the differences between the types of signature level.
 
-git tag v1.1.1
+1. Create a [Grafana Cloud account](https://grafana.com/signup).
+2. Make sure that the first part of the plugin ID matches the slug of your Grafana Cloud account.
+   - _You can find the plugin ID in the plugin.json file inside your plugin directory. For example, if your account slug is `acmecorp`, you need to prefix the plugin ID with `acmecorp-`._
+3. Create a Grafana Cloud API key with the `PluginPublisher` role.
+4. Keep a record of this API key as it will be required for signing a plugin
 
-git push origin v1.1.1
+## Signing a plugin
 
-v1.1.1 should be replaced with the actual version number desired to release to.  This push will trigger the release version of the github action that packages point-releases on merges to master.
+### Using Github actions release workflow
+
+If the plugin is using the github actions supplied with `@grafana/create-plugin` signing a plugin is included out of the box. The [release workflow](./.github/workflows/release.yml) can prepare everything to make submitting your plugin to Grafana as easy as possible. Before being able to sign the plugin however a secret needs adding to the Github repository.
+
+1. Please navigate to "settings > secrets > actions" within your repo to create secrets.
+2. Click "New repository secret"
+3. Name the secret "GRAFANA_API_KEY"
+4. Paste your Grafana Cloud API key in the Secret field
+5. Click "Add secret"
+
+#### Push a version tag
+
+To trigger the workflow we need to push a version tag to github. This can be achieved with the following steps:
+
+1. Run `npm version <major|minor|patch>`
+2. Run `git push origin main --follow-tags`
+
+
+## Learn more
+
+Below you can find source code for existing app plugins and other related documentation.
+
+- [Basic data source plugin example](https://github.com/grafana/grafana-plugin-examples/tree/master/examples/datasource-basic#readme)
+- [Plugin.json documentation](https://grafana.com/docs/grafana/latest/developers/plugins/metadata/)
+- [How to sign a plugin?](https://grafana.com/docs/grafana/latest/developers/plugins/sign-a-plugin/)
