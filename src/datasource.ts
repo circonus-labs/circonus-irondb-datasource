@@ -2,72 +2,63 @@ import {
   AnnotationQueryRequest,
   AnnotationEvent,
   ArrayVector,
-  // CoreApp,
   DataFrame,
-  DataSourceApi,
-  // DataSourceJsonData,
-  // DataQuery,
   DataSourceInstanceSettings,
+  DataSourceApi,
   DataQueryResponse,
   DataQueryResponseData,
   DataQueryRequest,
-  // Field,
-  // FieldConfig,
   FieldType,
-  // formatLabels,
-  // isTableData,
-  // Labels,
   LoadingState,
   MutableDataFrame,
   MutableField,
-  // ScopedVars,
-  // TIME_SERIES_TIME_FIELD_NAME,
-  // TIME_SERIES_VALUE_FIELD_NAME,
-  // TimeSeries,
 } from '@grafana/data';
-// import { DataSourceWithBackend } from '@grafana/runtime';
+import {
+  getBackendSrv,
+  getTemplateSrv
+} from '@grafana/runtime';
 import _ from 'lodash';
 import Log from './logger';
 import { Memoized } from 'memoizee';
 import Mustache from 'mustache';
 import {
   CirconusQuery,
-  CirconusVariableQuery,
   CirconusDataSourceOptions,
+  DataRequestItems,
+  HistogramTransforms,
+  CirconusVariableQuery,
   SegmentType,
   TagSet,
-  HistogramTransforms
 } from './types';
 import {
   DEFAULT_OPTIONS,
-  MIN_DURATION_MS_CAQL,
-  MAX_EXACT_DATAPOINTS_THRESHOLD,
-  MIN_DURATION_MS_FETCH,
   MAX_DATAPOINTS_THRESHOLD,
+  MAX_EXACT_DATAPOINTS_THRESHOLD,
+  MIN_DURATION_MS_CAQL,
+  MIN_DURATION_MS_FETCH,
   ROLLUP_ALIGN_MS,
   ROLLUP_ALIGN_MS_1DAY,
-  decodeTag,
-  encodeTag,
-  mergeTags,
-  splitTags,
-  taglessNameAndTags,
-  taglessName,
   isStatsdCounter,
-  parseDurationMS,
-  prepStringForRegExp,
+  decodeTag,
+  decodeTagsInLabel,
+  encodeTag,
   getTimeField,
   getNumberField,
   getTextField,
   getOtherField,
   metaInterpolateLabel,
-  decodeTagsInLabel,
+  mergeTags,
+  parseDurationMS,
+  prepStringForRegExp,
   setupCache,
+  splitTags,
+  taglessName,
+  taglessNameAndTags,
   md5
 } from './common';
 const log = Log('Circonus DataSource');
 
-export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceOptions> {
-  $q: any;
+export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceOptions> {
   backendSrv: any;
   templateSrv: any;
   dataSourceOptions: CirconusDataSourceOptions;
@@ -84,16 +75,10 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   datasourceRequest: (options: any) => any;
   queryRange: any;
 
-  constructor(
-    instanceSettings: DataSourceInstanceSettings<CirconusDataSourceOptions>,
-    $q: any,
-    backendSrv: any,
-    templateSrv: any
-  ) {
+  constructor(instanceSettings: DataSourceInstanceSettings<CirconusDataSourceOptions>) {
     super(instanceSettings);
-    this.$q = $q;
-    this.backendSrv = backendSrv;
-    this.templateSrv = templateSrv;
+    this.backendSrv = getBackendSrv();
+    this.templateSrv = getTemplateSrv();
     
     this.dataSourceOptions = instanceSettings.jsonData;
     _.defaults(this.dataSourceOptions, DEFAULT_OPTIONS);
@@ -106,89 +91,80 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
     this.appName            = 'Grafana';
     this.supportAnnotations = false;
     this.supportMetrics     = true;
-    this.datasourceRequest  = setupCache(this.dataSourceOptions.useCaching, backendSrv, this);
+    this.datasourceRequest  = setupCache(this.dataSourceOptions.useCaching, this.backendSrv, this);
 
     this.query = _.debounce(this.query, 300, { leading:true, trailing:true }) as (options: DataQueryRequest<CirconusQuery>) => Promise<DataQueryResponse>;
 
     if (!this.dataSourceOptions.disableUsageStatistics) {
-      backendSrv
+      this.backendSrv
           .get('/api/user')
           .then((info: any) => {
               this.userHash = md5(info.email);
           })
           .catch((e: Error) => log(() => 'error fetching Circonus user info: ' + JSON.stringify(e)));
-  }
-  }
-
-  /**
-   * This exposes the allowGraphite option, to indicate whether Graphite-style
-   * queries are enabled.
-   */
-  canShowGraphite(): boolean {
-    return !!this.dataSourceOptions.allowGraphite;
+    }
   }
 
   /**
-   * This exposes the caqlMinPeriod field.
-   */
-  getCaqlMinPeriod(): string {
-    return this.dataSourceOptions.caqlMinPeriod;
-  }
-
-  /**
-   * This the main query method which receives the query request from Grafana.
+   * This is the method which receives each query request from Grafana.
    */
   query(options: DataQueryRequest<CirconusQuery>): Promise<DataQueryResponse> {
+    // TEST CODE (RENDERS A SINE WAVE)
+    // -------------------------------------------------------------------------
     // const { range } = options;
     // const from = range!.from.valueOf();
     // const to = range!.to.valueOf();
-    // console.log('query: ', options);
-    // const data = options.targets.map(target => {
-    //   // Your code goes here.
-    //   const query = _.defaults(target, DEFAULT_QUERY);
+    // const data = options.targets.map((target) => {
     //   const frame = new MutableDataFrame({
-    //     refId: query.refId,
+    //     refId: target.refId,
     //     fields: [
     //       { name: 'time', type: FieldType.time },
     //       { name: 'value', type: FieldType.number },
     //     ],
-    //   });    
-    //   // frame.add({ time:t, value:v });  
-    //   return frame;
+    //   });
+    //   // duration of the time range, in milliseconds.
+    //   const duration = to - from;
+    //   // step determines how close in time (ms) the points will be to each other.
+    //   const step = duration / 1000;
+    //   for (let t = 0; t < duration; t += step) {
+    //     frame.add({ time: from + t, value: Math.sin((2 * Math.PI * t) / duration) });
+    //   }
+    //   return frame;      
     // });
-    
-    // return { data };
+    // return Promise.resolve({ data });
+    // -------------------------------------------------------------------------
+    // END OF TEST CODE
 
     if (!_.isUndefined(this.queryRange) && !_.isEqual(options.range, this.queryRange)) {
-        log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(options.range)}`);
-        if (this.dataSourceOptions.useCaching) {
-          const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
-          requestCache.clear();
-        }
+      log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(options.range)}`);
+      if (this.dataSourceOptions.useCaching) {
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
+        requestCache.clear();
+      }
     }
     this.queryRange = options.range;
     if (_.isEmpty(options.targets[0])) {
-      return this.$q.when({ data: [] });
+      return Promise.resolve({ data: [] as any[] });
     }
 
-    return Promise.all([this.buildDataRequestStreams(options)])
-      .then((sourceOptions) => {
-        if (_.isEmpty(sourceOptions[0])) {
-          return this.$q.when({ data: [] });
+    return this.buildDataRequestItems(options)
+      .then((preppedItems: void | DataRequestItems) => {
+        if (_.isEmpty(preppedItems) || !preppedItems) {
+          return Promise.resolve({ data: [] as any[] });
         }
-        return this.dataRequest(sourceOptions, true);
+        return this.dataRequest(preppedItems, true);
       })
       .then((queryResults) => {
         if (queryResults.t === 'ts') {
-          if (queryResults['data'].constructor === Array) {
-            queryResults['data'].sort((a, b): number => {
+          if (queryResults.data.constructor === Array) {
+            queryResults.data.sort((a: any, b: any): number => {
               return a && null == b
                 ? -1
                 : b && null == a
                 ? 1
                 : null == a && null == b
                 ? 0
-                : (a['target'] || '').localeCompare(b['target']);
+                : (a.target || '').localeCompare(b.target);
             });
           }
         }
@@ -204,35 +180,23 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   }
 
   /**
-   * This is the main method which is called to test the data source connection.
+   * This is the method called to test the data source connection.
    */
   testDatasource() {
     return this.metricTagsQuery('and(__name:ametric)')
       .then((results: any) => {
         const error = _.get(results, 'results[0].error');
-        if (error) {
-          return {
-            status: 'error',
-            message: error,
-            title: 'Error',
-          };
-        }
-        return {
-          status: 'success',
-          message: 'Data source is working',
-          title: 'Success',
-        };
+        const success = 'Data source is working';
+        return error
+          ? { status:'error', message:error, title:'Error' }
+          : { status:'success', message:success, title:'Success' };
       })
       .catch((error: any) => {
         let message = error.data?.message;
         if (!message) {
           message = `Error ${error.status || ''} ${error.statusText || ''}`;
         }
-        return {
-          status: 'error',
-          message: message,
-          title: 'Error',
-        };
+        return { status:'error', message:message, title:'Error' };
       });
   }
 
@@ -284,175 +248,625 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   }
 
   /**
-   * This pulls alerts to show as annotations.
+   * This exposes the allowGraphite option, to indicate whether Graphite-style
+   * queries are enabled.
    */
-  annotationQuery(query: AnnotationQueryRequest<CirconusQuery>): Promise<AnnotationEvent[]> {
-    log(() => 'annotationQuery() query = ' + JSON.stringify(query));
+  canShowGraphite(): boolean {
+    return !!this.dataSourceOptions.allowGraphite;
+  }
 
-    if (!_.isUndefined(this.queryRange) && !_.isEqual(query.range, this.queryRange)) {
-      log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(query.range)}`);
-      if (this.dataSourceOptions.useCaching) {
-        log(() => 'query() clearing cache');
-        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
-        requestCache.clear();
+  /**
+   * This exposes the caqlMinPeriod field.
+   */
+  getCaqlMinPeriod(): string {
+    return this.dataSourceOptions.caqlMinPeriod;
+  }
+
+  /**
+   * This gets the account ID formatted for use in an API path endpoint, if
+   * it's necessary.
+   */
+  getAccountIdForApiPath() {
+    return this.dataSourceOptions.irondbType === 'standalone' ? `/${this.dataSourceOptions.accountId}` : '';
+  }
+
+  /**
+   * This indicates whether we should ignore the Check UUID at the beginning 
+   * of the the first segment in graphite-style queries (they always start with 
+   * check UUIDs as the first segment if no query prefix is used).
+   */
+  ignoreGraphiteUUIDs() {
+    return !(this.dataSourceOptions.queryPrefix || '').trim();
+  }
+
+  /**
+   * This performs metric searches and performs other tasks as necessary to 
+   * build the metric streams, CAQL queries, alert queries, et al which are 
+   * necessary for the main data requests.
+   */
+  buildDataRequestItems(options: any) {
+    const templateSrv = this.templateSrv;
+    const checkVariablesEncoding = this.checkVariablesEncoding;
+    const metricGraphiteQuery = this.metricGraphiteQuery;
+    const metricTagsQuery = this.metricTagsQuery;
+    const start = new Date(options.range.from).getTime() / 1000;
+    const end = new Date(options.range.to).getTime() / 1000;
+    const { scopedVars, meta, refId, maxDataPoints } = options;
+    const intervalMs = Math.round(
+      (options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints
+    );
+    // these are the prepped items
+    const stdNames: any[] = [];
+    const caqlNames: any[] = [];
+    const alertNames: any[] = [];
+    const local_filters: any[] = [];
+    const local_filter_matches: any[] = [];
+    const labels: any[] = [];
+    const preppedItems: DataRequestItems = {
+      scopedVars,
+      meta,
+      refId,
+      maxDataPoints,
+      intervalMs,
+      std:   { start, end, names:stdNames },
+      caql:  { start, end, names:caqlNames },
+      alert: { start, end, names:alertNames, local_filters, local_filter_matches, labels, counts_only: false, query_type: '', target: null },
+    };
+    // filter out hidden or empty queries
+    const targets = _.reject(options.targets, (target) => {
+      const isEmpty = target.query == null && target.alertId == null;
+      const isNonLength = !target.query?.length && !target.alertId?.length;
+      const reject = target.hide || isEmpty || isNonLength;
+      return reject;
+    });
+    // there are no showing queries
+    if (!targets.length) {
+      return Promise.resolve(preppedItems);
+    }
+
+    return Promise
+      .all(targets.map((target) => {
+        preppedItems.refId = target.refId;
+        if (target.isCaql || target.queryType === 'caql') {
+          _buildCaqlItem(target);
+        }
+        else if (target.queryType === 'alerts' || target.queryType === 'alert_counts') {
+          _buildAlertItem(target);
+        }
+        else {
+          _buildMetricItems(target);
+        }
+        return Promise.resolve(preppedItems);
+      }))
+      .then((result) => {
+        return preppedItems;
+      })
+      .catch((err) => {
+        log(() => `buildIrondbParamsAsync() err = ${JSON.stringify(err)}`);
+      });
+    
+    /**
+     * This builds a CAQL item into the prepped items.
+     */
+    function _buildCaqlItem(target: any) {
+      const { query, rolluptype, metricrollup, format, refId, min_period = '' } = target;
+      preppedItems.caql.names.push({
+        leaf_name: query,
+        leaf_data: { rolluptype, metricrollup, format, refId, min_period },
+      });
+    }
+    
+    /**
+     * This builds an alert item into the prepped items.
+     */
+    function _buildAlertItem(target: any) {
+      let rawQuery = templateSrv.replace(target.query, preppedItems.scopedVars);
+      if (target.alert_id !== '') {
+        rawQuery = `alert_id:${templateSrv.replace(target.alert_id, preppedItems.scopedVars)}`;
+      }
+      preppedItems.alert.names.push(rawQuery);
+      preppedItems.alert.local_filters.push(
+        templateSrv.replace(target.local_filter, preppedItems.scopedVars)
+      );
+      preppedItems.alert.local_filter_matches.push(target.local_filter_match);
+      preppedItems.alert.counts_only = target.querytype === 'alert_counts';
+      preppedItems.alert.query_type = target.alert_count_query_type;
+      preppedItems.alert.labels.push(
+        templateSrv.replace(target.metriclabel, preppedItems.scopedVars)
+      );
+      preppedItems.alert.target = target;
+    }
+
+    /**
+     * This builds standard or graphite metric items into the prepped items.
+     */
+    function _buildMetricItems(target: any) {
+      const rawQuery = checkVariablesEncoding(
+        templateSrv.replace(target.query, preppedItems.scopedVars)
+      );
+      const isGraphite = 'graphite' === target.querytype;
+      const tagFilter = target.tagFilter || '';
+      const promise = isGraphite ?
+        metricGraphiteQuery(rawQuery, false, start, end, tagFilter) :
+        metricTagsQuery(rawQuery, false, start, end);
+  
+      return promise
+        .then((result: any) => {
+          // filter out text metrics
+          result.data = _.filter(result.data, (metric) => {
+            const metricTypes = (metric?.type || '').split(',');
+            return !metricTypes.includes('text');
+          });
+          // keep target references
+          result.data.forEach((d: any) => d.target = target);
+          return result.data;
+        })
+        .then((data: any[]) => {
+          data.forEach((d, i) => {
+            preppedItems.std.names.push(
+              _buildFetchStream(target, data, i)
+            );
+          });
+          return preppedItems;
+        });
+      
+      /**
+       * This builds a data fetch stream for each metric stream returned 
+       * from the query.
+       */
+      function _buildFetchStream(target: any, data: any[], i: number) {
+        const scopedVars = preppedItems.scopedVars;
+        let leafName = data[i].metric_name || data[i].name;
+        let leafUuid = data[i].leaf_data?.uuid;
+        let leafMetricName = data[i].leaf_data?.name;
+    
+        // get the metric type
+        const baseType = ('heatmap' === target.format 
+          ? 'histogram' 
+          : (data[i].metric_type || data[i].type || data[i].leaf_data?.metric_type || data[i].leaf_data.type));
+        let types = (baseType || 'numeric').split(',');
+        let thisType;
+        while (!thisType) {
+          thisType = types.pop();
+        }
+        // init the data
+        data[i].leaf_data = {
+          egress_function: 'average',
+          uuid: leafUuid || data[i]['uuid'],
+          metric_name: leafMetricName,
+          metrictype: thisType,
+          paneltype: data[i].target.paneltype,
+          target,
+        };
+        // set the transform (egressoverride)
+        if ('histogram' === thisType) {
+          target.egressoverride = 'histogram';
+        }
+        if (target.egressoverride !== 'average') {
+          if (target.egressoverride === 'automatic') {
+            if (isStatsdCounter(leafName)) {
+              data[i].leaf_data.egress_function = 'counter';
+            }
+          }
+          else {
+            data[i].leaf_data.egress_function = target.egressoverride;
+          }
+        }
+        // set the label
+        let metriclabel = target.metriclabel;
+        if (target.labeltype === 'default') {
+          metriclabel = '%n | %t{*}';
+        }
+        else if (target.labeltype === 'name') {
+          metriclabel = '%n';
+        }
+        else if (target.labeltype === 'cardinality') {
+          metriclabel = '%n | %t-{*}';
+        }
+        const interpolatedLabel = metaInterpolateLabel(metriclabel || '', data, i);
+        data[i].leaf_data.metriclabel = templateSrv.replace(interpolatedLabel, scopedVars);
+        // wrap things up
+        data[i].leaf_data.check_tags = data[i].check_tags;
+        if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
+          data[i].leaf_data.rolluptype = target.rolluptype;
+          data[i].leaf_data.metricrollup = target.metricrollup;
+        }
+        // return the item
+        return {
+          leaf_name: leafName,
+          leaf_data: data[i].leaf_data
+        };
       }
     }
-    this.queryRange = query.range;
+  }
 
-    let queries: any[] = [];
-    let headers: any = { 'Content-Type': 'application/json' };
+  /**
+   * This performs the data query requests.
+   */
+  dataRequest(preppedItems: DataRequestItems, followLimit = true) {
+    let queries: any = [];
+    let queryResults: any = { data:[], t:'ts' };
 
-    headers['X-Circonus-Auth-Token'] = this.dataSourceOptions.apiToken;
-    headers['X-Circonus-App-Name'] = this.appName;
-    headers['Accept'] = 'application/json';
+    // headers
+    let headers: any = {
+      'Content-Type': 'application/json',
+      'X-Snowth-Advisory-Limit': followLimit ? this.dataSourceOptions.resultsLimit : 100,
+      'Accept': 'application/json',
+    };
+    if ('hosted' === this.dataSourceOptions.irondbType) {
+      headers['X-Circonus-Auth-Token'] = this.dataSourceOptions.apiToken;
+      headers['X-Circonus-App-Name'] = this.appName;
+    }
+    else {
+      headers['X-Circonus-Account'] = this.dataSourceOptions.accountId;
+    }
 
-    if (query.annotation['annotationQueryType'] === 'alerts') {
-      let options: any = {
-        url: `${this.url}/v2/alert`,
-        method: 'GET',
-        headers: headers,
-        retry: 1,
-        start: query.range.from.valueOf() / 1000,
-        end: query.range.to.valueOf() / 1000,
-        isAlert: true,
-        local_filter: query.annotation['annotationFilterText'],
-        local_filter_match: query.annotation['annotationFilterApply'],
-        annotation: query.annotation,
-        withCredentials: this.basicAuth || this.withCredentials,
-        isCaql: false,
-      };
-      const alertId = this.templateSrv.replace(query.annotation.alertId);
-      const alertQuery = this.templateSrv.replace(query.annotation.annotationQueryText);
-      if (alertId !== '') {
-        options.url += `/${alertId}`;
+    // standard metric streams
+    if (preppedItems.std.names.length) {
+      const leafData = preppedItems.std.names[0].leaf_data;
+      const paneltype = leafData.target.format || leafData.format || 'ts';
+      for (let i = 0; i < preppedItems.std.names.length; i++) {
+        const thisLeafData = preppedItems.std.names[i].leaf_data;
+        let options: any = {
+          url: this.url,
+          method: 'POST',
+          name: 'fetch',
+          headers: headers,
+          withCredentials: this.basicAuth || this.withCredentials,
+          paneltype: paneltype,
+          format: thisLeafData.format,
+          isCaql: false,
+          isGraphite: false,
+          retry: 1,
+        };
+        // finish up the URL
+        if ('hosted' === this.dataSourceOptions.irondbType) {
+          options.url += '/irondb';
+        }
+        options.url += '/fetch';
+        let start = preppedItems.std.start;
+        let end = preppedItems.std.end;
+        const interval = this.getRollupSpan(preppedItems, start, end, false, preppedItems.std.names[i].leaf_data);
+        // when shifting the range to truncate the end, never shift less than minTruncation
+        const end_shift = Math.max(interval, parseInt(this.dataSourceOptions.minTruncation || '0', 10));
+        // if the range ends within 1s, it's "now"
+        const ends_now = Date.now() - end * 1000 < 1000;
+        start -= interval;
+        // sometimes we want to drop the last interval b/c that data is frequently incomplete
+        end = ends_now && this.dataSourceOptions.truncateNow ? end - end_shift : end + interval;
+        // compile the data streams
+        let metricLabels = [];
+        let check_tags = [];
+        let streams: any[] = [];
+        let data = {
+          streams: streams,
+          period: interval,
+          start: start,
+          count: Math.round((end - start) / interval),
+          reduce: [{
+            label: '',
+            method: paneltype === 'heatmap' ? 'merge' : 'pass'
+          }],
+        };
+        metricLabels.push(thisLeafData.metriclabel);
+        check_tags.push(thisLeafData.check_tags);
+        // check the transform
+        let transform = thisLeafData.egress_function;
+        if (thisLeafData.metrictype === 'histogram') {
+          if (paneltype === 'heatmap') {
+            transform = 'none';
+          }
+          else {
+            transform = HistogramTransforms[transform as 'count' || 'average' || 'stddev' || 'derive' || 'derive_stddev' || 'counter' || 'counter_stddev' || 'histogram'];
+            const leafName = preppedItems.std.names[i].leaf_name;
+            let transformMode = 'default';
+            if (isStatsdCounter(leafName)) {
+              transformMode = 'statsd_counter';
+            }
+            thisLeafData.target.hist_transform = transformMode;
+          }
+        }
+        const stream = {
+          transform: transform,
+          name: thisLeafData.metric_name || preppedItems.std.names[i].leaf_name,
+          uuid: thisLeafData.uuid,
+          kind: thisLeafData.metrictype,
+        };
+        // graphite metrics which are incomplete won't have UUIDs, so don't include them
+        if (stream.uuid) {
+          streams.push(stream);
+        }
+        options.data = data;
+        options.metricLabels = metricLabels;
+        options.check_tags = check_tags;
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        // add this query
+        queries.push(options);
       }
-      else {
-        options.url += `?search=${encodeURIComponent(alertQuery)}&size=500`;
+    }
+
+    // CAQL queries
+    if (preppedItems.caql.names.length) {
+      for (let i=0; i<preppedItems.caql.names.length; i++) {
+        let options = {
+          url: this.url,
+          method: 'POST',
+          data: '',
+          headers: headers,
+          start: preppedItems.caql.start,
+          end: preppedItems.caql.end,
+          retry: 1,
+          withCredentials: this.basicAuth || this.withCredentials,
+          isCaql: true,
+          name: preppedItems.caql.names[i],
+          format: preppedItems.caql.names[i].leaf_data?.format,
+          refId: preppedItems.caql.names[i].leaf_data?.refId,
+        };
+        if ('hosted' === this.dataSourceOptions.irondbType) {
+          options.url += '/irondb';
+        }
+        options.url += '/extension/lua';
+        if ('hosted' === this.dataSourceOptions.irondbType) {
+          options.url += '/public';
+        }
+        options.url += '/caql_v1';
+        // render CAQL query
+        const caqlQuery = this.templateSrv.replace(
+          preppedItems.caql.names[i].leaf_name,
+          preppedItems.scopedVars
+        );
+        const minPeriod = preppedItems.caql.names[i].leaf_data?.min_period;
+        // prefix with the target's min_period if min_period isn't in the query already
+        const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
+        // render start, end, & period
+        const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2}?)\s/i);
+        const minPeriodDirective = minPeriodMatches ?
+          Math.round(parseDurationMS(minPeriodMatches[1]) / 1000) :
+          null;
+        const calculatedInterval = this.getRollupSpan(
+          preppedItems,
+          options.start,
+          options.end,
+          true,
+          preppedItems.caql.names[i].leaf_data
+        );
+        // any min_period directive overrides the resolution here if it's lower and we're already at the min resolution
+        const intervalIsMin = calculatedInterval === Math.round(MIN_DURATION_MS_CAQL / 1000);
+        const interval = minPeriodDirective && intervalIsMin
+          ? Math.min(calculatedInterval, minPeriodDirective)
+          : calculatedInterval;
+        // when shifting the range to truncate the end, never shift less than minTruncation
+        const end_shift = Math.max(interval, parseInt(this.dataSourceOptions.minTruncation || '0', 10));
+        // if the range ends within 1s, it's "now"
+        const ends_now = Date.now() - options.end * 1000 < 1000;
+        options.start -= interval;
+        // sometimes we want to drop the last interval b/c that data is frequently incomplete
+        options.end = ends_now && this.dataSourceOptions.truncateNow ? options.end - end_shift : options.end + interval;
+        let reqData = {
+          start: options.start.toFixed(3),
+          end: options.end.toFixed(3),
+          period: interval,
+          format: 'DF4',
+          q: caqlQueryMP,
+        };
+        options.data = JSON.stringify(reqData);
+        // basic auth
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        // add the query
+        queries.push(options);
       }
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
+    }
+
+    // alert queries
+    if (preppedItems.alert.names.length) {
+      for (let i = 0; i < preppedItems.alert.names.length; i++) {
+        let options: any = {
+          url: `${this.url}${'hosted' === this.dataSourceOptions.irondbType ? '/v2' : ''}/alert`,
+          method: 'GET',
+          headers: headers,
+          retry: 1,
+          start: preppedItems.alert.start,
+          end: preppedItems.alert.end,
+          isAlert: true,
+          counts_only: preppedItems.alert.counts_only,
+          label: preppedItems.alert.labels[i],
+          local_filter: preppedItems.alert.local_filters[i],
+          local_filter_match: preppedItems.alert.local_filter_matches[i],
+          query_type: preppedItems.alert.query_type,
+          target: preppedItems.alert.target,
+          withCredentials: this.basicAuth || this.withCredentials,
+          isCaql: false,
+          refId: preppedItems.refId,
+        };
+        // finish URL
+        const alertQuery = this.templateSrv.replace(
+          preppedItems.alert.names[i],
+          preppedItems.scopedVars
+        );
+        if (alertQuery.startsWith('alert_id:')) {
+          options.url += `/${alertQuery.split(':')[1]}`;
+        }
+        else {
+          options.url += `?search=${encodeURIComponent(alertQuery)}&size=1000`;
+        }
+        // basic auth (not sure if this is actually set anywhere...?)
+        if (this.basicAuth) {
+          options.headers.Authorization = this.basicAuth;
+        }
+        // add this query
+        queries.push(options);
       }
-      queries.push(options);
     }
 
     return Promise.all(
-      queries.map((query) =>
-        this.datasourceRequest(query)
-        .then((result: any) => {
-          if (!_.isUndefined(query.isAlert)) {
-            return this.enrichAlertsWithRules(result, query);
-          }
-          return Promise.resolve([]);
-        })
-        .then((results: any[]) => {
-          // this is a list of objects with "alert" and "rule" fields.
-          const events: AnnotationEvent[] = [];
-          for (const a of results) {
-            const alert = a['alert'];
-            const rule = a['rule'];
-            const tags: TagSet = {};
-
-            if (alert['_occurred_on'] < query.start || alert['_occurred_on'] > query.end) {
-              continue;
-            }
-
-            const cn = alert['_canonical_metric_name'];
-            const metric = alert['_metric_name'];
-            if (cn !== undefined && cn !== '') {
-              const stream_tags = taglessNameAndTags(cn)[1];
-              const st = splitTags(stream_tags);
-              mergeTags(tags, st);
-            }
-            for (const tag of alert['_tags']) {
-              const tagSep = tag.split(/:/g);
-              let tagCat = tagSep.shift();
-              if (!tagCat.startsWith('__') && tagCat !== '') {
-                let tagVal = tagSep.join(':');
-                tagCat = decodeTag(tagCat);
-                tagVal = decodeTag(tagVal);
-                if (tags[tagCat] === undefined) {
-                  tags[tagCat] = [];
+        queries.map((query: any, i: number, queries: any) =>
+          this.datasourceRequest(query)
+            .then((result: any) => {
+              const warning = result.data?.head?.warning;
+              if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
+                this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
+              }
+              if (!_.isUndefined(query.isAlert)) {
+                if (query.counts_only) {
+                  return this.countAlerts(result, query);
                 }
-                tags[tagCat].push(tagVal);
+                else {
+                  return this.enrichAlertsWithRules(result, query).then((results) => {
+                    return this.convertAlertDataToGrafana(results);
+                  });
+                }
+              }
+              else if (query.isGraphite) {
+                return this.convertIrondbGraphiteDataToGrafana(result, query);
+              }
+              else {
+                return this.convertIrondbDf4DataToGrafana(result, query);
+              }
+            })
+            .then((result: any) => {
+              const query = result.query;
+              if (_.isArray(result.data)) {
+                for (let i=0; i<result.data.length; i++) {
+                  if ('target' in result && 'refId' in result.target) {
+                    result.data[i].target = result.target.refId;
+                  }
+                  else if (query && query.refId) {
+                    result.data[i].target = query.refId;
+                  }
+                  queryResults.data.push(result.data[i]);
+                }
+              }
+              if (_.isObject(result.data)) {
+                if ('target' in result && 'refId' in result.target) {
+                  result.data.target = result.target.refId;
+                }
+                else if (query && query.refId) {
+                  result.data.target = query.refId;
+                }
+                queryResults.data.push(result.data);
+              }
+              if (null != result.t) {
+                queryResults.t = result.t;
+              }
+
+              return queryResults;
+            })
+        )
+      )
+      .then((result) => {
+        return queryResults;
+      })
+      .catch((err) => {
+        if (err.status !== 0 || err.status >= 300) {
+          this.throwerr(err);
+        }
+      });
+  }
+
+  /**
+   * This determines the data period for a request.
+   */
+  getRollupSpan(preppedItems: DataRequestItems, start: number, end: number, isCaql: boolean, leafData: any) {
+    let rolluptype = leafData.rolluptype;
+    const metricrollup = leafData.metricrollup;
+    if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
+      rolluptype = 'automatic';
+      log(() => `getRollupSpan() defaulting to automatic`);
+    }
+    if (rolluptype === 'exact') {
+      const exactMs = parseDurationMS(metricrollup);
+      const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
+      log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
+      if (exactDatapoints > (preppedItems.maxDataPoints || 1000000) * MAX_EXACT_DATAPOINTS_THRESHOLD) {
+        this.throwerr('Too many datapoints requested.');
+      }
+      // check rollup alignment
+      for (const alignMs of ROLLUP_ALIGN_MS) {
+        if (exactMs < alignMs) {
+          if (alignMs % exactMs !== 0) {
+            this.throwerr('Unaligned rollup period requested.');
+          }
+        }
+      }
+      const isGreaterThanOneDay = exactMs > ROLLUP_ALIGN_MS_1DAY;
+      const notAlignedToDays = exactMs % ROLLUP_ALIGN_MS_1DAY !== 0;
+      if (isGreaterThanOneDay && notAlignedToDays) {
+        this.throwerr('Unaligned rollup period requested.');
+      }
+
+      return _forceRollupAlignment(exactMs) / 1000;
+    }
+    else {
+      let minimumMs = isCaql ? MIN_DURATION_MS_CAQL : MIN_DURATION_MS_FETCH;
+      if (rolluptype === 'minimum') {
+        minimumMs = parseDurationMS(metricrollup);
+      }
+      const intervalMs = Math.max(preppedItems.intervalMs, minimumMs);
+      let interval = _nudgeInterval(_forceRollupAlignment(intervalMs) / 1000, -1);
+      while ((end - start) / interval > (preppedItems.maxDataPoints || 1000000) * MAX_DATAPOINTS_THRESHOLD) {
+        interval = _nudgeInterval(interval + 0.001, 1);
+      }
+
+      return interval;
+    }
+
+    /**
+     * This aligns a rollup value to the nearest 10s increment
+     */
+    function _forceRollupAlignment(rollupMs: number) {
+      if (rollupMs < 60000) {
+        rollupMs = Math.max(10000, Math.ceil(rollupMs / 10000) * 10000);
+      }
+      return rollupMs;
+    }
+
+    /**
+     * This nudges an interval value either up or down.
+     */
+    function _nudgeInterval(input: number, dir: number) {
+      const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
+      const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
+      const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map((a) => a * 60);
+      const _d = [24, 12, 8, 6, 4, 3, 2, 1].map((a) => a * 60 * 60);
+      const _matchset = [_s, _m, _h, _d];
+
+      if (dir !== -1) {
+        dir = 1;
+      }
+      // dir says if we're not a match do we choose 1 (larger) or -1 (smaller)
+      if (input < 0.001) {
+        return 0.001;
+      }
+      for (let si = 0; si < _matchset.length; si++) {
+        const set = _matchset[si];
+        if (input < set[0]) {
+          for (let idx = 1; idx < set.length; idx++) {
+            if (input > set[idx]) {
+              if (dir === -1) {
+                return set[idx];
+              }
+              else {
+                return set[idx - 1];
               }
             }
-
-            const annotationTags = [];
-            for (const tagCat in tags) {
-              annotationTags.push(tagCat + ':' + tags[tagCat][0]);
-            }
-
-            // each circonus alert can produce 2 events, one for the alert and one for the clear.
-            // alert first.
-            const alert_match: any = {};
-            alert_match.metric = metric;
-            alert_match.value = alert['_value'];
-
-            const data: any = {};
-            data.evalMatches = [];
-            data.evalMatches.push(alert_match);
-
-            let notes =
-              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
-              rule['notes'] :
-              'Oh no!';
-
-            notes = Mustache.render(notes, tags);
-
-            const event: any = {
-              time: alert['_occurred_on'] * 1000,
-              title: 'ALERTING',
-              text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />`+
-                (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
-                  ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
-                  : ''),
-              tags: annotationTags,
-              alertId: alert['_cid'].replace('/alert/', ''),
-              newState: 'alerting',
-              source: query.annotation,
-              data: data,
-            };
-
-            events.push(event);
-
-            notes =
-              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
-              rule['notes'] :
-              'Yay!';
-
-            notes = Mustache.render(notes, tags);
-
-            // clear if it's cleared:
-            if (alert['_cleared_on'] !== null) {
-              const alert_match: any = {};
-              alert_match.metric = metric;
-              alert_match.value = alert['_cleared_value'];
-              const data: any = {};
-              data.evalMatches = [];
-              data.evalMatches.push(alert_match);
-
-              const event: any = {
-                time: alert['_cleared_on'] * 1000,
-                title: 'OK',
-                text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />` +
-                  (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
-                    ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
-                    : ''),
-                tags: annotationTags,
-                alertId: alert['_cid'].replace('/alert/', ''),
-                newState: 'ok',
-                source: query.annotation,
-                data: data,
-              };
-              events.push(event);
+            if (input === set[idx]) {
+              return set[idx];
             }
           }
-          return events;
-        })
-      )
-    ).then((results) => {
-      return results;
-    });
+        }
+      }
+      if (input % 86400 === 0) {
+        return input;
+      }
+      if (dir === 1) {
+        return (1 + Math.floor(input / 86400)) * 86400;
+      }
+      return Math.floor(input / 86400) * 86400;
+    }
   }
 
   /**
@@ -702,23 +1116,6 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   }
 
   /**
-   * This gets the account ID formatted for use in an API path endpoint, if
-   * it's necessary.
-   */
-  getAccountIdForApiPath() {
-    return this.dataSourceOptions.irondbType === 'standalone' ? `/${this.dataSourceOptions.accountId}` : '';
-  }
-
-  /**
-   * This indicates whether we should ignore the Check UUID at the beginning 
-   * of the the first segment in graphite-style queries (they always start with 
-   * check UUIDs as the first segment if no query prefix is used).
-   */
-  ignoreGraphiteUUIDs() {
-    return !(this.dataSourceOptions.queryPrefix || '').trim();
-  }
-
-  /**
    * This performs a graphite-style metric search.
    */
   metricGraphiteQuery(
@@ -819,12 +1216,11 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
     isGraphite = false,
     customLimit?: number
   ) {
+    const limit = customLimit || this.dataSourceOptions.resultsLimit;
     let baseUrl = this.url;
     let headers: any = {
       'Content-Type': 'application/json',
-      'X-Snowth-Advisory-Limit': followLimit 
-        ? customLimit || this.dataSourceOptions.resultsLimit 
-        : 100,
+      'X-Snowth-Advisory-Limit': followLimit ? limit : 100,
     };
 
     if ('hosted' !== this.dataSourceOptions.irondbType) {
@@ -864,291 +1260,30 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   }
 
   /**
-   * This performs the data query requests.
+   * This looks at the variables and checks for variable values which need 
+   * base64 encoding due to being used as tag values. (This is rather 
+   * brute-force, but since we can't fully parse the query here, it's all we 
+   * can do.)
+   * We're basically looking at all the current variable values and encoding 
+   * them if they're preceded by a colon.
    */
-  dataRequest(optionsAll: any, followLimit = true) {
-    const sourceOptions = optionsAll[0];
-    let queries: any = [];
-    let queryResults: any = { data:[], t:'ts' };
+  checkVariablesEncoding(query: string) {
+    const slashifyCharsRegExp = /([\\\[\]\(\)\:\-\^\$\?\+\*\.])/g;
+    let vars = this.templateSrv.getVariables();
 
-    // headers
-    let headers: any = {
-      'Content-Type': 'application/json',
-      'X-Snowth-Advisory-Limit': followLimit ? this.dataSourceOptions.resultsLimit : 100,
-      'Accept': 'application/json',
-    };
-    if ('hosted' === this.dataSourceOptions.irondbType) {
-      headers['X-Circonus-Auth-Token'] = this.dataSourceOptions.apiToken;
-      headers['X-Circonus-App-Name'] = this.appName;
-    }
-    else {
-      headers['X-Circonus-Account'] = this.dataSourceOptions.accountId;
-    }
+    vars.forEach((cfg: any) => {
+      let val = cfg?.current?.value || '';
+      let valRegExp;
+      try {
+        let slashedVal = slashifyCharsRegExp.test(val) ? val.replace(slashifyCharsRegExp, '\\$1') : val;
+        valRegExp = new RegExp(`:${slashedVal}`, 'g');
+        if (valRegExp.test(query)) {
+          query = query.replace(valRegExp, `:${encodeTag(SegmentType.MetricName, val as string)}`);
+        }
+      } catch (e) {}
+    });
 
-    // standard metric streams
-    if (sourceOptions.std.names.length) {
-      const leafData = sourceOptions.std.names[0].leaf_data;
-      const paneltype = leafData.target.format || leafData.format || 'ts';
-      for (let i = 0; i < sourceOptions.std.names.length; i++) {
-        const thisLeafData = sourceOptions.std.names[i].leaf_data;
-        let options: any = {
-          url: this.url,
-          method: 'POST',
-          name: 'fetch',
-          headers: headers,
-          withCredentials: this.basicAuth || this.withCredentials,
-          paneltype: paneltype,
-          format: thisLeafData.format,
-          isCaql: false,
-          isGraphite: false,
-          retry: 1,
-        };
-        // finish up the URL
-        if ('hosted' === this.dataSourceOptions.irondbType) {
-          options.url += '/irondb';
-        }
-        options.url += '/fetch';
-        let start = sourceOptions.std.start;
-        let end = sourceOptions.std.end;
-        const interval = this.getRollupSpan(sourceOptions, start, end, false, sourceOptions.std.names[i].leaf_data);
-        // when shifting the range to truncate the end, never shift less than minTruncation
-        const end_shift = Math.max(interval, parseInt(this.dataSourceOptions.minTruncation || '0', 10));
-        // if the range ends within 1s, it's "now"
-        const ends_now = Date.now() - end * 1000 < 1000;
-        start -= interval;
-        // sometimes we want to drop the last interval b/c that data is frequently incomplete
-        end = ends_now && this.dataSourceOptions.truncateNow ? end - end_shift : end + interval;
-        // compile the data streams
-        let metricLabels = [];
-        let check_tags = [];
-        let streams: any[] = [];
-        let data = {
-          streams: streams,
-          period: interval,
-          start: start,
-          count: Math.round((end - start) / interval),
-          reduce: [{
-            label: '',
-            method: paneltype === 'heatmap' ? 'merge' : 'pass'
-          }],
-        };
-        metricLabels.push(thisLeafData.metriclabel);
-        check_tags.push(thisLeafData.check_tags);
-        // check the transform
-        let transform = thisLeafData.egress_function;
-        if (thisLeafData.metrictype === 'histogram') {
-          if (paneltype === 'heatmap') {
-            transform = 'none';
-          }
-          else {
-            transform = HistogramTransforms[transform as 'count' || 'average' || 'stddev' || 'derive' || 'derive_stddev' || 'counter' || 'counter_stddev' || 'histogram'];
-            const leafName = sourceOptions.std.names[i].leaf_name;
-            let transformMode = 'default';
-            if (isStatsdCounter(leafName)) {
-              transformMode = 'statsd_counter';
-            }
-            thisLeafData.target.hist_transform = transformMode;
-          }
-        }
-        const stream = {
-          transform: transform,
-          name: thisLeafData.metric_name || sourceOptions.std.names[i].leaf_name,
-          uuid: thisLeafData.uuid,
-          kind: thisLeafData.metrictype,
-        };
-        // graphite metrics which are incomplete won't have UUIDs, so don't include them
-        if (stream.uuid) {
-          streams.push(stream);
-        }
-        options.data = data;
-        options.metricLabels = metricLabels;
-        options.check_tags = check_tags;
-        if (this.basicAuth) {
-          options.headers.Authorization = this.basicAuth;
-        }
-        // add this query
-        queries.push(options);
-      }
-    }
-
-    // CAQL queries
-    if (sourceOptions.caql.names.length) {
-      for (let i=0; i<sourceOptions.caql.names.length; i++) {
-        let options = {
-          url: this.url,
-          method: 'POST',
-          data: '',
-          headers: headers,
-          start: sourceOptions.caql.start,
-          end: sourceOptions.caql.end,
-          retry: 1,
-          withCredentials: this.basicAuth || this.withCredentials,
-          isCaql: true,
-          name: sourceOptions.caql.names[i],
-          format: sourceOptions.caql.names[i].leaf_data?.format,
-          refId: sourceOptions.caql.names[i].leaf_data?.refId,
-        };
-        if ('hosted' === this.dataSourceOptions.irondbType) {
-          options.url += '/irondb';
-        }
-        options.url += '/extension/lua';
-        if ('hosted' === this.dataSourceOptions.irondbType) {
-          options.url += '/public';
-        }
-        options.url += '/caql_v1';
-        // render CAQL query
-        const caqlQuery = this.templateSrv.replace(
-          sourceOptions.caql.names[i].leaf_name,
-          sourceOptions.scopedVars
-        );
-        const minPeriod = sourceOptions.caql.names[i].leaf_data?.min_period;
-        // prefix with the target's min_period if min_period isn't in the query already
-        const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
-        // render start, end, & period
-        const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2}?)\s/i);
-        const minPeriodDirective = minPeriodMatches ?
-          Math.round(parseDurationMS(minPeriodMatches[1]) / 1000) :
-          null;
-        const calculatedInterval = this.getRollupSpan(
-          sourceOptions,
-          options.start,
-          options.end,
-          true,
-          sourceOptions.caql.names[i].leaf_data
-        );
-        // any min_period directive overrides the resolution here if it's lower and we're already at the min resolution
-        const intervalIsMin = calculatedInterval === Math.round(MIN_DURATION_MS_CAQL / 1000);
-        const interval = minPeriodDirective && intervalIsMin
-          ? Math.min(calculatedInterval, minPeriodDirective)
-          : calculatedInterval;
-        // when shifting the range to truncate the end, never shift less than minTruncation
-        const end_shift = Math.max(interval, parseInt(this.dataSourceOptions.minTruncation || '0', 10));
-        // if the range ends within 1s, it's "now"
-        const ends_now = Date.now() - options.end * 1000 < 1000;
-        options.start -= interval;
-        // sometimes we want to drop the last interval b/c that data is frequently incomplete
-        options.end = ends_now && this.dataSourceOptions.truncateNow ? options.end - end_shift : options.end + interval;
-        let reqData = {
-          start: options.start.toFixed(3),
-          end: options.end.toFixed(3),
-          period: interval,
-          format: 'DF4',
-          q: caqlQueryMP,
-        };
-        options.data = JSON.stringify(reqData);
-        // basic auth
-        if (this.basicAuth) {
-          options.headers.Authorization = this.basicAuth;
-        }
-        // add the query
-        queries.push(options);
-      }
-    }
-
-    // alert queries
-    if (sourceOptions.alert.names.length) {
-      for (let i = 0; i < sourceOptions['alert']['names'].length; i++) {
-        let options: any = {
-          url: `${this.url}${'hosted' === this.dataSourceOptions.irondbType ? '/v2' : ''}/alert`,
-          method: 'GET',
-          headers: headers,
-          retry: 1,
-          start: sourceOptions.alert.start,
-          end: sourceOptions.alert.end,
-          isAlert: true,
-          counts_only: sourceOptions.alert.counts_only,
-          label: sourceOptions.alert.labels[i],
-          local_filter: sourceOptions.alert.local_filters[i],
-          local_filter_match: sourceOptions.alert.local_filter_matches[i],
-          query_type: sourceOptions.alert.query_type,
-          target: sourceOptions.alert.target,
-          withCredentials: this.basicAuth || this.withCredentials,
-          isCaql: false,
-          refId: sourceOptions.refId,
-        };
-        // finish URL
-        const alertQuery = this.templateSrv.replace(
-          sourceOptions.alert.names[i],
-          sourceOptions.scopedVars
-        );
-        if (alertQuery.startsWith('alert_id:')) {
-          options.url += `/${alertQuery.split(':')[1]}`;
-        }
-        else {
-          options.url += `?search=${encodeURIComponent(alertQuery)}&size=1000`;
-        }
-        // basic auth (not sure if this is actually set anywhere...?)
-        if (this.basicAuth) {
-          options.headers.Authorization = this.basicAuth;
-        }
-        // add this query
-        queries.push(options);
-      }
-    }
-
-    return Promise.all(
-        queries.map((query: any, i: number, queries: any) =>
-          this.datasourceRequest(query)
-            .then((result: any) => {
-              const warning = result.data?.head?.warning;
-              if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
-                this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
-              }
-              if (!_.isUndefined(query.isAlert)) {
-                if (query.counts_only) {
-                  return this.countAlerts(result, query);
-                }
-                else {
-                  return this.enrichAlertsWithRules(result, query).then((results) => {
-                    return this.convertAlertDataToGrafana(results);
-                  });
-                }
-              }
-              else if (query.isGraphite) {
-                return this.convertIrondbGraphiteDataToGrafana(result, query);
-              }
-              else {
-                return this.convertIrondbDf4DataToGrafana(result, query);
-              }
-            })
-            .then((result: any) => {
-              const query = result.query;
-              if (_.isArray(result.data)) {
-                for (let i=0; i<result.data.length; i++) {
-                  if ('target' in result && 'refId' in result.target) {
-                    result.data[i].target = result.target.refId;
-                  }
-                  else if (query && query.refId) {
-                    result.data[i].target = query.refId;
-                  }
-                  queryResults.data.push(result.data[i]);
-                }
-              }
-              if (_.isObject(result.data)) {
-                if ('target' in result && 'refId' in result.target) {
-                  result.data.target = result.target.refId;
-                }
-                else if (query && query.refId) {
-                  result.data.target = query.refId;
-                }
-                queryResults.data.push(result.data);
-              }
-              if (null != result.t) {
-                queryResults.t = result.t;
-              }
-
-              return queryResults;
-            })
-        )
-      )
-      .then((result) => {
-        return queryResults;
-      })
-      .catch((err) => {
-        if (err.status !== 0 || err.status >= 300) {
-          this.throwerr(err);
-        }
-      });
+    return query;
   }
 
   /**
@@ -1412,7 +1547,7 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
           };
         })
         .catch((failed: any) => {
-          // TODO: skipping ruleset groups for now, this would be hard to implement
+          // skipping ruleset groups for now, as they would be hard to implement
           return {
             alert: query.alert_data,
             rule: null,
@@ -1422,309 +1557,6 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
       .then((results) => {
         return results;
       });
-  }
-
-  /**
-   * This determines the data period for a request.
-   */
-  getRollupSpan(options: any, start: number, end: number, isCaql: boolean, leafData: any) {
-    let rolluptype = leafData.rolluptype;
-    const metricrollup = leafData.metricrollup;
-    if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
-      rolluptype = 'automatic';
-      log(() => `getRollupSpan() defaulting to automatic`);
-    }
-    if (rolluptype === 'exact') {
-      const exactMs = parseDurationMS(metricrollup);
-      const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
-      log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
-      if (exactDatapoints > options.maxDataPoints * MAX_EXACT_DATAPOINTS_THRESHOLD) {
-        this.throwerr('Too many datapoints requested.');
-      }
-      // check rollup alignment
-      for (const alignMs of ROLLUP_ALIGN_MS) {
-        if (exactMs < alignMs) {
-          if (alignMs % exactMs !== 0) {
-            this.throwerr('Unaligned rollup period requested.');
-          }
-        }
-      }
-      const isGreaterThanOneDay = exactMs > ROLLUP_ALIGN_MS_1DAY;
-      const notAlignedToDays = exactMs % ROLLUP_ALIGN_MS_1DAY !== 0;
-      if (isGreaterThanOneDay && notAlignedToDays) {
-        this.throwerr('Unaligned rollup period requested.');
-      }
-
-      return _forceRollupAlignment(exactMs) / 1000;
-    }
-    else {
-      let minimumMs = isCaql ? MIN_DURATION_MS_CAQL : MIN_DURATION_MS_FETCH;
-      if (rolluptype === 'minimum') {
-        minimumMs = parseDurationMS(metricrollup);
-      }
-      const intervalMs = Math.max(options.intervalMs, minimumMs);
-      let interval = _nudgeInterval(_forceRollupAlignment(intervalMs) / 1000, -1);
-      while ((end - start) / interval > options.maxDatapoints * MAX_DATAPOINTS_THRESHOLD) {
-        interval = _nudgeInterval(interval + 0.001, 1);
-      }
-
-      return interval;
-    }
-
-    /**
-     * This aligns a rollup value to the nearest 10s increment
-     */
-    function _forceRollupAlignment(rollupMs: number) {
-      if (rollupMs < 60000) {
-        rollupMs = Math.max(10000, Math.ceil(rollupMs / 10000) * 10000);
-      }
-      return rollupMs;
-    }
-
-    /**
-     * This nudges an interval value either up or down.
-     */
-    function _nudgeInterval(input: number, dir: number) {
-      const _s = [1, 0.5, 0.25, 0.2, 0.1, 0.05, 0.025, 0.02, 0.01, 0.005, 0.002, 0.001];
-      const _m = [60, 30, 20, 15, 10, 5, 3, 2, 1];
-      const _h = [60, 30, 20, 15, 10, 5, 3, 2, 1].map((a) => a * 60);
-      const _d = [24, 12, 8, 6, 4, 3, 2, 1].map((a) => a * 60 * 60);
-      const _matchset = [_s, _m, _h, _d];
-
-      if (dir !== -1) {
-        dir = 1;
-      }
-      // dir says if we're not a match do we choose 1 (larger) or -1 (smaller)
-      if (input < 0.001) {
-        return 0.001;
-      }
-      for (let si = 0; si < _matchset.length; si++) {
-        const set = _matchset[si];
-        if (input < set[0]) {
-          for (let idx = 1; idx < set.length; idx++) {
-            if (input > set[idx]) {
-              if (dir === -1) {
-                return set[idx];
-              }
-              else {
-                return set[idx - 1];
-              }
-            }
-            if (input === set[idx]) {
-              return set[idx];
-            }
-          }
-        }
-      }
-      if (input % 86400 === 0) {
-        return input;
-      }
-      if (dir === 1) {
-        return (1 + Math.floor(input / 86400)) * 86400;
-      }
-      return Math.floor(input / 86400) * 86400;
-    }
-  }
-
-  /**
-   * This performs metric searches and performs other tasks as necessary to 
-   * build the metric streams, CAQL queries, alert queries, et al which are 
-   * necessary for the main data requests.
-   */
-  buildDataRequestStreams(options: any) {
-    const templateSrv = this.templateSrv;
-    const checkVariablesEncoding = this.checkVariablesEncoding;
-    const metricGraphiteQuery = this.metricGraphiteQuery;
-    const metricTagsQuery = this.metricTagsQuery;
-    const start = new Date(options.range.from).getTime() / 1000;
-    const end = new Date(options.range.to).getTime() / 1000;
-    const { scopedVars, meta, refId, maxDataPoints } = options;
-    const intervalMs = Math.round(
-      (options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints
-    );
-    // these are the prepped items
-    const stdNames: any[] = [];
-    const caqlNames: any[] = [];
-    const alertNames: any[] = [];
-    const local_filters: any[] = [];
-    const local_filter_matches: any[] = [];
-    const labels: any[] = [];
-    const preppedItems = {
-      scopedVars,
-      meta,
-      refId,
-      maxDataPoints,
-      intervalMs,
-      std:   { start, end, names:stdNames },
-      caql:  { start, end, names:caqlNames },
-      alert: { start, end, names:alertNames, local_filters, local_filter_matches, labels, counts_only: false, query_type: '', target: null },
-    };
-    // filter out hidden or empty queries
-    const targets = _.reject(options.targets, (target) => {
-      const isEmpty = target.query == null && target.alert_id == null;
-      const isNonLength = !target.query?.length && !target.alert_id?.length;
-      const reject = target.hide || isEmpty || isNonLength;
-      return reject;
-    });
-    // there are no showing queries
-    if (!targets.length) {
-      return Promise.resolve({});
-    }
-
-    return Promise
-      .all(targets.map((target) => {
-        preppedItems.refId = target.refId;
-        if (target.isCaql || target.querytype === 'caql') {
-          _buildCaqlItem(target);
-        }
-        else if (target.querytype === 'alerts' || target.querytype === 'alert_counts') {
-          _buildAlertItem(target);
-        }
-        else {
-          _buildMetricItems(target);
-        }
-        return Promise.resolve(preppedItems);
-      }))
-      .then((result) => {
-        return preppedItems;
-      })
-      .catch((err) => {
-        log(() => `buildIrondbParamsAsync() err = ${JSON.stringify(err)}`);
-      });
-    
-    /**
-     * This builds a CAQL item into the prepped items.
-     */
-    function _buildCaqlItem(target: any) {
-      const { query, rolluptype, metricrollup, format, refId, min_period = '' } = target;
-      preppedItems.caql.names.push({
-        leaf_name: query,
-        leaf_data: { rolluptype, metricrollup, format, refId, min_period },
-      });
-    }
-    
-    /**
-     * This builds an alert item into the prepped items.
-     */
-    function _buildAlertItem(target: any) {
-      let rawQuery = templateSrv.replace(target.query, preppedItems.scopedVars);
-      if (target.alert_id !== '') {
-        rawQuery = `alert_id:${templateSrv.replace(target.alert_id, preppedItems.scopedVars)}`;
-      }
-      preppedItems.alert.names.push(rawQuery);
-      preppedItems.alert.local_filters.push(
-        templateSrv.replace(target.local_filter, preppedItems.scopedVars)
-      );
-      preppedItems.alert.local_filter_matches.push(target.local_filter_match);
-      preppedItems.alert.counts_only = target.querytype === 'alert_counts';
-      preppedItems.alert.query_type = target.alert_count_query_type;
-      preppedItems.alert.labels.push(
-        templateSrv.replace(target.metriclabel, preppedItems.scopedVars)
-      );
-      preppedItems.alert.target = target;
-    }
-
-    /**
-     * This builds standard or graphite metric items into the prepped items.
-     */
-    function _buildMetricItems(target: any) {
-      const rawQuery = checkVariablesEncoding(
-        templateSrv.replace(target.query, preppedItems.scopedVars)
-      );
-      const isGraphite = 'graphite' === target.querytype;
-      const tagFilter = target.tagFilter || '';
-      const promise = isGraphite ?
-        metricGraphiteQuery(rawQuery, false, start, end, tagFilter) :
-        metricTagsQuery(rawQuery, false, start, end);
-  
-      return promise
-        .then((result: any) => {
-          // filter out text metrics
-          result.data = _.filter(result.data, (metric) => {
-            const metricTypes = (metric?.type || '').split(',');
-            return !metricTypes.includes('text');
-          });
-          // keep target references
-          result.data.forEach((d: any) => d.target = target);
-          return result.data;
-        })
-        .then((data: any[]) => {
-          data.forEach((d, i) => {
-            preppedItems.std.names.push(
-              _buildFetchStream(target, data, i)
-            );
-          });
-          return preppedItems;
-        });
-      
-      /**
-       * This builds a data fetch stream for each metric stream returned 
-       * from the query.
-       */
-      function _buildFetchStream(target: any, data: any[], i: number) {
-        const scopedVars = preppedItems.scopedVars;
-        let leafName = data[i].metric_name || data[i].name;
-        let leafUuid = data[i].leaf_data?.uuid;
-        let leafMetricName = data[i].leaf_data?.name;
-    
-        // get the metric type
-        const baseType = ('heatmap' === target.format 
-          ? 'histogram' 
-          : (data[i].metric_type || data[i].type || data[i].leaf_data?.metric_type || data[i].leaf_data.type));
-        let types = (baseType || 'numeric').split(',');
-        let thisType;
-        while (!thisType) {
-          thisType = types.pop();
-        }
-        // init the data
-        data[i].leaf_data = {
-          egress_function: 'average',
-          uuid: leafUuid || data[i]['uuid'],
-          metric_name: leafMetricName,
-          metrictype: thisType,
-          paneltype: data[i].target.paneltype,
-          target,
-        };
-        // set the transform (egressoverride)
-        if ('histogram' === thisType) {
-          target.egressoverride = 'histogram';
-        }
-        if (target.egressoverride !== 'average') {
-          if (target.egressoverride === 'automatic') {
-            if (isStatsdCounter(leafName)) {
-              data[i].leaf_data.egress_function = 'counter';
-            }
-          }
-          else {
-            data[i].leaf_data.egress_function = target.egressoverride;
-          }
-        }
-        // set the label
-        let metriclabel = target.metriclabel;
-        if (target.labeltype === 'default') {
-          metriclabel = '%n | %t{*}';
-        }
-        else if (target.labeltype === 'name') {
-          metriclabel = '%n';
-        }
-        else if (target.labeltype === 'cardinality') {
-          metriclabel = '%n | %t-{*}';
-        }
-        const interpolatedLabel = metaInterpolateLabel(metriclabel || '', data, i);
-        data[i].leaf_data.metriclabel = templateSrv.replace(interpolatedLabel, scopedVars);
-        // wrap things up
-        data[i].leaf_data.check_tags = data[i].check_tags;
-        if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
-          data[i].leaf_data.rolluptype = target.rolluptype;
-          data[i].leaf_data.metricrollup = target.metricrollup;
-        }
-        // return the item
-        return {
-          leaf_name: leafName,
-          leaf_data: data[i].leaf_data
-        };
-      }
-    }
   }
 
   /**
@@ -1998,96 +1830,6 @@ export default class DataSource extends DataSourceApi<CirconusQuery, CirconusDat
   }
 
   /**
-   * This looks at the variables and checks for variable values which need 
-   * base64 encoding due to being used as tag values. (This is rather 
-   * brute-force, but since we can't fully parse the query here, it's all we 
-   * can do.)
-   * We're basically looking at all the current variable values and encoding 
-   * them if they're preceded by a colon.
-   */
-  checkVariablesEncoding(query: string) {
-    const slashifyCharsRegExp = /([\\\[\]\(\)\:\-\^\$\?\+\*\.])/g;
-    let vars = this.templateSrv.getVariables();
-
-    vars.forEach((cfg: any) => {
-      let val = cfg?.current?.value || '';
-      let valRegExp;
-      try {
-        let slashedVal = slashifyCharsRegExp.test(val) ? val.replace(slashifyCharsRegExp, '\\$1') : val;
-        valRegExp = new RegExp(`:${slashedVal}`, 'g');
-        if (valRegExp.test(query)) {
-          query = query.replace(valRegExp, `:${encodeTag(SegmentType.MetricName, val as string)}`);
-        }
-      } catch (e) {}
-    });
-
-    return query;
-  }
-
-/*
-an alert looks like this:
-  {
-  "_cid": "/alert/48145680",
-  "_acknowledgement": null,
-  "_alert_url": "https://mlb-infrastructure.circonus.com/fault-detection/alerts/48145680",
-  "_broker": "/broker/2761",
-  "_check": "/check/283849",
-  "_check_name": "AMQ - legacy 02 npd activemq",
-  "_cleared_on": null,
-  "_cleared_value": null,
-  "_maintenance": [
-    "/maintenance/169927",
-    "/maintenance/167993"
-  ],
-  "_metric_link": null,
-  "_metric_name": "QueueSize",
-  "_canonical_metric_name": "QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
-  "_signature": "8f6126f5-3be4-4324-9831-ce468bef21e7`QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
-  "_metric_notes": "{\"notes\":\"AMQ QueueSize has gotten too large, check subscribers\"}",
-  "_occurred_on": 1609958123,
-  "_rule_set": "/rule_set/268647",
-  "_severity": 1,
-  "_tags": [
-    "category:partner",
-    "env:npd",
-    "service:amq"
-  ],
-  "_value": "1091"
-}
-
-and the `rule` field will look like:
-{
-  "derive": "average",
-  "_cid": "/rule_set/268647",
-  "metric_name": "QueueSize",
-  "check": "/check/0",
-  "metric_type": "numeric",
-  "tags": [],
-  "_host": null,
-  "notes": "AMQ QueueSize has gotten too large, check subscribers",
-  "lookup_key": null,
-  "name": null,
-  "parent": null,
-  "rules": [
-    {
-      "severity": 1,
-      "criteria": "max value",
-      "wait": 0,
-      "windowing_duration": 120,
-      "value": "1000",
-      "windowing_min_duration": 0,
-      "windowing_function": "average"
-    }
-  ],
-  "link": null,
-  "filter": "and(service:amq,not(env:prod),not(host:activemq*-internal.sportradar.us-east4.bdatasf-gcp-npd.mlbinfra.net))",
-  "contact_groups": {
-    "1": ["/contact_group/5738"], "2": [], "3": [], "4": [], "5": []
-  }
-}
-*/
-
-  /**
    * This converts alert data to Grafana's format.
    */
   convertAlertDataToGrafana(enrichedResults: any[]) {
@@ -2325,9 +2067,8 @@ and the `rule` field will look like:
         }
       }
 
-      /*
-      Add a text based description of the rules that are attached to this alert,
-      separated by pipes.
+      /* Add a text based description of the rules that are attached to this 
+      alert, separated by pipes.
       "rules": [
         {
           "severity": 1,
@@ -2415,4 +2156,238 @@ and the `rule` field will look like:
       });
     }
   }
+
+  /**
+   * This pulls alerts to show as annotations.
+   */
+  annotationQuery(query: AnnotationQueryRequest<CirconusQuery>): Promise<AnnotationEvent[]> {
+    log(() => 'annotationQuery() query = ' + JSON.stringify(query));
+
+    if (!_.isUndefined(this.queryRange) && !_.isEqual(query.range, this.queryRange)) {
+      log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(query.range)}`);
+      if (this.dataSourceOptions.useCaching) {
+        log(() => 'query() clearing cache');
+        const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
+        requestCache.clear();
+      }
+    }
+    this.queryRange = query.range;
+
+    let queries: any[] = [];
+    let headers: any = { 'Content-Type': 'application/json' };
+
+    headers['X-Circonus-Auth-Token'] = this.dataSourceOptions.apiToken;
+    headers['X-Circonus-App-Name'] = this.appName;
+    headers['Accept'] = 'application/json';
+
+    if (query.annotation['annotationQueryType'] === 'alerts') {
+      let options: any = {
+        url: `${this.url}/v2/alert`,
+        method: 'GET',
+        headers: headers,
+        retry: 1,
+        start: query.range.from.valueOf() / 1000,
+        end: query.range.to.valueOf() / 1000,
+        isAlert: true,
+        local_filter: query.annotation['annotationFilterText'],
+        local_filter_match: query.annotation['annotationFilterApply'],
+        annotation: query.annotation,
+        withCredentials: this.basicAuth || this.withCredentials,
+        isCaql: false,
+      };
+      const alertId = this.templateSrv.replace(query.annotation.alertId);
+      const alertQuery = this.templateSrv.replace(query.annotation.annotationQueryText);
+      if (alertId !== '') {
+        options.url += `/${alertId}`;
+      }
+      else {
+        options.url += `?search=${encodeURIComponent(alertQuery)}&size=500`;
+      }
+      if (this.basicAuth) {
+        options.headers.Authorization = this.basicAuth;
+      }
+      queries.push(options);
+    }
+
+    return Promise.all(
+      queries.map((query) =>
+        this.datasourceRequest(query)
+        .then((result: any) => {
+          if (!_.isUndefined(query.isAlert)) {
+            return this.enrichAlertsWithRules(result, query);
+          }
+          return Promise.resolve([]);
+        })
+        .then((results: any[]) => {
+          // this is a list of objects with "alert" and "rule" fields.
+          const events: AnnotationEvent[] = [];
+          for (const a of results) {
+            const alert = a['alert'];
+            const rule = a['rule'];
+            const tags: TagSet = {};
+
+            if (alert['_occurred_on'] < query.start || alert['_occurred_on'] > query.end) {
+              continue;
+            }
+
+            const cn = alert['_canonical_metric_name'];
+            const metric = alert['_metric_name'];
+            if (cn !== undefined && cn !== '') {
+              const stream_tags = taglessNameAndTags(cn)[1];
+              const st = splitTags(stream_tags);
+              mergeTags(tags, st);
+            }
+            for (const tag of alert['_tags']) {
+              const tagSep = tag.split(/:/g);
+              let tagCat = tagSep.shift();
+              if (!tagCat.startsWith('__') && tagCat !== '') {
+                let tagVal = tagSep.join(':');
+                tagCat = decodeTag(tagCat);
+                tagVal = decodeTag(tagVal);
+                if (tags[tagCat] === undefined) {
+                  tags[tagCat] = [];
+                }
+                tags[tagCat].push(tagVal);
+              }
+            }
+
+            const annotationTags = [];
+            for (const tagCat in tags) {
+              annotationTags.push(tagCat + ':' + tags[tagCat][0]);
+            }
+
+            // each circonus alert can produce 2 events, one for the alert and one for the clear.
+            // alert first.
+            const alert_match: any = {};
+            alert_match.metric = metric;
+            alert_match.value = alert['_value'];
+
+            const data: any = {};
+            data.evalMatches = [];
+            data.evalMatches.push(alert_match);
+
+            let notes =
+              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
+              rule['notes'] :
+              'Oh no!';
+
+            notes = Mustache.render(notes, tags);
+
+            const event: any = {
+              time: alert['_occurred_on'] * 1000,
+              title: 'ALERTING',
+              text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />`+
+                (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
+                  ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
+                  : ''),
+              tags: annotationTags,
+              alertId: alert['_cid'].replace('/alert/', ''),
+              newState: 'alerting',
+              source: query.annotation,
+              data: data,
+            };
+
+            events.push(event);
+
+            notes =
+              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
+              rule['notes'] :
+              'Yay!';
+
+            notes = Mustache.render(notes, tags);
+
+            // clear if it's cleared:
+            if (alert['_cleared_on'] !== null) {
+              const alert_match: any = {};
+              alert_match.metric = metric;
+              alert_match.value = alert['_cleared_value'];
+              const data: any = {};
+              data.evalMatches = [];
+              data.evalMatches.push(alert_match);
+
+              const event: any = {
+                time: alert['_cleared_on'] * 1000,
+                title: 'OK',
+                text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />` +
+                  (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
+                    ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
+                    : ''),
+                tags: annotationTags,
+                alertId: alert['_cid'].replace('/alert/', ''),
+                newState: 'ok',
+                source: query.annotation,
+                data: data,
+              };
+              events.push(event);
+            }
+          }
+          return events;
+        })
+      )
+    ).then((results) => {
+      return results;
+    });
+  }
+
+  /* an alert looks like this:
+    {
+    "_cid": "/alert/48145680",
+    "_acknowledgement": null,
+    "_alert_url": "https://mlb-infrastructure.circonus.com/fault-detection/alerts/48145680",
+    "_broker": "/broker/2761",
+    "_check": "/check/283849",
+    "_check_name": "AMQ - legacy 02 npd activemq",
+    "_cleared_on": null,
+    "_cleared_value": null,
+    "_maintenance": [
+      "/maintenance/169927",
+      "/maintenance/167993"
+    ],
+    "_metric_link": null,
+    "_metric_name": "QueueSize",
+    "_canonical_metric_name": "QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
+    "_signature": "8f6126f5-3be4-4324-9831-ce468bef21e7`QueueSize|ST[brokerName:Internal_ActiveMQ_Broker,destinationName:lookup.background.job.topic.qa,destinationType:Queue,host:activemq02-internal.legacy.us-east4.bdatasf-gcp-npd.mlbinfra.net,type:Broker]",
+    "_metric_notes": "{\"notes\":\"AMQ QueueSize has gotten too large, check subscribers\"}",
+    "_occurred_on": 1609958123,
+    "_rule_set": "/rule_set/268647",
+    "_severity": 1,
+    "_tags": [
+      "category:partner",
+      "env:npd",
+      "service:amq"
+    ],
+    "_value": "1091"
+  }
+  
+  and the `rule` field will look like:
+  {
+    "derive": "average",
+    "_cid": "/rule_set/268647",
+    "metric_name": "QueueSize",
+    "check": "/check/0",
+    "metric_type": "numeric",
+    "tags": [],
+    "_host": null,
+    "notes": "AMQ QueueSize has gotten too large, check subscribers",
+    "lookup_key": null,
+    "name": null,
+    "parent": null,
+    "rules": [
+      {
+        "severity": 1,
+        "criteria": "max value",
+        "wait": 0,
+        "windowing_duration": 120,
+        "value": "1000",
+        "windowing_min_duration": 0,
+        "windowing_function": "average"
+      }
+    ],
+    "link": null,
+    "filter": "and(service:amq,not(env:prod),not(host:activemq*-internal.sportradar.us-east4.bdatasf-gcp-npd.mlbinfra.net))",
+    "contact_groups": {
+      "1": ["/contact_group/5738"], "2": [], "3": [], "4": [], "5": []
+    }
+  }
+  */  
 }

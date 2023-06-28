@@ -1,4 +1,4 @@
-import { DataQuery, DataSourceJsonData } from '@grafana/data';
+import { DataQuery, DataSourceJsonData, ScopedVars } from '@grafana/data';
 
 /**
  * These are the configuration options for individual queries.
@@ -68,6 +68,42 @@ export interface CirconusDataSourceOptions extends DataSourceJsonData {
   hideCAQLWarnings: boolean; // Whether to hide CAQL warnings and show the data, instead of throwing errors to show the warnings
   queryPrefix: string; // When using graphite-style queries, this is any pre-set query prefix needed for the IRONdb setup in use
   disableUsageStatistics: boolean; // Whether to disable anonymized usage statistics
+}
+
+/**
+ * This is the structure used when prepping items for the main data request(s).
+ */
+export interface LeafItem {
+  leaf_name: string;
+  leaf_data: any;
+}
+export interface DataRequestItems {
+  refId: string;
+  scopedVars?: ScopedVars;
+  meta?: any;
+  maxDataPoints?: number;
+  intervalMs: number;
+  std: {
+    start: number,
+    end: number,
+    names: LeafItem[]
+  };
+  caql: {
+    start: number,
+    end: number,
+    names: LeafItem[]
+  };
+  alert: {
+    start: number,
+    end: number,
+    names: string[],
+    local_filters: string[],
+    local_filter_matches: string[],
+    labels: string[],
+    counts_only: boolean,
+    query_type: string,
+    target: any
+  };
 }
 
 /**

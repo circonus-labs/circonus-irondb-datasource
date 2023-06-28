@@ -1,13 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
-  "name": "Circonus",
+  "name": "Circonus Datasource",
   "id": "circonus-irondb-datasource",
   "metrics": true,
   "backend": true,
   "alerting": true,
   "annotations": true,
-  "executable": "gpx_circonus_datasource",
+  "executable": "gpx_circonus_irondb_datasource",
   "info": {
     "description": "A data source for accessing Circonus metric and alert data.",
     "author": {
@@ -28,7 +28,7 @@
     "updated": "%TODAY%"
   },
   "dependencies": {
-    "grafanaDependency": ">=9.5.2",
+    "grafanaDependency": ">=9.5.3",
     "plugins": []
   }
 }

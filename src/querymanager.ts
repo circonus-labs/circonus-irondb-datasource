@@ -2,7 +2,7 @@ import _ from 'lodash';
 import Log from './logger';
 import Parser from './parser';
 import { SelectableValue } from '@grafana/data';
-import DataSource from './datasource';
+import { DataSource } from './datasource';
 import { CirconusQuery, SegmentType, Segment } from './types';
 import { DURATION_REGEXP, DURATION_UNITS_DEFAULT, parseDurationMS, encodeTag, decodeTag } from './common';
 
@@ -10,7 +10,7 @@ const log = Log('Circonus QueryManager');
 
 export default class QueryManager {
   datasource: DataSource;
-  query: CirconusQuery;
+  query: CirconusQuery;  
   segments: Segment[] = [];
   gSegments: Segment[] = [];
   error = '';

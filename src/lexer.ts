@@ -191,6 +191,7 @@ export default class Lexer {
     let id = '';
     let index = 0;
     let type, char;
+    const instance = this;
     const peek = this.peek;
 
     // Detects any character in the Unicode categories "Uppercase
@@ -220,14 +221,14 @@ export default class Lexer {
     function readUnicodeEscapeSequence() {
       index += 1;
 
-      if (peek(index) !== 'u') {
+      if (peek.call(instance, index) !== 'u') {
         return null;
       }
 
-      let ch1 = peek(index + 1);
-      let ch2 = peek(index + 2);
-      let ch3 = peek(index + 3);
-      let ch4 = peek(index + 4);
+      let ch1 = peek.call(instance, index + 1);
+      let ch2 = peek.call(instance, index + 2);
+      let ch3 = peek.call(instance, index + 3);
+      let ch4 = peek.call(instance, index + 4);
       let code;
 
       if (isHexDigit(ch1) && isHexDigit(ch2) && isHexDigit(ch3) && isHexDigit(ch4)) {
@@ -245,7 +246,7 @@ export default class Lexer {
     }
 
     function getIdentifierStart() {
-      let chr = peek(index);
+      let chr = peek.call(instance, index);
       let code = chr.charCodeAt(0);
 
       if (chr === '*') {
@@ -275,7 +276,7 @@ export default class Lexer {
     }
 
     function getIdentifierPart() {
-      let chr = peek(index);
+      let chr = peek.call(instance, index);
       let code = chr.charCodeAt(0);
 
       if (code === 92) {

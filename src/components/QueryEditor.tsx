@@ -1,17 +1,31 @@
 import { css, cx } from '@emotion/css';
 import React, { ChangeEvent, useState } from 'react';
 import _ from 'lodash';
-import { Button, InlineField, InlineFieldRow, Input, Label, SegmentAsync, Select, TextArea, useStyles2 } from '@grafana/ui';
-import { GrafanaTheme2, QueryEditorProps, SelectableValue } from '@grafana/data';
-import DataSource from '../datasource';
 import QueryManager from '../querymanager';
+import { DataSource } from '../datasource';
 import {
+  GrafanaTheme2,
+  QueryEditorProps,
+  SelectableValue
+} from '@grafana/data';
+import {
+  Button,
+  InlineField,
+  InlineFieldRow,
+  Input,
+  Label,
+  SegmentAsync,
+  Select,
+  TextArea,
+  useStyles2
+} from '@grafana/ui';
+import {
+  CaqlFindFunctions,
+  CaqlHistogramTransforms,
   CirconusDataSourceOptions,
   CirconusQuery,
   Segment as CirconusSegment,
-  SegmentType,
-  CaqlHistogramTransforms,
-  CaqlFindFunctions
+  SegmentType
 } from '../types';
 import {
   DEFAULT_QUERY,
@@ -35,10 +49,23 @@ export function QueryEditor(props: Props) {
   // props
   const { datasource, query, onChange, onRunQuery } = props;
   _.defaults(query, DEFAULT_QUERY);
-  const { metricLabel, egressOverride, rollupType, metricRollup } = query;
-  const { format, queryDisplay, alertId, localFilterMatch } = query;
-  const { localFilter, alertCountQueryType } = query;
-  let { queryType, labelType, minPeriod } = query;
+  const {
+    metricLabel,
+    egressOverride,
+    rollupType,
+    metricRollup,
+    format,
+    queryDisplay,
+    alertId,
+    localFilterMatch,
+    localFilter,
+    alertCountQueryType
+  } = query;
+  let {
+    queryType,
+    labelType,
+    minPeriod
+  } = query;
 
   // initialize the query manager
   const manager = new QueryManager(datasource, query);
@@ -72,13 +99,8 @@ export function QueryEditor(props: Props) {
 
   /**
    * This updates a query field value when the field changes.
-   * @param {string} field
-   * @param {any} value 
    */
   function updateField(field: string, value: any) {
-    if (field === 'foo') {
-      return;
-    }
     setLastFieldChanged(field);
     onChange({
       ...query,
@@ -478,13 +500,6 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This empties the entire segments array.
-   */
-  // function emptySegments() {
-  //   manager.emptySegments();
-  // }
-
-  /**
    * This takes a standard query egress param and uses it to determine the 
    * corresponding CAQL find() function.
    */
@@ -835,7 +850,7 @@ export function QueryEditor(props: Props) {
         isAlertsQuery || isAlertCountQuery
         ? <>
             <InlineFieldRow>
-              <InlineField 
+              <InlineField
                 label={<Label className={cx(styles.labels)}>Alert ID</Label>}
                 >
                 <Input
@@ -1061,7 +1076,6 @@ export function QueryEditor(props: Props) {
 }
 
 function getStyles(theme: GrafanaTheme2) {
-  console.log('theme: ', theme);
   return {
     labels: css`
       display: flex;

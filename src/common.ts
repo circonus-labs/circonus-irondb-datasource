@@ -1,8 +1,19 @@
-import { CirconusDataSourceOptions, CirconusQuery, SegmentType, TagSet } from './types';
-import { ArrayVector, FieldType, MutableField, TIME_SERIES_TIME_FIELD_NAME, TIME_SERIES_VALUE_FIELD_NAME } from '@grafana/data';
 import memoize from 'memoizee';
-import DataSource from './datasource';
+import { DataSource } from './datasource';
 import _ from 'lodash';
+import {
+  ArrayVector,
+  FieldType,
+  MutableField,
+  TIME_SERIES_TIME_FIELD_NAME,
+  TIME_SERIES_VALUE_FIELD_NAME
+} from '@grafana/data';
+import {
+  CirconusDataSourceOptions,
+  CirconusQuery,
+  SegmentType,
+  TagSet
+} from './types';
 
 export const DEFAULT_QUERY: Partial<CirconusQuery> = {
   queryType: 'basic',
