@@ -285,6 +285,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
    * necessary for the main data requests.
    */
   buildDataRequestItems(options: any) {
+    const ds = this;
     const templateSrv = this.templateSrv;
     const checkVariablesEncoding = this.checkVariablesEncoding;
     const metricGraphiteQuery = this.metricGraphiteQuery;
@@ -381,14 +382,15 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      * This builds standard or graphite metric items into the prepped items.
      */
     function _buildMetricItems(target: any) {
-      const rawQuery = checkVariablesEncoding(
+      const rawQuery = checkVariablesEncoding.call(
+        ds,
         templateSrv.replace(target.query, preppedItems.scopedVars)
       );
       const isGraphite = 'graphite' === target.querytype;
       const tagFilter = target.tagFilter || '';
       const promise = isGraphite ?
-        metricGraphiteQuery(rawQuery, false, start, end, tagFilter) :
-        metricTagsQuery(rawQuery, false, start, end);
+        metricGraphiteQuery.call(ds, rawQuery, false, start, end, tagFilter) :
+        metricTagsQuery.call(ds, rawQuery, false, start, end);
   
       return promise
         .then((result: any) => {

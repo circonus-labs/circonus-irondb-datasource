@@ -369,7 +369,7 @@ export default class QueryManager {
     }
     let isGraphite = 'graphite' === this.query.queryType;
     const segmentsArray = this[isGraphite ? 'gSegments' : 'segments'];
-    this[isGraphite ? 'gSegments' : 'segments'] = segmentsArray.splice(0, index);
+    segmentsArray.splice(index, segmentsArray.length - index);
   }
 
   /**

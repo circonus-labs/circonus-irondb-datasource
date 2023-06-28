@@ -437,7 +437,7 @@ export function QueryEditor(props: Props) {
     // if we changed the start metric, then we remove all the filters 
     // because they're invalid now
     if (0 === index) {
-      removeSegments(index + 1);
+      manager.removeSegments(index + 1);
       checkForPlusAndSelect();
       setSegmentFocus(index + 1);
     }
@@ -490,13 +490,6 @@ export function QueryEditor(props: Props) {
     }
     // always try to add a plus segment (only if there's not one already)
     manager.addPlusSegment();
-  }
-
-  /**
-   * This takes an index and removes that segment and all following segments.
-   */
-  function removeSegments(index: number) {
-    manager.removeSegments(index);
   }
 
   /**
@@ -665,6 +658,9 @@ export function QueryEditor(props: Props) {
   function buildGraphiteQuery() {
     query.query = query.queryDisplay = manager.getGraphiteMetricQuery();
     query.tagFilter = manager.getGraphiteTagFilter();
+    updateField('queryDisplay', query.queryDisplay);
+    updateField('query', query.query);
+    updateField('tagFilter', query.tagFilter);
   }
 
   /**
@@ -672,6 +668,8 @@ export function QueryEditor(props: Props) {
    */
   function buildStandardQuery() {
     query.query = query.queryDisplay = manager.getStandardQuery();
+    updateField('queryDisplay', query.queryDisplay);
+    updateField('query', query.query);
   }
 
   const isCaqlQuery = queryType === 'caql';
