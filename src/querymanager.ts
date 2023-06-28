@@ -101,6 +101,9 @@ export default class QueryManager {
 
     // it's ok if the `and(` & `)` wrappers are present, they're handled below
     for (let tag of tags) {
+      if (!tag) {
+        continue;
+      }
       if (first) {
         first = false;
       } 
