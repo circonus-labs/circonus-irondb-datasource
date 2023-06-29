@@ -1,7 +1,7 @@
 import { css, cx } from '@emotion/css';
 import React, { ChangeEvent, useState } from 'react';
 import _ from 'lodash';
-import QueryManager from '../querymanager';
+import Parser from '../parser';
 import { DataSource } from '../datasource';
 import {
   GrafanaTheme2,
@@ -29,6 +29,9 @@ import {
 } from '../types';
 import {
   DEFAULT_QUERY,
+  DURATION_REGEXP,
+  DURATION_UNITS_DEFAULT,
+  parseDurationMS,
   taglessName,
   encodeTag,
   decodeTag,
@@ -44,6 +47,12 @@ export function QueryEditor(props: Props) {
   const [lastFieldChanged, setLastFieldChanged] = useState('');
   const [lastQueryType, setLastQueryType] = useState(props.query.queryType);
   const [lastCaql, setLastCaql] = useState('caql' === lastQueryType ? props.query.query : '');
+  const tempSegs: CirconusSegment[] = [];
+  // const [segments, setSegments] = useState(tempSegs);
+  const segments = useState(tempSegs)[0];
+  const tempGSegs: CirconusSegment[] = [];
+  // const [gSegments, setGSegments] = useState(tempGSegs);
+  const gSegments = useState(tempGSegs)[0];
   const styles = useStyles2(getStyles);
 
   // props
@@ -66,29 +75,11 @@ export function QueryEditor(props: Props) {
     labelType,
     minPeriod
   } = query;
+  let error = '';
 
-  // TODO: support old queries using old snake-case properties
-
-  // initialize the query manager
-  const manager = new QueryManager(datasource, query);
-
-  // options for dropdowns
-  const queryTypeOptions = manager.getQueryTypeOptions();
-  const labelTypeOptions = manager.getLabelTypeOptions();
-  const egressOverrideOptions = manager.getEgressOverrideOptions();
-  const rollupTypeOptions = manager.getRollupTypeOptions();
-  const formatOptions = manager.getFormatOptions();
-  const localFilterMatchOptions = manager.getLocalFilterMatchOptions();
-  const alertCountQueryTypeOptions = manager.getAlertCountQueryTypeOptions();
   // ensure minPeriod has the 's' suffix (used to be a bare integer)
   if (minPeriod) {
     minPeriod += /[a-zA-Z]$/.test(minPeriod) ? '' : 's';
-  }
-  const minPeriodOptions = manager.getMinPeriodOptions(minPeriod);
-
-  // double-check the queryType
-  if (!queryTypeOptions.some((cfg) => cfg.value === queryType)) {
-    queryType = query.isCaql ? 'caql' : datasource.canShowGraphite() ? 'graphite' : 'basic';
   }
   
   // don't allow empty custom labels
@@ -96,8 +87,68 @@ export function QueryEditor(props: Props) {
     labelType = 'default';
   }
 
+  // TODO: support old queries using old snake-case properties
+
+  // parse the query
+  if ('basic' === query.queryType) {
+    parseStandardQuery();
+  }
+  else if ('graphite' === query.queryType) {
+    parseGraphiteQuery();
+  }
   // make sure the proper segments are there for new queries
   checkForPlusAndSelect();
+
+  // options for dropdowns
+  const queryTypeOptions = [
+    { value: 'caql', label: 'CAQL' },
+    { value: 'basic', label: 'Standard' },
+    { value: 'alerts', label: 'Alerts' },
+    { value: 'alert_counts', label: 'Alert Counts' }
+  ];
+  if (datasource.canShowGraphite()) {
+    queryTypeOptions.splice(2, 0, { value: 'graphite', label: 'Graphite Style' });
+  }
+  const labelTypeOptions = [
+    { value: 'default', label: 'name and tags' },
+    { value: 'name', label: 'name only' },
+    { value: 'cardinality', label: 'high cardinality tags' },
+    { value: 'custom', label: 'custom' },
+  ];
+  const egressOverrideOptions = [
+    { value: 'automatic', label: 'automatic' },
+    { value: 'count', label: 'number of data points (count)' },
+    { value: 'average', label: 'average value (gauge)' },
+    { value: 'stddev', label: 'standard deviation a.k.a. σ (stddev)' },
+    { value: 'derive', label: 'rate of change (derive)' },
+    { value: 'derive_stddev', label: 'rate of change σ (derive_stddev)' },
+    { value: 'counter', label: 'rate of positive change (counter)' },
+    { value: 'counter_stddev', label: 'rate of positive change σ (counter_stddev)' },
+  ];
+  const rollupTypeOptions = [
+    { value: 'automatic', label: 'automatic' },
+    { value: 'minimum', label: 'minimum' },
+    { value: 'exact', label: 'exact' },
+  ];
+  const formatOptions = [
+    { value: 'ts', label: 'Time Series' },
+    { value: 'table', label: 'Table' },
+    { value: 'heatmap', label: 'Heatmap' },
+  ];
+  const localFilterMatchOptions = [
+    { value: 'all', label: 'ALL' },
+    { value: 'any', label: 'ANY' },
+  ];
+  const alertCountQueryTypeOptions = [
+    { value: 'instant', label: 'instant' },
+    { value: 'range', label: 'range' },
+  ];
+  const minPeriodOptions = getMinPeriodOptions(minPeriod);
+
+  // double-check the queryType
+  if (!queryTypeOptions.some((cfg) => cfg.value === queryType)) {
+    queryType = query.isCaql ? 'caql' : datasource.canShowGraphite() ? 'graphite' : 'basic';
+  }
 
   /**
    * This updates a query field value when the field changes.
@@ -138,6 +189,7 @@ export function QueryEditor(props: Props) {
     else if (lastQueryType === 'basic' && queryType === 'graphite') {
       convertStandardToGraphite();
       checkForPlusAndSelect();
+      buildGraphiteQuery();
     }
     // Graphite -> CAQL
     else if (lastQueryType === 'graphite' && queryType === 'caql') {
@@ -153,6 +205,7 @@ export function QueryEditor(props: Props) {
     else if (lastQueryType === 'graphite' && queryType === 'basic') {
       convertGraphiteToStandard();
       checkForPlusAndSelect();
+      buildStandardQuery();
     }
     // Alerts
     else if (queryType === 'alerts' || queryType === 'alert_counts') {
@@ -166,36 +219,696 @@ export function QueryEditor(props: Props) {
   }
 
   /**
+   * This returns the CAQL min period options.
+   */
+  function getMinPeriodOptions(currentMinPeriod?: string): SelectableValue[] {
+    const options = [
+      { value: '', label: 'none' },
+      { value: '60s', label: '60s' },
+      { value: '300s', label: '300s' },
+    ];
+    const caqlMinPeriod = datasource.getCaqlMinPeriod();
+
+    // add any from the datasource config which aren't present already
+    if (caqlMinPeriod) {
+      let periods = caqlMinPeriod.trim().split(',');
+      periods.forEach((duration) => {
+        const matches = duration.toLocaleLowerCase().match(DURATION_REGEXP);
+        if (matches) {
+          duration += matches[2] ? '' : DURATION_UNITS_DEFAULT;
+          if (!options.some((opt) => opt.value === duration)) {
+            options.push({ value:duration, label:duration });
+          }
+        }
+      });
+      // sort
+      options.sort((a,b) => {
+        const ad = parseDurationMS(a.value || '0');
+        const bd = parseDurationMS(b.value || '0');
+        return ad < bd ? -1 : ad > bd ? 1 : 0;
+      });
+    }
+    // add the current minPeriod if it's an old, odd value
+    if (currentMinPeriod && !options.some((opt) => opt.value === currentMinPeriod)) {
+      options.push({ value:currentMinPeriod, label:currentMinPeriod });
+    }
+
+    return options;
+  }
+
+  /**
+   * This parses a standard query into segments.
+   */
+  function parseStandardQuery() {
+    // reset
+    emptySegments();
+    error = '';
+
+    const queryString = (query.query || '').slice(4, -1) || '__name:*'; // remove the `and(` & `)` wrappers
+    const tags = queryString.split(',');
+    let nameIndex = tags.findIndex((tag) => /^__name:/.test(tag));
+    if (~nameIndex) {
+      const metricName = tags[nameIndex].replace(/^__name:/, '');
+      tags.splice(nameIndex, 1);
+      segments.push({ type: SegmentType.MetricName, value: decodeTag(metricName) });
+    }
+
+    let tagFilter = tags.join(',');
+    let newSegments = parseTagFilter(tagFilter);
+    Array.prototype.splice.apply(segments, [segments.length, 0, ...newSegments]);
+  }
+
+  /**
+   * This parses a graphite-style query into segments, with tag filter segments.
+   */
+  function parseGraphiteQuery() {
+    // reset
+    emptySegments();
+    error = '';
+
+    // parse the query into segments
+    let queryString = query.query || '';
+    const parser = new Parser(queryString);
+    const astNode = parser.getAst();
+    if (astNode === null) {
+      gSegments.push({ type: SegmentType.MetricName, value:'select metric' });
+      gSegments.push({ type: SegmentType.TagPlus });
+      return;
+    }
+    else if (astNode.type === 'error') {
+      error = `${astNode.message} at position: ${astNode.pos}`;
+      return;
+    }
+    // graphite functions are not supported, only metric expressions
+    else if (astNode.type === 'metric') {
+        Array.prototype.splice.apply(gSegments, [0, gSegments.length, ...astNode.segments]);
+    }
+    gSegments.forEach((segment) => {
+      if (!(segment.type in SegmentType)) {
+        segment.type = SegmentType.MetricName;
+      }
+    });
+    // add the tag filter if applicable
+    const tagFilter = query.tagFilter || '';
+    if (tagFilter) {
+      let newSegments = parseTagFilter(tagFilter);
+      Array.prototype.splice.apply(gSegments, [gSegments.length, 0, ...newSegments]);
+    }
+  }
+
+  /**
+   * This takes a tag/search filter like `and(foo:bar)` or just a list of tags 
+   * like `foo:bar,baz:quux` and converts it to a segments array.
+   */
+  function parseTagFilter(tagFilter = '') {
+    const tags = tagFilter.split(',');
+    let newSegments: CirconusSegment[] = [];
+    let first = true;
+
+    // it's ok if the `and(` & `)` wrappers are present, they're handled below
+    for (let tag of tags) {
+      if (!tag) {
+        continue;
+      }
+      if (first) {
+        first = false;
+      } 
+      else {
+        newSegments.push({ type: SegmentType.TagSep });
+      }
+      let tagPcs = tag.split(':');
+      let tagCat = tagPcs.shift() as string;
+      let tagVal = tagPcs.join(':');
+      // strip off any operator wrappers
+      if (tagCat.startsWith('and(') || tagCat.startsWith('not(')) {
+        newSegments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, 4) });
+        tagCat = tagCat.slice(4);
+      } 
+      else if (tagCat.startsWith('or(')) {
+        newSegments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, 3) });
+        tagCat = tagCat.slice(3);
+      }
+      newSegments.push({ type: SegmentType.TagCat, value: decodeTag(tagCat) });
+      newSegments.push({ type: SegmentType.TagPair });
+      let end = 0;
+      while (tagVal.endsWith(')')) {
+        tagVal = tagVal.slice(0, -1);
+        end++;
+      }
+      newSegments.push({ type: SegmentType.TagVal, value: decodeTag(tagVal) });
+      for (let i = 0; i < end; i++) {
+        newSegments.push({ type: SegmentType.TagPlus });
+        newSegments.push({ type: SegmentType.TagEnd });
+      }
+    }
+    // if there were no tags, go ahead and add a plus segment
+    if (tags.length === 0) {
+      newSegments.push({ type: SegmentType.TagPlus });
+    }
+
+    return newSegments;
+  }
+
+  /**
+   * This converts the standard segments array (or another arbitrary string) 
+   * to the graphite segments array.
+   */
+  function convertStandardToGraphite(metricName = '') {
+    let nameSegments: CirconusSegment[] = [];
+    let filterSegments: CirconusSegment[] = [];
+    const hasTwoSegments = 2 === segments.length;
+    const hasMetricSegment = segments.some((s) => s?.type === SegmentType.MetricName);
+    const hasPlusSegment = segments.some((s) => s?.type === SegmentType.TagPlus);
+
+    // process a passed metricName
+    if (metricName) {
+      nameSegments = metricName.split('|ST')[0].split('.')
+        .map((piece: string) => ({ type: SegmentType.MetricName, value: piece }));
+    }
+    // if the source segments are only [*][+] then convert to [select metric][+]
+    else if (hasTwoSegments && hasMetricSegment && hasPlusSegment) {
+      addSelectMetricSegment();
+      addPlusSegment();
+    }
+    // process segments into name & filter segments
+    else {
+      segments.forEach((segment) => {
+        if (segment.type === SegmentType.MetricName) {
+          nameSegments = (segment.value || '').split('|ST')[0].split('.')
+            .map((piece: string) => ({ type: SegmentType.MetricName, value: piece }));
+        }
+        else {
+          const clonedSegment = _.assign({}, segment);
+          filterSegments.push(clonedSegment);
+        }
+      });
+    }
+    Array.prototype.splice.apply(gSegments, [0, gSegments.length, ...nameSegments, ...filterSegments]);
+
+    // if the standard query was '*', we want a blank graphite query
+    if (1 === gSegments.length && '*' === gSegments[0].value) {
+      gSegments.splice(0, 1);
+    }
+  }
+
+  /**
+   * This converts the graphite segments array to the standard segments array.
+   */
+  function convertGraphiteToStandard() {
+    let namePieces: string[] = [];
+    let filterSegments: CirconusSegment[] = [];
+    let uuid = '';
+
+    // split segments into name & filter segments
+    gSegments.forEach((segment: CirconusSegment, idx: number) => {
+      if (segment.type === SegmentType.MetricName) {
+        // pull any check UUID off of the beginning of a metric name
+        if (/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$/.test(segment.value || '') && 0 === idx) {
+          uuid = segment.value as string;
+        }
+        // we don't want "select metric" at the end of a partial metric name
+        else {
+          namePieces.push('select metric' === segment.value ? '*' : segment.value as string);
+        }
+      }
+      // clone other non-metric segments
+      else {
+        let clonedSegment = _.assign({}, segment);
+        filterSegments.push(clonedSegment);
+      }
+    });
+
+    // combine everything into the segments array
+    const nameSegments: CirconusSegment[] = [
+      { type: SegmentType.MetricName, value: namePieces.join('.') }
+    ];
+    Array.prototype.splice.apply(segments, [0, segments.length, ...nameSegments, ...filterSegments]);
+
+    // if we have a check UUID then we need to add it as a tag filter
+    if (uuid) {
+      let firstOpIsAnd = false;
+      let hasTagFilter = segments.some((segment) => {
+        const isOp = segment.type === SegmentType.TagOp;
+        if (isOp) {
+          firstOpIsAnd = /^and/.test(segment.value as string);
+        }
+        return isOp;
+      });
+      // if there's a tag filter and the outer operator is `and()`, 
+      // then insert the UUID at the end of that operator
+      if (hasTagFilter && firstOpIsAnd) {
+        const lastSegment = segments[segments.length - 1];
+        const nextLastSegment = segments[segments.length - 2];
+        let spliceIndex = -1;
+        if (lastSegment.type === SegmentType.TagEnd) {
+          if (nextLastSegment.type === SegmentType.TagPlus) {
+            spliceIndex = segments.length - 2;
+          }
+          else {
+            spliceIndex = segments.length - 1;
+          }
+        }
+        if (~spliceIndex) {
+          segments.splice(
+            spliceIndex,
+            0,
+            { type: SegmentType.TagSep },
+            { type: SegmentType.TagCat, value: '__check_uuid' },
+            { type: SegmentType.TagPair },
+            { type: SegmentType.TagVal, value: uuid }
+          );
+        }
+      }
+      // if there's a tag filter but the outer operator is not `and()`, 
+      // then wrap the filter in an `and()` operator.
+      else if (hasTagFilter && !firstOpIsAnd) {
+        const firstOpIndex = segments.findIndex((segment) => segment.type === SegmentType.TagOp);
+        if (~firstOpIndex) {
+          segments.splice(firstOpIndex, 0, { type: SegmentType.TagOp, value: 'and(' });
+        }
+        segments.push(
+          { type: SegmentType.TagSep },
+          { type: SegmentType.TagCat, value: '__check_uuid' },
+          { type: SegmentType.TagPair },
+          { type: SegmentType.TagVal, value: uuid },
+          { type: SegmentType.TagPlus },
+          { type: SegmentType.TagEnd }
+        );
+      }
+      // if there's no tag filter so far, then add an `and()` operator
+      else if (!hasTagFilter) {
+        segments.push(
+          { type: SegmentType.TagOp, value: 'and(' },
+          { type: SegmentType.TagCat, value: '__check_uuid' },
+          { type: SegmentType.TagPair },
+          { type: SegmentType.TagVal, value: uuid },
+          { type: SegmentType.TagPlus },
+          { type: SegmentType.TagEnd }
+        );
+      }
+    }
+  }
+
+  /**
+   * This returns either the entire graphite metric segment path (not including 
+   * any tag filter), or the path up to the specified index if one is passed.
+   */
+  function getGraphiteSegmentPath(index?: number) {
+    // if an index isn't passed, get the segment path up to the first 
+    // non-metric name segment
+    if (!_.isNumber(index)) {
+      index = gSegments.findIndex((el) => (el.type != null && el.type !== SegmentType.MetricName));
+      if (!~index) {
+        index = gSegments.length;
+      }
+    }
+    const tagFilterIdx = gSegments.findIndex((el) => (el.type != null && el.type !== SegmentType.MetricName));
+    let arr = gSegments.slice(0, Math.min(index, tagFilterIdx));
+    if (!arr.length) {
+      arr.push({ type: SegmentType.MetricName, value: '' });
+    }
+
+    return arr.reduce((str, segment) => `${str}${(segment.value || '')}.`, '');
+  }
+
+  /**
+   * This updates a segment's value.
+   */
+  function updateSegmentValue(segment: CirconusSegment, index: number) {
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    (segs[index] || {}).value = segment.value;
+  }
+
+  /**
+   * This adds a "select metric" segment before any tag filter segments.
+   */
+  function addSelectMetricSegment() {
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    const hasSelectAlready = segs.some((el) => {
+      return el.value === 'select metric';
+    });
+    let idx = segs.findIndex((el) => {
+      return el.type != null && el.type !== SegmentType.MetricName;
+    });
+    // if there isn't a non-metric segment, add it at the end
+    if (!~idx) {
+      idx = segs.length;
+    }
+    // if we don't already have a select segment, add one
+    if (!hasSelectAlready) {
+      segs.splice(idx, 0, {
+        type: SegmentType.MetricName,
+        value: 'select metric',
+      });
+    }
+  }
+
+  /**
+   * This adds a "plus" segment at the end.
+   */
+  function addPlusSegment() {
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    const hasPlusAlready = segs.some((el) => {
+      return el.type === SegmentType.TagPlus;
+    });
+    // if we don't already have a plus segment, add one
+    if (!hasPlusAlready) {
+      segs.push({
+        type: SegmentType.TagPlus,
+      });
+    }
+  }
+
+  /**
+   * This takes an index and removes that segment and all following segments.
+   */
+  function removeSegments(index?: number) {
+    if (_.isNumber(index)) {
+      let isGraphite = 'graphite' === query.queryType;
+      const segs = isGraphite ? gSegments : segments;
+      segs.splice(index, segs.length - index);
+    }
+  }
+
+  /**
+   * This empties out the segments array.
+   */
+  function emptySegments() {
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    segs.splice(0, segments.length);
+  }
+
+  /**
+   * This removes an entire operator (e.g. "and(...)" including sub-operators) 
+   * from a query.
+   */
+  function QMremoveOperator(startIndex: number) {
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    let readIndex = startIndex + 1;
+    let endsNeeded = 1;
+    const lastIndex = segs.length;
+    // We need to remove ourself (as well as every other segment) until our 
+    // TagEnd. For every TagOp we hit, we need to wait until we hit one more 
+    // TagEnd, to remove any sub-ops.
+    while (endsNeeded > 0 && readIndex < lastIndex) {
+      const type = segs[readIndex].type;
+      if (type === SegmentType.TagOp) {
+        endsNeeded++;
+      }
+      else if (type === SegmentType.TagEnd) {
+        endsNeeded--;
+        if (endsNeeded === 0) {
+          break; // don't increment readIndex
+        }
+      }
+      readIndex++;
+    }
+    let deleteStart = startIndex;
+    let countDelete = readIndex - startIndex + 1;
+    // If I have a comma in front of me that needs killing, remove it
+    const precedingSegment = segs[startIndex - 1] || {};
+    if (precedingSegment.type === SegmentType.TagSep) {
+      deleteStart--;
+      countDelete++;
+    }
+    segs.splice(deleteStart, countDelete);
+    // If these match, we removed the outermost operator, so we need a new plus segment
+    if (lastIndex === readIndex + 1) {
+      segs.push({ type: SegmentType.TagPlus });
+    }
+  }
+
+  /**
+   * This adds an operator (and() | not() | or()) and a first filter tag 
+   * to a query.
+   */
+  function QMaddOperator(startIndex: number, value: string) {
+    if (value !== 'and(' && value !== 'not(' && value !== 'or(') {
+      return;
+    }
+    const isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    const firstNonMetricIndex = segs.findIndex((segment) => {
+      return segment.type != null && segment.type !== SegmentType.MetricName;
+    });
+    const isNotTheFirstOperator = firstNonMetricIndex < startIndex;
+    // remove any plus segment
+    if (segs[startIndex]?.type === SegmentType.TagPlus) {
+      segs.splice(startIndex, 1);
+    }
+    // if this isn't the first operator, add a separator (comma)
+    if (isNotTheFirstOperator) {
+      segs.splice(startIndex, 0, { type: SegmentType.TagSep });
+      startIndex++;
+    }
+    // add the segments
+    segs.splice(
+      startIndex,
+      0,
+      { type: SegmentType.TagOp, value: value },
+      { type: SegmentType.TagCat, value: 'select tag' }, // fake: true
+      { type: SegmentType.TagPair },
+      { type: SegmentType.TagVal, value: '*' },
+      { type: SegmentType.TagPlus },
+      { type: SegmentType.TagEnd }
+    );
+    // if this isn't the first operator, add another plus segment
+    if (isNotTheFirstOperator) {
+      segs.splice(
+        startIndex + 6,
+        0,
+        { type: SegmentType.TagPlus });
+    }
+  }
+
+  /**
+   * This adds a tag (and category) to a query.
+   */
+  function QMaddTag(startIndex: number, value: string) {
+    let isGraphite = 'graphite' === query.queryType;
+    const segs = isGraphite ? gSegments : segments;
+    // if this is at least the fourth segment, then we have at least one tag 
+    // before us, and we need a separator (comma)
+    if (startIndex >= 3) {
+      segs.splice(startIndex, 0, { type: SegmentType.TagSep });
+      startIndex++;
+    }
+    // add the tag itself
+    segs.splice(
+      startIndex,
+      0,
+      { type: SegmentType.TagCat, value: value },
+      { type: SegmentType.TagPair },
+      { type: SegmentType.TagVal, value: '*' }
+    );
+    // if index is 1 (the first segment after the metric name), it's the 
+    // first addition and we're a tagCat so that means we need to add in 
+    // the implicit "and(" at the beginning and ")" at the end
+    if (startIndex === 1) {
+      segs.splice(startIndex, 0, {
+        type: SegmentType.TagOp,
+        value: 'and(',
+      });
+      segs.push({ type: SegmentType.TagEnd });
+    }
+  }
+
+  /**
+   * This gets the standard query including metric name and tag filter
+   */
+  function QMgetStandardQuery(): string {
+    let query = '';
+    let addComma = false;
+
+    for (const segment of segments) {
+      const type = segment.type;
+      const isPlus = type === SegmentType.TagPlus;
+      const isEnd = type === SegmentType.TagEnd;
+      const isSep = type === SegmentType.TagSep;
+      const isOp = type === SegmentType.TagOp;
+      const isPair = type === SegmentType.TagPair;
+      const isCat = type === SegmentType.TagCat;
+      const isMetric = type === SegmentType.MetricName;
+
+      if (isPlus) {
+        continue;
+      }
+      if (addComma && !isEnd && !isSep) {
+        query += ',';
+      }
+      if (isMetric) {
+        query += '__name:';
+      }
+      query += encodeTag(type, segment.value as string);
+      if (isOp || isPair || isCat || isSep) {
+        addComma = false;
+      }
+      else {
+        addComma = true;
+      }
+    }
+
+    return `and(${query})`;
+  }
+
+  /**
+   * This gets the graphite query metric, not including any tag filter.
+   */
+  function QMgetGraphiteMetricQuery(): string {
+    return getGraphiteSegmentPath()
+      // this order matters, to strip off a trailing period and do it before this last one
+      .replace(/\.select\smetric.$/, '')
+      .replace(/\.$/, '')
+      .replace(/^select\smetric$/, '');
+  }
+
+  /**
+   * This gets the graphite query tag filter, not including any metric name
+   */
+  function QMgetGraphiteTagFilter(): string {
+    let filterValues: string[] = [];
+
+    gSegments.forEach((segment) => {
+      switch (segment.type) {
+        case SegmentType.TagPair:
+          filterValues.push(':');
+          break;
+
+        case SegmentType.TagSep:
+          filterValues.push(',');
+          break;
+
+        case SegmentType.TagEnd:
+          filterValues.push(')');
+          break;
+
+        case SegmentType.TagCat:
+        case SegmentType.TagVal:
+        case SegmentType.TagOp:
+          filterValues.push(segment.value as string);
+          break;
+      }
+    });
+
+    return filterValues.join('');
+  }
+
+  /**
+   * This takes the queries and replaces all query reference placeholders.
+   * queryDisplay -> {render} -> targetFull & query
+   */
+  function QMrenderQueryReferences(query: CirconusQuery, queries: CirconusQuery[]) {
+    _renderRefs(query, queries);
+    // loop through other queries and update targetFull as needed
+    for (let q of queries || []) {
+      if (q.refId !== query.refId) {
+        _renderRefs(q, queries);
+      }
+    }
+
+    function _renderRefs(thisQuery: CirconusQuery, allQueries: CirconusQuery[]) {
+      const placeholderRegex = /\#([A-Z])/g;
+      let renderedQuery = `${thisQuery.queryDisplay}`;
+
+      // organize queries by refId (removing reference to self)
+      const queriesByRefId = _.keyBy(allQueries, 'refId');
+      delete queriesByRefId[thisQuery.refId];
+
+      // use refCount to track circular references
+      _.each(queriesByRefId, (q1, q1RefId) => {
+        let refCount = 0;
+        // loop through all the other queries (the ones not matching `q1RefId`)
+        _.each(queriesByRefId, (q2, q2RefId) => {
+          if (q2RefId !== q1RefId) {
+            // find all references to q1RefId
+            const matches = (q2.query || q2.queryDisplay || '').match(placeholderRegex);
+            const matchCount = matches?.filter((match: string) => match === `#${q1RefId}`).length || 0;
+            refCount += matchCount;
+          }
+        });
+        // this is how many references to this query exist in other queries
+        q1.refCount = refCount;
+      });
+
+      // Keep interpolating until there are no query placeholder references 
+      // (the loop is because the referenced query might contain a reference 
+      // to another query).
+      while (renderedQuery!.match(placeholderRegex) !== null) {
+        const updatedQuery: string = renderedQuery!.replace(placeholderRegex, _refProcessor);
+        // end this cycle if nothing was replaced
+        if (updatedQuery === renderedQuery) {
+          break;
+        } 
+        else {
+          renderedQuery = updatedQuery;
+        }
+      }
+      // check the final rendered query
+      delete thisQuery.targetFull;
+      if (thisQuery.query !== renderedQuery) {
+        thisQuery.query = thisQuery.targetFull = renderedQuery;
+      }
+
+      function _refProcessor (entireMatch: string, refIdOnly: string): string {
+        const q = queriesByRefId[refIdOnly];
+        // if there's no corresponding query, just return the entire match
+        // and no replacement will be performed.
+        if (!q) {
+          return entireMatch;
+        }
+        // if there are no more references to this query, 
+        // remove it from the ref object.
+        if (q.refCount && q.refCount <= 0) {
+          delete queriesByRefId[refIdOnly];
+        }
+        // decrement the reference count and proceed with the replacement
+        else {
+          q.refCount && q.refCount--;
+        }
+        // replace any CAQL directive
+        const queryString = q.query || '';
+
+        return 'caql' === q.queryType ? queryString.replace(/^#\w+=?\w*\s/, '') : queryString;
+      }
+    };
+  }
+
+  /**
    * This queries the tag cats endpoint with the current metric name to get 
    * an array of options for the next segment.
    * TODO: debounce this
    */
   async function getStandardCategoryOptions(index: number, search: string): Promise<SelectableValue[]> {
-      const isPlusSegment = manager.segments[index]?.type === SegmentType.TagPlus;
-      const metricSegment = manager.segments.find((s) => s.type === SegmentType.MetricName);
-      const metricName = encodeTag(SegmentType.MetricName, metricSegment?.value as string);
-      const options: SelectableValue[] = [];
+    const isPlusSegment = segments[index]?.type === SegmentType.TagPlus;
+    const metricSegment = segments.find((s) => s.type === SegmentType.MetricName);
+    const metricName = encodeTag(SegmentType.MetricName, metricSegment?.value as string);
+    const options: SelectableValue[] = [];
 
-      // perform query
-      const values = await datasource.metricTagCatsQuery(`and(__name:${metricName})`);
+    // perform query
+    const values = await datasource.metricTagCatsQuery(`and(__name:${metricName})`);
 
-      if (values?.data?.length) {
-        if (isPlusSegment) {
-          options.push({ label: 'and(', value: 'and(' });
-          options.push({ label: 'not(', value: 'not(' });
-          options.push({ label: 'or(',  value: 'or(' });
-        }
-        // TODO: figure out where the variables come from ---v
-        // _.eachRight(this.templateSrv.variables, (variable) => {
-        //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
-        // });
-        for (const tagCat of values.data) {
-          let decodedCat = decodeTag(tagCat);
-          options.push({ label: decodedCat, value: decodedCat });
-        }
+    if (values?.data?.length) {
+      if (isPlusSegment) {
+        options.push({ label: 'and(', value: 'and(' });
+        options.push({ label: 'not(', value: 'not(' });
+        options.push({ label: 'or(',  value: 'or(' });
       }
+      // TODO: figure out where the variables come from ---v
+      // _.eachRight(this.templateSrv.variables, (variable) => {
+      //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
+      // });
+      for (const tagCat of values.data) {
+        let decodedCat = decodeTag(tagCat);
+        options.push({ label: decodedCat, value: decodedCat });
+      }
+    }
 
-      return options;
+    return options;
   }
 
   /**
@@ -204,9 +917,9 @@ export function QueryEditor(props: Props) {
    * TODO: debounce this
    */
   async function getStandardValueOptions(index: number, search: string): Promise<SelectableValue[]> {
-    const metricSegment = manager.segments.find((s) => s.type === SegmentType.MetricName);
+    const metricSegment = segments.find((s) => s.type === SegmentType.MetricName);
     const metricName = encodeTag(SegmentType.MetricName, metricSegment?.value as string);
-    const tagCat = manager.segments[index - 2]?.value as string;
+    const tagCat = segments[index - 2]?.value as string;
     const options: SelectableValue[] = [];
 
     if (tagCat && tagCat !== 'select tag') {
@@ -249,7 +962,7 @@ export function QueryEditor(props: Props) {
    * TODO: debounce this
    */
   async function getStandardDefaultOptions(index: number, search = ''): Promise<SelectableValue[]> {
-      const isMetricSegment = manager.segments[index]?.type === SegmentType.MetricName;
+      const isMetricSegment = segments[index]?.type === SegmentType.MetricName;
       const options: SelectableValue[] = [];
 
       if (isMetricSegment) {
@@ -283,8 +996,8 @@ export function QueryEditor(props: Props) {
    * TODO: debounce this
    */
   async function getGraphiteCategoryOptions(index: number, search = ''): Promise<SelectableValue[]> {
-    const isPlusSegment = manager.gSegments[index]?.type === SegmentType.TagPlus;
-    const metricName = manager.getGraphiteSegmentPath()
+    const isPlusSegment = gSegments[index]?.type === SegmentType.TagPlus;
+    const metricName = getGraphiteSegmentPath()
       .replace(/\.select\smetric\.$/, '.*')
       .replace(/\.$/, '');
     const options: SelectableValue[] = [];
@@ -317,10 +1030,10 @@ export function QueryEditor(props: Props) {
    * TODO: debounce this
    */
   async function getGraphiteValueOptions(index: number, search = ''): Promise<SelectableValue[]> {
-    const metricName = manager.getGraphiteSegmentPath()
+    const metricName = getGraphiteSegmentPath()
       .replace(/\.select\smetric\.$/, '.*')
       .replace(/\.$/, '');
-    const tagCat = manager.gSegments[index - 2]?.value as string;
+    const tagCat = gSegments[index - 2]?.value as string;
     const options: SelectableValue[] = [];
 
     if (tagCat && tagCat !== 'select tag') {
@@ -353,7 +1066,7 @@ export function QueryEditor(props: Props) {
     const isFirst = 0 === index;
     const ignoreUUIDs = datasource.ignoreGraphiteUUIDs();
     // if this is not the first segment, then get the entire preceding path
-    const query = isFirst ? '' : manager.getGraphiteSegmentPathUpTo(index);
+    const query = isFirst ? '' : getGraphiteSegmentPath(index);
     let options: SelectableValue[] = [];
 
     // perform query
@@ -406,12 +1119,12 @@ export function QueryEditor(props: Props) {
   function updatePlusSegmentValue(index: number, segment: CirconusSegment) {
     // we're adding something, either an operator or a tag
     if (segment.value === 'and(' || segment.value === 'not(' || segment.value === 'or(') {
-      manager.addOperator(index, segment.value);
+      QMaddOperator(index, segment.value);
       // we do not have a category yet, so focus on the new category segment
       setSegmentFocus(index + 3);
     }
     else {
-      manager.addTag(index, segment.value as string);
+      QMaddTag(index, segment.value as string);
       setSegmentFocus(index + 1);
       buildQueries();
     }
@@ -421,10 +1134,10 @@ export function QueryEditor(props: Props) {
    * This updates a standard operator segment value.
    */
   function updateOperatorSegmentValue(index: number, segment: CirconusSegment) {
-    manager.updateSegmentValue(segment, index);
+    updateSegmentValue(segment, index);
     // we need to remove the entire operator, including sub-segments
     if (segment.value === 'REMOVE') {
-      manager.removeOperator(index);
+      QMremoveOperator(index);
     }
     // otherwise, changing an operator doesn't affect any other segments
     checkForPlusAndSelect();
@@ -435,11 +1148,11 @@ export function QueryEditor(props: Props) {
    * This updates a standard segment value (metric name, tag cat or tag val).
    */
   function updateStandardSegmentValue(index: number, segment: CirconusSegment) {
-    manager.updateSegmentValue(segment, index);
+    updateSegmentValue(segment, index);
     // if we changed the start metric, then we remove all the filters 
     // because they're invalid now
     if (0 === index) {
-      manager.removeSegments(index + 1);
+      removeSegments(index + 1);
       checkForPlusAndSelect();
       setSegmentFocus(index + 1);
     }
@@ -452,24 +1165,24 @@ export function QueryEditor(props: Props) {
   function updateGraphiteSegmentValue(index: number, segment: CirconusSegment) {
     const isMultiSegment = /\./.test(String(segment.value));
 
-    manager.updateSegmentValue(segment, index);
+    updateSegmentValue(segment, index);
 
     // if we changed the first metric segment, we remove all the filters 
     // because they're in a different namespace now
     if (0 === index) {
-      manager.removeSegments(index + 1);
+      removeSegments(index + 1);
     }
     // if they've entered multiple segments, we need to reconstruct the 
     // name segments by using the entire name entered so far
     if (isMultiSegment) {
-      const graphiteName = manager.getGraphiteSegmentPath().replace(/\.$/, '');
-      manager.convertStandardToGraphite(graphiteName);
+      const graphiteName = getGraphiteSegmentPath().replace(/\.$/, '');
+      convertStandardToGraphite(graphiteName);
     }
     // if it's not the last segment, there are other segments following.
     // TODO -> figure out how to determine isNotLastSegment
     const isNotLastSegment = true;
     if (isNotLastSegment && segment.type === SegmentType.MetricName) {
-      manager.addSelectMetricSegment();
+      addSelectMetricSegment();
     }
     checkForPlusAndSelect();
     if (isNotLastSegment) {
@@ -484,14 +1197,14 @@ export function QueryEditor(props: Props) {
   function checkForPlusAndSelect() {
     if ('graphite' === query.queryType) {
       // check the metric name so far;
-      const path = manager.getGraphiteSegmentPath();
+      const path = getGraphiteSegmentPath();
       // if there isn't a metric name, add a "select metric" segment
       if (!path || '.' === path) {
-        manager.addSelectMetricSegment();
+        addSelectMetricSegment();
       }
     }
     // always try to add a plus segment (only if there's not one already)
-    manager.addPlusSegment();
+    addPlusSegment();
   }
 
   /**
@@ -572,7 +1285,7 @@ export function QueryEditor(props: Props) {
     let metric = '*';
     let filter = '';
 
-    manager.segments.forEach((segment: CirconusSegment) => {
+    segments.forEach((segment: CirconusSegment) => {
       switch (segment.type) {
         case SegmentType.MetricName:
           metric = segment.value as string;
@@ -616,33 +1329,17 @@ export function QueryEditor(props: Props) {
    */
   function buildCAQLFromGraphite(): string {
     convertGraphiteToStandard();
-
-    return buildCAQLFromStandard('[graphite]');
-  }
-
-  /**
-   * This converts standard segments to graphite segments.
-   */
-  function convertStandardToGraphite() {
-    manager.convertStandardToGraphite();
-    checkForPlusAndSelect();
-    buildGraphiteQuery();
-  }
-
-  /**
-   * This converts graphite segments to standard segments.
-   */
-  function convertGraphiteToStandard() {
-    manager.convertGraphiteToStandard();
     checkForPlusAndSelect();
     buildStandardQuery();
+
+    return buildCAQLFromStandard('[graphite]');
   }
 
   /**
    * This rebuilds queries after segments have changed.
    */
   function buildQueries() {
-    if (manager.error) {
+    if (error) {
       return;
     }
     if (isGraphiteQuery) {
@@ -651,15 +1348,15 @@ export function QueryEditor(props: Props) {
     else if (isStandardQuery) {
         buildStandardQuery();
     }
-    manager.renderQueryReferences(query, props.queries as CirconusQuery[]);
+    QMrenderQueryReferences(query, props.queries as CirconusQuery[]);
   }
 
   /**
    * This builds a graphite-style query out of the segments.
    */
   function buildGraphiteQuery() {
-    query.query = query.queryDisplay = manager.getGraphiteMetricQuery();
-    query.tagFilter = manager.getGraphiteTagFilter();
+    query.query = query.queryDisplay = QMgetGraphiteMetricQuery();
+    query.tagFilter = QMgetGraphiteTagFilter();
     updateField('queryDisplay', query.queryDisplay);
     updateField('query', query.query);
     updateField('tagFilter', query.tagFilter);
@@ -669,7 +1366,7 @@ export function QueryEditor(props: Props) {
    * This builds a standard query out of the segments.
    */
   function buildStandardQuery() {
-    query.query = query.queryDisplay = manager.getStandardQuery();
+    query.query = query.queryDisplay = QMgetStandardQuery();
     updateField('queryDisplay', query.queryDisplay);
     updateField('query', query.query);
   }
@@ -708,7 +1405,7 @@ export function QueryEditor(props: Props) {
               >
               <div className={cx(styles.flexWrap)}>
                 {
-                  manager.segments.map((segment, index) => {
+                  segments.map((segment, index) => {
                     switch (segment.type) {
                       case SegmentType.TagOp:
                         return <SegmentAsync
@@ -774,7 +1471,7 @@ export function QueryEditor(props: Props) {
               >
               <>
                 {
-                  manager.gSegments.map((segment, index) => {
+                  gSegments.map((segment, index) => {
                     switch (segment.type) {
                       case SegmentType.TagOp:
                         return <SegmentAsync
