@@ -67,6 +67,8 @@ export function QueryEditor(props: Props) {
     minPeriod
   } = query;
 
+  // TODO: support old queries using old snake-case properties
+
   // initialize the query manager
   const manager = new QueryManager(datasource, query);
 
@@ -704,7 +706,7 @@ export function QueryEditor(props: Props) {
             <InlineField 
               label={<Label className={cx(styles.labels)}>Series</Label>}
               >
-              <>
+              <div className={cx(styles.flexWrap)}>
                 {
                   manager.segments.map((segment, index) => {
                     switch (segment.type) {
@@ -758,7 +760,7 @@ export function QueryEditor(props: Props) {
                     }
                   })
                 }
-              </>
+              </div>
             </InlineField>
             <div className={cx(styles.fillFlex)}></div>
           </InlineFieldRow>
@@ -1103,9 +1105,13 @@ function getStyles(theme: GrafanaTheme2) {
     `,
     fillFlex: css`
       display: flex;
-      flex-grow: 1;
+      flex: 1 1 auto;
       background-color: ${theme.colors.background.secondary};
       margin-bottom: ${theme.spacing(0.5)};
+    `,
+    flexWrap: css`
+      display: flex;
+      flex: 1 1 auto;
     `,
   };
 }

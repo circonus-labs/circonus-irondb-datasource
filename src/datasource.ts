@@ -95,6 +95,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
     this.query = _.debounce(this.query, 300, { leading:true, trailing:true }) as (options: DataQueryRequest<CirconusQuery>) => Promise<DataQueryResponse>;
 
+    // TODO: support old queries using old snake-case properties
+
     if (!this.dataSourceOptions.disableUsageStatistics) {
       this.backendSrv
           .get('/api/user')
@@ -136,7 +138,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     // END OF TEST CODE
 
     if (!_.isUndefined(this.queryRange) && !_.isEqual(options.range, this.queryRange)) {
-      log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(options.range)}`);
       if (this.dataSourceOptions.useCaching) {
         const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
@@ -300,8 +301,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     const stdNames: any[] = [];
     const caqlNames: any[] = [];
     const alertNames: any[] = [];
-    const local_filters: any[] = [];
-    const local_filter_matches: any[] = [];
+    const localFilters: any[] = [];
+    const localFilterMatches: any[] = [];
     const labels: any[] = [];
     const preppedItems: DataRequestItems = {
       scopedVars,
@@ -311,7 +312,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       intervalMs,
       std:   { start, end, names:stdNames },
       caql:  { start, end, names:caqlNames },
-      alert: { start, end, names:alertNames, local_filters, local_filter_matches, labels, counts_only: false, query_type: '', target: null },
+      alert: { start, end, names:alertNames, localFilters, localFilterMatches, labels, countsOnly: false, queryType: '', target: null },
     };
     // filter out hidden or empty queries
     const targets = _.reject(options.targets, (target) => {
@@ -326,24 +327,25 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
 
     return Promise
-      .all(targets.map((target) => {
+      .allSettled(targets.map((target) => {
+        let promise: Promise<any>;
         preppedItems.refId = target.refId;
         if (target.isCaql || target.queryType === 'caql') {
-          _buildCaqlItem(target);
+          promise = _buildCaqlItem(target);
         }
         else if (target.queryType === 'alerts' || target.queryType === 'alert_counts') {
-          _buildAlertItem(target);
+          promise = _buildAlertItem(target);
         }
         else {
-          _buildMetricItems(target);
+          promise = _buildMetricItems(target);
         }
-        return Promise.resolve(preppedItems);
+        return promise;
       }))
       .then((result) => {
         return preppedItems;
       })
       .catch((err) => {
-        log(() => `buildIrondbParamsAsync() err = ${JSON.stringify(err)}`);
+        log(() => `buildIrondbParamsAsync() error = ${JSON.stringify(err)}`);
       });
     
     /**
@@ -351,10 +353,13 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      */
     function _buildCaqlItem(target: any) {
       const { query, rolluptype, metricrollup, format, refId, min_period = '' } = target;
+
       preppedItems.caql.names.push({
         leaf_name: query,
         leaf_data: { rolluptype, metricrollup, format, refId, min_period },
       });
+
+      return Promise.resolve();
     }
     
     /**
@@ -362,20 +367,23 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      */
     function _buildAlertItem(target: any) {
       let rawQuery = templateSrv.replace(target.query, preppedItems.scopedVars);
-      if (target.alert_id !== '') {
-        rawQuery = `alert_id:${templateSrv.replace(target.alert_id, preppedItems.scopedVars)}`;
+
+      if (target.alertId !== '') {
+        rawQuery = `alert_id:${templateSrv.replace(target.alertId, preppedItems.scopedVars)}`;
       }
       preppedItems.alert.names.push(rawQuery);
-      preppedItems.alert.local_filters.push(
-        templateSrv.replace(target.local_filter, preppedItems.scopedVars)
+      preppedItems.alert.localFilters.push(
+        templateSrv.replace(target.localFilter, preppedItems.scopedVars)
       );
-      preppedItems.alert.local_filter_matches.push(target.local_filter_match);
-      preppedItems.alert.counts_only = target.querytype === 'alert_counts';
-      preppedItems.alert.query_type = target.alert_count_query_type;
+      preppedItems.alert.localFilterMatches.push(target.localFilterMatch);
+      preppedItems.alert.countsOnly = target.queryType === 'alert_counts';
+      preppedItems.alert.queryType = target.alertCountQueryType;
       preppedItems.alert.labels.push(
         templateSrv.replace(target.metriclabel, preppedItems.scopedVars)
       );
       preppedItems.alert.target = target;
+
+      return Promise.resolve();
     }
 
     /**
@@ -386,7 +394,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         ds,
         templateSrv.replace(target.query, preppedItems.scopedVars)
       );
-      const isGraphite = 'graphite' === target.querytype;
+      const isGraphite = 'graphite' === target.queryType;
       const tagFilter = target.tagFilter || '';
       const promise = isGraphite ?
         metricGraphiteQuery.call(ds, rawQuery, false, start, end, tagFilter) :
@@ -399,17 +407,13 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             const metricTypes = (metric?.type || '').split(',');
             return !metricTypes.includes('text');
           });
-          // keep target references
-          result.data.forEach((d: any) => d.target = target);
-          return result.data;
-        })
-        .then((data: any[]) => {
-          data.forEach((d, i) => {
+          // build the streams
+          result.data.forEach((d: any, i: number) => {
+            d.target = target; // keep target references
             preppedItems.std.names.push(
-              _buildFetchStream(target, data, i)
+              _buildFetchStream(target, result.data, i)
             );
           });
-          return preppedItems;
         });
       
       /**
@@ -441,17 +445,13 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           target,
         };
         // set the transform (egressoverride)
-        if ('histogram' === thisType) {
-          target.egressoverride = 'histogram';
-        }
-        if (target.egressoverride !== 'average') {
-          if (target.egressoverride === 'automatic') {
-            if (isStatsdCounter(leafName)) {
-              data[i].leaf_data.egress_function = 'counter';
-            }
+        const egressoverride = thisType === 'histogram' ? 'histogram' : target.egressoverride;
+        if (egressoverride && egressoverride !== 'average') {
+          if (egressoverride === 'automatic' && isStatsdCounter(leafName)) {
+            data[i].leaf_data.egress_function = 'counter';
           }
           else {
-            data[i].leaf_data.egress_function = target.egressoverride;
+            data[i].leaf_data.egress_function = egressoverride;
           }
         }
         // set the label
@@ -674,11 +674,11 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           start: preppedItems.alert.start,
           end: preppedItems.alert.end,
           isAlert: true,
-          counts_only: preppedItems.alert.counts_only,
+          countsOnly: preppedItems.alert.countsOnly,
           label: preppedItems.alert.labels[i],
-          local_filter: preppedItems.alert.local_filters[i],
-          local_filter_match: preppedItems.alert.local_filter_matches[i],
-          query_type: preppedItems.alert.query_type,
+          localFilter: preppedItems.alert.localFilters[i],
+          localFilterMatch: preppedItems.alert.localFilterMatches[i],
+          queryType: preppedItems.alert.queryType,
           target: preppedItems.alert.target,
           withCredentials: this.basicAuth || this.withCredentials,
           isCaql: false,
@@ -713,7 +713,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
                 this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
               }
               if (!_.isUndefined(query.isAlert)) {
-                if (query.counts_only) {
+                if (query.countsOnly) {
                   return this.countAlerts(result, query);
                 }
                 else {
@@ -777,12 +777,10 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     const metricrollup = leafData.metricrollup;
     if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
       rolluptype = 'automatic';
-      log(() => `getRollupSpan() defaulting to automatic`);
     }
     if (rolluptype === 'exact') {
       const exactMs = parseDurationMS(metricrollup);
       const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
-      log(() => `getRollupSpan() exactMs = ${exactMs}, exactDatapoints = ${exactDatapoints}`);
       if (exactDatapoints > (preppedItems.maxDataPoints || 1000000) * MAX_EXACT_DATAPOINTS_THRESHOLD) {
         this.throwerr('Too many datapoints requested.');
       }
@@ -898,9 +896,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       from = range.from.valueOf() / 1000;
       to = range.to.valueOf() / 1000;
       if (!_.isUndefined(this.queryRange) && !_.isEqual(range, this.queryRange)) {
-        log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(range)}`);
         if (this.dataSourceOptions.useCaching) {
-          log(() => 'query() clearing cache');
           const requestCache = this.datasourceRequest as unknown as Memoized < (options: any) => any > ;
           requestCache.clear();
         }
@@ -1155,14 +1151,12 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
     let queryUrl = `/find${this.getAccountIdForApiPath()}/tags?query=${query}`;
     if (this.dataSourceOptions.activityTracking && from && to) {
-      log(() => `metricTagsQuery() activityWindow = [${from},${to}]`);
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
       queryUrl += `&activity_end_secs=${_.toInteger(to)}`;
     }
     if (requestLatest) {
       queryUrl += '&latest=2';
     }
-    log(() => `metricTagsQuery() queryUrl = ${queryUrl}`);
 
     return this.searchRequest('GET', queryUrl, false, true, true, false, customLimit);
   }
@@ -1182,7 +1176,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
       queryUrl += `&activity_end_secs=${_.toInteger(to)}`;
     }
-    log(() => `metricTagValsQuery() queryUrl = ${queryUrl}`);
 
     return this.searchRequest('GET', queryUrl, false, true, true, false, customLimit);
   }
@@ -1201,7 +1194,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
       queryUrl += `&activity_end_secs=${_.toInteger(to)}`;
     }
-    log(() => `metricTagCatsQuery() queryUrl = ${queryUrl}`);
 
     return this.searchRequest('GET', queryUrl, false, true, true, false, customLimit);
   }
@@ -1256,7 +1248,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       headers: headers,
       retry: 1,
     };
-    log(() => `searchRequest() options = ${JSON.stringify(options)}`);
 
     return this.datasourceRequest(options);
   }
@@ -1403,9 +1394,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     // if there's a local filter, parse it into match pairs 
     // (a filter is a series of field:value tokens separated by commas)
     let filter_pairs = [];
-    const filter_match = query.local_filter_match;
-    if (query.local_filter) {
-      const tokens = query.local_filter.split(',');
+    const filter_match = query.localFilterMatch;
+    if (query.localFilter) {
+      const tokens = query.localFilter.split(',');
       for (const t of tokens) {
         const x = t.trim();
         const i = x.indexOf(':');
@@ -1420,7 +1411,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
     // for range queries, fill minute buckets with zeroes
     const countBuckets: any = {};
-    if (query.query_type === 'range') {
+    if (query.queryType === 'range') {
       let qs = query.start;
       qs = qs - (qs % 60); // floor to the previous minute
       let qe = query.end;
@@ -1438,7 +1429,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       }
       const alert = data[i];
       let epoch = alert._occurred_on;
-      if (query.query_type === 'range') {
+      if (query.queryType === 'range') {
         epoch = epoch - (epoch % 60); // floor to the previous minute
         if (String(epoch) in countBuckets) {
           countBuckets[String(epoch)]++;
@@ -1455,7 +1446,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     timeField.refId = query.refId;
     const valueField = getNumberField(label);
     const dataFrames: DataFrame[] = [];
-    if (query['query_type'] === 'range') {
+    if (query.queryType === 'range') {
       for (let [epoch, count] of Object.entries(countBuckets)) {
         timeField.values.add(Number(epoch) * 1000);
         valueField.values.add(count);
@@ -1502,9 +1493,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     // if there's a local filter, parse it into match pairs 
     // (a filter is a series of field:value tokens separated by commas)
     let filter_pairs = [];
-    const filter_match = query.local_filter_match;
-    if (query.local_filter) {
-      const tokens = query.local_filter.split(',');
+    const filter_match = query.localFilterMatch;
+    if (query.localFilter) {
+      const tokens = query.localFilter.split(',');
       for (const t of tokens) {
         const x = t.trim();
         const i = x.indexOf(':');
@@ -2163,12 +2154,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
    * This pulls alerts to show as annotations.
    */
   annotationQuery(query: AnnotationQueryRequest<CirconusQuery>): Promise<AnnotationEvent[]> {
-    log(() => 'annotationQuery() query = ' + JSON.stringify(query));
-
     if (!_.isUndefined(this.queryRange) && !_.isEqual(query.range, this.queryRange)) {
-      log(() => `query() time range changed ${JSON.stringify(this.queryRange)} -> ${JSON.stringify(query.range)}`);
       if (this.dataSourceOptions.useCaching) {
-        log(() => 'query() clearing cache');
         const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
         requestCache.clear();
       }
@@ -2191,8 +2178,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         start: query.range.from.valueOf() / 1000,
         end: query.range.to.valueOf() / 1000,
         isAlert: true,
-        local_filter: query.annotation['annotationFilterText'],
-        local_filter_match: query.annotation['annotationFilterApply'],
+        localFilter: query.annotation['annotationFilterText'],
+        localFilterMatch: query.annotation['annotationFilterApply'],
         annotation: query.annotation,
         withCredentials: this.basicAuth || this.withCredentials,
         isCaql: false,

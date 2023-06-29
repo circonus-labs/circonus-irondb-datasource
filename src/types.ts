@@ -97,11 +97,11 @@ export interface DataRequestItems {
     start: number,
     end: number,
     names: string[],
-    local_filters: string[],
-    local_filter_matches: string[],
+    localFilters: string[],
+    localFilterMatches: string[],
     labels: string[],
-    counts_only: boolean,
-    query_type: string,
+    countsOnly: boolean,
+    queryType: string,
     target: any
   };
 }

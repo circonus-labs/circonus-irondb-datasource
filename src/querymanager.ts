@@ -24,6 +24,10 @@ export default class QueryManager {
     else if ('graphite' === query.queryType) {
       this.parseGraphiteQuery();
     }
+
+    // TODO: support old queries using old snake-case properties
+
+    log(() => `QueryManager initialized`);
   }
 
   /**
@@ -33,8 +37,6 @@ export default class QueryManager {
     // reset
     this.segments.splice(0, this.segments.length);
     this.error = '';
-
-    log(() => `parseStandardQuery() query = ${JSON.stringify(this.query)}`);
 
     const query = (this.query.query || '').slice(4, -1) || '__name:*'; // remove the `and(` & `)` wrappers
     const tags = query.split(',');
@@ -57,8 +59,6 @@ export default class QueryManager {
     // reset
     this.gSegments.splice(0, this.segments.length);
     this.error = '';
-
-    log(() => `parseGraphiteQuery() query = ${JSON.stringify(this.query)}`);
 
     // parse the query into segments
     let query = this.query.query || '';
