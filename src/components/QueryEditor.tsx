@@ -45,8 +45,7 @@ type Props = QueryEditorProps<DataSource, CirconusQuery, CirconusDataSourceOptio
 export function QueryEditor(props: Props) {
   // state & styles
   const [lastFieldChanged, setLastFieldChanged] = useState('');
-  const [lastQueryType, setLastQueryType] = useState(props.query.queryType);
-  const [lastCaql, setLastCaql] = useState('caql' === lastQueryType ? props.query.query : '');
+  const [lastCaql, setLastCaql] = useState('caql' === props.query.queryType ? props.query.queryDisplay : '');
   const tempSegs: CirconusSegment[] = [];
   const [segments, setSegments] = useState(tempSegs);
   const tempGSegs: CirconusSegment[] = [];
@@ -69,7 +68,6 @@ export function QueryEditor(props: Props) {
     alertCountQueryType
   } = query;
   let {
-    queryType,
     labelType,
     minPeriod
   } = query;
@@ -144,8 +142,8 @@ export function QueryEditor(props: Props) {
   const minPeriodOptions = getMinPeriodOptions(minPeriod);
 
   // double-check the queryType
-  if (!queryTypeOptions.some((cfg) => cfg.value === queryType)) {
-    queryType = query.isCaql ? 'caql' : datasource.canShowGraphite() ? 'graphite' : 'basic';
+  if (!queryTypeOptions.some((cfg) => cfg.value === query.queryType)) {
+    query.queryType = query.isCaql ? 'caql' : datasource.canShowGraphite() ? 'graphite' : 'basic';
   }
 
   /**
@@ -164,56 +162,59 @@ export function QueryEditor(props: Props) {
   /**
    * This performs query conversion and other tasks upon changing the query type.
    */
-  function changeEditorMode() {
+  function changeEditorMode(oldQueryType: string, newQueryType: string) {
+    query.queryType = newQueryType as typeof query.queryType;
     // CAQL -> Standard
-    if (lastQueryType === 'caql' && queryType === 'basic') {
+    if (oldQueryType === 'caql' && newQueryType === 'basic') {
       checkForPlusAndSelect();
     }
     // CAQL -> Graphite
-    else if (lastQueryType === 'caql' && queryType === 'graphite') {
+    else if (oldQueryType === 'caql' && newQueryType === 'graphite') {
       checkForPlusAndSelect();
     }
     // Standard -> CAQL
-    else if (lastQueryType === 'basic' && queryType === 'caql') {
+    else if (oldQueryType === 'basic' && newQueryType === 'caql') {
       let isEmpty = query.query === 'and(__name:*)';
       if (lastCaql && isEmpty) {
-        updateField('queryDisplay', lastCaql);
+        query.queryDisplay = lastCaql;
       }
       else {
-        updateField('queryDisplay', buildCAQLFromStandard());
+        query.queryDisplay = buildCAQLFromStandard();
       }
     }
     // Standard -> Graphite
-    else if (lastQueryType === 'basic' && queryType === 'graphite') {
+    else if (oldQueryType === 'basic' && newQueryType === 'graphite') {
       convertStandardToGraphite();
       checkForPlusAndSelect();
       buildGraphiteQuery();
     }
     // Graphite -> CAQL
-    else if (lastQueryType === 'graphite' && queryType === 'caql') {
+    else if (oldQueryType === 'graphite' && newQueryType === 'caql') {
       let isEmpty = query.query === '' || query.query === '*' || query.query === '*.*';
       if (lastCaql && isEmpty) {
-        updateField('queryDisplay', lastCaql);
+        query.queryDisplay = lastCaql;
       }
       else {
-        updateField('queryDisplay', buildCAQLFromGraphite());
+        query.queryDisplay = buildCAQLFromGraphite();
       }
     }
     // Graphite -> Standard
-    else if (lastQueryType === 'graphite' && queryType === 'basic') {
+    else if (oldQueryType === 'graphite' && newQueryType === 'basic') {
       convertGraphiteToStandard();
       checkForPlusAndSelect();
       buildStandardQuery();
     }
     // Alerts
-    else if (queryType === 'alerts' || queryType === 'alert_counts') {
-      updateField('queryDisplay', '');
+    else if (newQueryType === 'alerts' || newQueryType === 'alert_counts') {
+      query.queryDisplay = '';
+    }
+    if ('caql' === newQueryType) {
+      setLastCaql(query.queryDisplay);
     }
     buildQueries();
-    setLastQueryType(queryType);
-    if ('caql' === queryType) {
-        setLastCaql(query.query);
-    }
+    updateField('query', query.query);
+    updateField('queryDisplay', query.queryDisplay);
+    updateField('queryType', query.queryType);
   }
 
   /**
@@ -1261,14 +1262,13 @@ export function QueryEditor(props: Props) {
     if (error) {
       return;
     }
-    if (isGraphiteQuery) {
+    if (query.queryType === 'graphite') {
         buildGraphiteQuery();
     } 
-    else if (isStandardQuery) {
+    else if (query.queryType === 'basic') {
         buildStandardQuery();
     }
     renderQueryReferences(query, props.queries as CirconusQuery[]);
-    console.log('buildQueries: ', query.query);
   }
 
   /**
@@ -1350,11 +1350,11 @@ export function QueryEditor(props: Props) {
     updateField('query', query.query);
   }
 
-  const isCaqlQuery = queryType === 'caql';
-  const isStandardQuery = queryType === 'basic';
-  const isGraphiteQuery = queryType === 'graphite';
-  const isAlertsQuery = queryType === 'alerts';
-  const isAlertCountQuery = queryType === 'alert_counts';
+  const isCaqlQuery = query.queryType === 'caql';
+  const isStandardQuery = query.queryType === 'basic';
+  const isGraphiteQuery = query.queryType === 'graphite';
+  const isAlertsQuery = query.queryType === 'alerts';
+  const isAlertCountQuery = query.queryType === 'alert_counts';
   const isCustomLabelType = labelType === 'custom';
   const isHeatmapFormat = format === 'heatmap';
   const isAutoRollupType = rollupType === 'automatic';
@@ -1367,10 +1367,9 @@ export function QueryEditor(props: Props) {
           >
           <Select
             options={queryTypeOptions}
-            value={queryType}
+            value={query.queryType}
             onChange={(obj: SelectableValue<string>) => {
-              updateField('queryType', obj.value);
-              changeEditorMode();
+              changeEditorMode(query.queryType, obj.value as string);
             }}
             />
         </InlineField>
@@ -1531,7 +1530,7 @@ export function QueryEditor(props: Props) {
             placeholder="find('metric','and(tag:val)') | stats:sum()"
             onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
               let value = event.target.value;
-              updateField('queryDisplay', value);
+              updateField('queryDisplay', query.queryDisplay = value);
               buildQueries();
             }}
             >
@@ -1548,11 +1547,11 @@ export function QueryEditor(props: Props) {
                 <Input
                   value={alertId}
                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    let value = event.target.value;
-                    updateField('alertId', value);
-                    if (value.trim()) {
-                      updateField('query', '');
-                      updateField('queryDisplay', '');
+                    let value = event.target.value.trim();
+                    updateField('alertId', query.alertId = value ? Number(value) : undefined);
+                    if (value) {
+                      updateField('query', query.query = '');
+                      updateField('queryDisplay', query.queryDisplay = '');
                     }
                   }}
                   autoFocus={lastFieldChanged === 'labelType'}
@@ -1569,7 +1568,7 @@ export function QueryEditor(props: Props) {
                   placeholder="(metric:available)(active:1)"
                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     let value = event.target.value;
-                    updateField('query', value);
+                    updateField('query', query.query = value);
                   }}
                   autoFocus={lastFieldChanged === 'labelType'}
                   />
@@ -1584,7 +1583,7 @@ export function QueryEditor(props: Props) {
                   options={localFilterMatchOptions}
                   value={localFilterMatch}
                   onChange={(obj: SelectableValue<string>) => {
-                    updateField('localFilterMatch', obj.value);
+                    updateField('localFilterMatch', query.localFilterMatch = obj.value as typeof localFilterMatch);
                   }}
                   />
               </InlineField>
@@ -1596,7 +1595,7 @@ export function QueryEditor(props: Props) {
                   placeholder="tag:cluster:core-central*,acknowleged:false"
                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     let value = event.target.value;
-                    updateField('localFilter', value);
+                    updateField('localFilter', query.localFilter = value);
                   }}
                   autoFocus={lastFieldChanged === 'localFilterMatch'}
                   />
@@ -1612,7 +1611,7 @@ export function QueryEditor(props: Props) {
                       options={alertCountQueryTypeOptions}
                       value={alertCountQueryType}
                       onChange={(obj: SelectableValue<string>) => {
-                        updateField('alertCountQueryType', obj.value);
+                        updateField('alertCountQueryType', query.alertCountQueryType = obj.value);
                       }}
                       />
                   </InlineField>
@@ -1632,7 +1631,7 @@ export function QueryEditor(props: Props) {
                 options={labelTypeOptions}
                 value={labelType}
                 onChange={(obj: SelectableValue<string>) => {
-                  updateField('labelType', obj.value);
+                  updateField('labelType', query.labelType = obj.value as typeof labelType);
                 }}
                 />
             </InlineField>
@@ -1645,9 +1644,9 @@ export function QueryEditor(props: Props) {
                     value={metricLabel}
                     onChange={(event: ChangeEvent<HTMLInputElement>) => {
                       let value = event.target.value;
-                      updateField('metricLabel', value);
+                      updateField('metricLabel', query.metricLabel = value);
                       if (!value.trim()) {
-                        updateField('labelType', 'default');
+                        updateField('labelType', query.labelType = 'default');
                       }
                     }}
                     autoFocus={lastFieldChanged === 'labelType'}
@@ -1669,9 +1668,9 @@ export function QueryEditor(props: Props) {
                 value={metricLabel}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   let value = event.target.value;
-                  updateField('metricLabel', value);
+                  updateField('metricLabel', query.metricLabel = value);
                   if (!value.trim() && labelType === 'custom') {
-                    updateField('labelType', 'default');
+                    updateField('labelType', query.labelType = 'default');
                   }
                 }}
                 />
@@ -1690,7 +1689,7 @@ export function QueryEditor(props: Props) {
                 options={egressOverrideOptions}
                 value={egressOverride}
                 onChange={(obj: SelectableValue<string>) => {
-                  updateField('egressOverride', obj.value);
+                  updateField('egressOverride', query.egressOverride = obj.value as typeof egressOverride);
                 }}
                 />
             </InlineField>
@@ -1706,7 +1705,7 @@ export function QueryEditor(props: Props) {
             options={rollupTypeOptions}
             value={rollupType}
             onChange={(obj: SelectableValue<string>) => {
-              updateField('rollupType', obj.value);
+              updateField('rollupType', query.rollupType = obj.value as typeof rollupType);
             }}
             />
         </InlineField>
@@ -1719,9 +1718,9 @@ export function QueryEditor(props: Props) {
                 value={metricRollup}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   let value = event.target.value;
-                  updateField('metricRollup', value);
+                  updateField('metricRollup', query.metricRollup = value);
                   if (!value.trim()) {
-                    updateField('rollupType', 'automatic');
+                    updateField('rollupType', query.rollupType = 'automatic');
                   }
                 }}
                 autoFocus={lastFieldChanged === 'rollupType'}
@@ -1741,7 +1740,7 @@ export function QueryEditor(props: Props) {
                 options={minPeriodOptions}
                 value={minPeriod}
                 onChange={(obj: SelectableValue<string>) => {
-                  updateField('minPeriod', obj.value);
+                  updateField('minPeriod', query.minPeriod = obj.value);
                 }}
                 />
             </InlineField>
@@ -1757,7 +1756,7 @@ export function QueryEditor(props: Props) {
             options={formatOptions}
             value={format}
             onChange={(obj: SelectableValue<string>) => {
-              updateField('format', obj.value);
+              updateField('format', query.format = obj.value);
             }}
             />
         </InlineField>
