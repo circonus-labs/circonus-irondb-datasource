@@ -169,8 +169,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             });
           }
         }
-
-        log(() => 'query() queryResults = ' + JSON.stringify(queryResults));
         return queryResults;
       })
       .catch((err) => {
@@ -379,7 +377,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       preppedItems.alert.countsOnly = target.queryType === 'alert_counts';
       preppedItems.alert.queryType = target.alertCountQueryType;
       preppedItems.alert.labels.push(
-        templateSrv.replace(target.metriclabel, preppedItems.scopedVars)
+        templateSrv.replace(target.metricLabel, preppedItems.scopedVars)
       );
       preppedItems.alert.target = target;
 
@@ -443,6 +441,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           metrictype: thisType,
           paneltype: data[i].target.paneltype,
           target,
+          isGraphite,
         };
         // set the transform (egressoverride)
         const egressoverride = thisType === 'histogram' ? 'histogram' : target.egressoverride;
@@ -455,18 +454,18 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           }
         }
         // set the label
-        let metriclabel = target.metriclabel;
-        if (target.labeltype === 'default') {
-          metriclabel = '%n | %t{*}';
+        let metricLabel = target.metricLabel;
+        if (target.labelType === 'default') {
+          metricLabel = '%n | %t{*}';
         }
-        else if (target.labeltype === 'name') {
-          metriclabel = '%n';
+        else if (target.labelType === 'name') {
+          metricLabel = '%n';
         }
-        else if (target.labeltype === 'cardinality') {
-          metriclabel = '%n | %t-{*}';
+        else if (target.labelType === 'cardinality') {
+          metricLabel = '%n | %t-{*}';
         }
-        const interpolatedLabel = metaInterpolateLabel(metriclabel || '', data, i);
-        data[i].leaf_data.metriclabel = templateSrv.replace(interpolatedLabel, scopedVars);
+        const interpolatedLabel = metaInterpolateLabel(metricLabel || '', data, i);
+        data[i].leaf_data.metricLabel = templateSrv.replace(interpolatedLabel, scopedVars);
         // wrap things up
         data[i].leaf_data.check_tags = data[i].check_tags;
         if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
@@ -518,7 +517,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           paneltype: paneltype,
           format: thisLeafData.format,
           isCaql: false,
-          isGraphite: false,
+          isGraphite: false, // thisLeafData.isGraphite, // forcing this to false b/c our graphite queries return DF4 data
           retry: 1,
         };
         // finish up the URL
@@ -537,8 +536,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         // sometimes we want to drop the last interval b/c that data is frequently incomplete
         end = ends_now && this.dataSourceOptions.truncateNow ? end - end_shift : end + interval;
         // compile the data streams
-        let metricLabels = [];
-        let check_tags = [];
         let streams: any[] = [];
         let data = {
           streams: streams,
@@ -550,8 +547,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             method: paneltype === 'heatmap' ? 'merge' : 'pass'
           }],
         };
-        metricLabels.push(thisLeafData.metriclabel);
-        check_tags.push(thisLeafData.check_tags);
         // check the transform
         let transform = thisLeafData.egress_function;
         if (thisLeafData.metrictype === 'histogram') {
@@ -579,8 +574,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           streams.push(stream);
         }
         options.data = data;
-        options.metricLabels = metricLabels;
-        options.check_tags = check_tags;
+        options.metricLabels = [thisLeafData.metricLabel];
+        options.check_tags = [thisLeafData.check_tags];
         if (this.basicAuth) {
           options.headers.Authorization = this.basicAuth;
         }
@@ -705,61 +700,62 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
 
     return Promise.all(
-        queries.map((query: any, i: number, queries: any) =>
-          this.datasourceRequest(query)
-            .then((result: any) => {
-              const warning = result.data?.head?.warning;
-              if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
-                this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
-              }
-              if (!_.isUndefined(query.isAlert)) {
-                if (query.countsOnly) {
-                  return this.countAlerts(result, query);
-                }
-                else {
-                  return this.enrichAlertsWithRules(result, query).then((results) => {
-                    return this.convertAlertDataToGrafana(results);
-                  });
-                }
-              }
-              else if (query.isGraphite) {
-                return this.convertIrondbGraphiteDataToGrafana(result, query);
+      queries.map((query: any, i: number, queries: any) =>
+        this.datasourceRequest(query)
+          .then((result: any) => {
+            const warning = result.data?.head?.warning;
+            if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
+              this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
+            }
+            if (!_.isUndefined(query.isAlert)) {
+              if (query.countsOnly) {
+                return this.countAlerts(result, query);
               }
               else {
-                return this.convertIrondbDf4DataToGrafana(result, query);
+                return this.enrichAlertsWithRules(result, query).then((results) => {
+                  return this.convertAlertDataToGrafana(results);
+                });
               }
-            })
-            .then((result: any) => {
-              const query = result.query;
-              if (_.isArray(result.data)) {
-                for (let i=0; i<result.data.length; i++) {
-                  if ('target' in result && 'refId' in result.target) {
-                    result.data[i].target = result.target.refId;
-                  }
-                  else if (query && query.refId) {
-                    result.data[i].target = query.refId;
-                  }
-                  queryResults.data.push(result.data[i]);
-                }
-              }
-              if (_.isObject(result.data)) {
+            }
+            else if (query.isGraphite) {
+              return this.convertIrondbGraphiteDataToGrafana(result, query);
+            }
+            else {
+              return this.convertIrondbDf4DataToGrafana(result, query);
+            }
+          })
+          .then((result: any) => {
+            const query = result.query;
+            if (_.isArray(result.data)) {
+              for (let i=0; i<result.data.length; i++) {
                 if ('target' in result && 'refId' in result.target) {
-                  result.data.target = result.target.refId;
+                  result.data[i].target = result.target.refId;
                 }
                 else if (query && query.refId) {
-                  result.data.target = query.refId;
+                  result.data[i].target = query.refId;
                 }
-                queryResults.data.push(result.data);
+                queryResults.data.push(result.data[i]);
               }
-              if (null != result.t) {
-                queryResults.t = result.t;
+            }
+            if (_.isObject(result.data)) {
+              if ('target' in result && 'refId' in result.target) {
+                result.data.target = result.target.refId;
               }
+              else if (query && query.refId) {
+                result.data.target = query.refId;
+              }
+              queryResults.data.push(result.data);
+            }
+            if (null != result.t) {
+              queryResults.t = result.t;
+            }
 
-              return queryResults;
-            })
+            return queryResults;
+          })
         )
       )
       .then((result) => {
+        console.log(queryResults.data.length);
         return queryResults;
       })
       .catch((err) => {
@@ -1686,9 +1682,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       let lname = taglessName(tname);
       let tags = meta[si].tags;
       const metricLabel = metricLabels[si];
-      if (_.isString(metricLabel)) {
-        lname = metricLabel;
-      }
       const labels: any = {};
 
       if (check_tags[si] !== undefined) {
@@ -1713,9 +1706,12 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           }
         }
       }
+      if (metricLabel && _.isString(metricLabel)) {
+        lname = metricLabel;
+      }
       lname = decodeTagsInLabel(lname);
       let dname = lname;
-      if (decoded_tags.length > 0 && explicitTags) {
+      if ((!metricLabel || !_.isString(metricLabel)) && (decoded_tags.length > 0 && explicitTags)) {
         dname += ` { ${decoded_tags.join(', ')} }`;
       }
 
@@ -1784,6 +1780,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
   /**
    * This converts data from the metric data/fetch endpoint to Grafana's format.
+   * NOTE: not sure what this actually does...it may be vestigial - cfiskeaux
    */
   convertIrondbGraphiteDataToGrafana(result: any, query: any) {
     let data = result.data;

@@ -77,11 +77,6 @@ export function QueryEditor(props: Props) {
   if (minPeriod) {
     minPeriod += /[a-zA-Z]$/.test(minPeriod) ? '' : 's';
   }
-  
-  // don't allow empty custom labels
-  if (!metricLabel && labelType === 'custom') {
-    labelType = 'default';
-  }
 
   // TODO: support old queries using old snake-case properties
 
