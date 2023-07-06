@@ -924,6 +924,7 @@ export function QueryEditor(props: Props) {
           options.push({
             value: reducedName,
             label: reducedName,
+            leaf: option.leaf,
           });
         }
       }
@@ -1107,7 +1108,7 @@ export function QueryEditor(props: Props) {
   /**
    * This updates a graphite segment value (metric name, tag cat or tag val).
    */
-  function updateGraphiteSegmentValue(index: number, segment: CirconusSegment) {
+  function updateGraphiteSegmentValue(index: number, segment: CirconusSegment, isLastSegment?: boolean) {
     const isMultiSegment = /\./.test(String(segment.value));
 
     updateSegmentValueAndUpdateState(segment, index);
@@ -1124,13 +1125,11 @@ export function QueryEditor(props: Props) {
       convertStandardToGraphite(graphiteName);
     }
     // if it's not the last segment, there are other segments following.
-    // TODO -> figure out how to determine isNotLastSegment
-    const isNotLastSegment = true;
-    if (isNotLastSegment && segment.type === SegmentType.MetricName) {
+    if (!isLastSegment && segment.type === SegmentType.MetricName) {
       addSelectMetricSegmentAndUpdateState();
     }
     checkForPlusAndSelect();
-    if (isNotLastSegment) {
+    if (!isLastSegment) {
       setSegmentFocus(index + 1);
     }
     buildQueries();
@@ -1456,7 +1455,7 @@ export function QueryEditor(props: Props) {
               className={cx(styles.noRightMargin)}
               label={<Label className={cx(styles.labels)}>Series</Label>}
               >
-              <>
+              <div className={cx(styles.flexWrap)}>
                 {
                   gSegments.map((segment, index) => {
                     switch (segment.type) {
@@ -1512,12 +1511,12 @@ export function QueryEditor(props: Props) {
                           allowCustomValue={true}
                           loadOptions={(search) => getGraphiteDefaultOptions(index, search as string)}
                           inputMinWidth={150}
-                          onChange={(item: SelectableValue) => updateGraphiteSegmentValue(index, { type:segment.type, value:item.value })}
+                          onChange={(item: SelectableValue) => updateGraphiteSegmentValue(index, { type:segment.type, value:item.value }, item.leaf)}
                           />;
                     }
                   })
                 }
-              </>
+              </div>
             </InlineField>
             <div className={cx(styles.fillFlex)}></div>
           </InlineFieldRow>
