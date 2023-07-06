@@ -16,7 +16,7 @@ import {
 } from './types';
 
 export const DEFAULT_QUERY: Partial<CirconusQuery> = {
-  queryType: 'basic',
+  queryType: 'graphite',
   labelType: 'default',
   metricLabel: '',
   egressOverride: 'automatic',
