@@ -1531,6 +1531,7 @@ export function QueryEditor(props: Props) {
               let value = event.target.value;
               updateField('queryDisplay', query.queryDisplay = value);
               buildQueries();
+              updateField('query', query.query);
             }}
             >
           </TextArea>
