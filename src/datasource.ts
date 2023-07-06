@@ -897,7 +897,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       to = range.to.valueOf() / 1000;
       if (!_.isUndefined(this.queryRange) && !_.isEqual(range, this.queryRange)) {
         if (this.dataSourceOptions.useCaching) {
-          const requestCache = this.datasourceRequest as unknown as Memoized < (options: any) => any > ;
+          const requestCache = this.datasourceRequest as unknown as Memoized <(options: any) => any>;
           requestCache.clear();
         }
       }
@@ -905,7 +905,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
 
     let q: CirconusVariableQuery;
-    if (typeof query === 'string') {
+    if (_.isString(query)) {
       // attempt to translate variable.useTags into the new CirconusVariableQuery structure
       q = {
         queryType: variable?.useTags && variable.tagValuesQuery
