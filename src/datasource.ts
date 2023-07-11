@@ -93,8 +93,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     this.supportMetrics     = true;
     this.datasourceRequest  = setupCache(this.dataSourceOptions.useCaching, this.backendSrv, this);
 
-    this.query = _.debounce(this.query, 300, { leading:true, trailing:true }) as (options: DataQueryRequest<CirconusQuery>) => Promise<DataQueryResponse>;
-
     // TODO: support old queries using old snake-case properties
 
     if (!this.dataSourceOptions.disableUsageStatistics) {
