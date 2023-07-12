@@ -9,6 +9,9 @@ import {
   SelectableValue
 } from '@grafana/data';
 import {
+  getTemplateSrv
+} from '@grafana/runtime';
+import {
   Button,
   InlineField,
   InlineFieldRow,
@@ -43,6 +46,8 @@ import {
 type Props = QueryEditorProps<DataSource, CirconusQuery, CirconusDataSourceOptions>;
 
 export function QueryEditor(props: Props) {
+  const templateSrv = getTemplateSrv();
+
   // state & styles
   const [lastFieldChanged, setLastFieldChanged] = useState('');
   const [lastCaql, setLastCaql] = useState('caql' === props.query.queryType ? props.query.queryDisplay : '');
@@ -721,24 +726,23 @@ export function QueryEditor(props: Props) {
     const metricName = encodeTag(SegmentType.MetricName, metricSegment?.value as string);
     const options: SelectableValue[] = [];
 
+    // add basics
+    if (isPlusSegment) {
+      options.push({ label: 'and(', value: 'and(' });
+      options.push({ label: 'not(', value: 'not(' });
+      options.push({ label: 'or(',  value: 'or(' });
+    }
+    // add the variables as options
+    templateSrv.getVariables().forEach((variable) => {
+      options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
+    });
+
     // perform query
     const values = await datasource.metricTagCatsQuery(`and(__name:${metricName})`);
-
-    if (values?.data?.length) {
-      if (isPlusSegment) {
-        options.push({ label: 'and(', value: 'and(' });
-        options.push({ label: 'not(', value: 'not(' });
-        options.push({ label: 'or(',  value: 'or(' });
-      }
-      // TODO: figure out where the variables come from ---v
-      // _.eachRight(this.templateSrv.variables, (variable) => {
-      //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
-      // });
-      for (const tagCat of values.data) {
-        let decodedCat = decodeTag(tagCat);
-        options.push({ label: decodedCat, value: decodedCat });
-      }
-    }
+    (values?.data || []).forEach((tagCat: any) => {
+      let decodedCat = decodeTag(tagCat);
+      options.push({ label: decodedCat, value: decodedCat });
+    });
 
     return options;
   }
@@ -754,21 +758,19 @@ export function QueryEditor(props: Props) {
     const tagCat = segments[index - 2]?.value as string;
     const options: SelectableValue[] = [];
 
+    // add basics
+    options.push({ label: '*', value: '*' });
+    // add the variables as options
+    templateSrv.getVariables().forEach((variable) => {
+      options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
+    });
+
     if (tagCat && tagCat !== 'select tag') {
       const values = await datasource.metricTagValsQuery('and(__name:' + metricName + ')', encodeTag(SegmentType.TagCat, tagCat, false));
-      
-      const tagVals = values?.data;
-      options.push({ label: '*', value: '*' });
-      if (tagVals?.length) {
-        // TODO: figure out where the variables come from ---v
-        // _.eachRight(this.templateSrv.variables, (variable) => {
-        //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
-        // });
-        for (const tagVal of tagVals) {
-          let decodedVal = decodeTag(tagVal);
-          options.push({ label: decodedVal, value: decodedVal });
-        }
-      }
+      (values?.data || []).forEach((tagVal: any) => {
+        let decodedVal = decodeTag(tagVal);
+        options.push({ label: decodedVal, value: decodedVal });
+      });
     }
 
     return options;
@@ -834,24 +836,23 @@ export function QueryEditor(props: Props) {
       .replace(/\.$/, '');
     const options: SelectableValue[] = [];
 
+    // add basics
+    if (isPlusSegment) {
+      options.push({ label: 'and(', value: 'and(' });
+      options.push({ label: 'not(', value: 'not(' });
+      options.push({ label: 'or(',  value: 'or(' });
+    }
+    // add the variables as options
+    templateSrv.getVariables().forEach((variable) => {
+      options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
+    });
+
     // perform query
     const values = await datasource.metricTagCatsQuery(`and(__name:${metricName})`);
-
-    if (values?.data?.length) {
-      if (isPlusSegment) {
-        options.push({ label: 'and(', value: 'and(' });
-        options.push({ label: 'not(', value: 'not(' });
-        options.push({ label: 'or(',  value: 'or(' });
-      }
-      // TODO: figure out where the variables come from ---v
-      // _.eachRight(this.templateSrv.variables, (variable) => {
-      //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
-      // });
-      for (const tagCat of values.data) {
-        let decodedCat = decodeTag(tagCat);
-        options.push({ label: decodedCat, value: decodedCat });
-      }
-    }
+    (values?.data || []).forEach((tagCat: any) => {
+      let decodedCat = decodeTag(tagCat);
+      options.push({ label: decodedCat, value: decodedCat });
+    });
 
     return options;
   }
@@ -868,22 +869,20 @@ export function QueryEditor(props: Props) {
     const tagCat = gSegments[index - 2]?.value as string;
     const options: SelectableValue[] = [];
 
+    // add basics
+    options.push({ label: '*', value: '*' });
+    // add the variables as options
+    templateSrv.getVariables().forEach((variable) => {
+      options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
+    });
+
     if (tagCat && tagCat !== 'select tag') {
       // perform query
       const values = await datasource.metricTagValsQuery(`and(__name:${metricName})`, encodeTag(SegmentType.TagCat, tagCat, false));
-      
-      const tagVals = values?.data;
-      options.push({ label: '*', value: '*' });
-      if (tagVals?.length) {
-        // TODO: figure out where the variables come from ---v
-        // _.eachRight(this.templateSrv.variables, (variable) => {
-        //   options.push({ label: `$${variable.name}`, value: `$${variable.name}` });
-        // });
-        for (const tagVal of tagVals) {
-          let decodedVal = decodeTag(tagVal);
-          options.push({ label: decodedVal, value: decodedVal });
-        }
-      }
+      (values?.data || []).forEach((tagVal: any) => {
+        let decodedVal = decodeTag(tagVal);
+        options.push({ label: decodedVal, value: decodedVal });
+      });
     }
 
     return options;
@@ -940,13 +939,6 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This sets the focus on the specified segment input.
-   */
-  function setSegmentFocus(index: number) {
-    // TODO: figure out how to set segment focus
-  }
-
-  /**
    * This updates a standard plus segment value.
    */
   function updatePlusSegmentValue(index: number, segment: CirconusSegment) {
@@ -993,7 +985,7 @@ export function QueryEditor(props: Props) {
         setSegments([...segments]);
       }
       // we do not have a category yet, so focus on the new category segment
-      setSegmentFocus(index + 3);
+      // setSegmentFocus(index + 3); // TODO: figure out how to focus on a particular segment
     }
     else {
       // if this is at least the fourth segment, then we have at least one tag 
@@ -1026,7 +1018,7 @@ export function QueryEditor(props: Props) {
       else {
         setSegments([...segments]);
       }
-      setSegmentFocus(index + 1);
+      // setSegmentFocus(index + 1); // TODO: figure out how to focus on a particular segment
       buildQueries();
     }
   }
@@ -1095,7 +1087,7 @@ export function QueryEditor(props: Props) {
     if (0 === index) {
       removeSegmentsAndUpdateState(index + 1);
       checkForPlusAndSelect();
-      setSegmentFocus(index + 1);
+      // setSegmentFocus(index + 1); // TODO: figure out how to focus on a particular segment
     }
     buildQueries();
   }
@@ -1125,7 +1117,7 @@ export function QueryEditor(props: Props) {
     }
     checkForPlusAndSelect();
     if (!isLastSegment) {
-      setSegmentFocus(index + 1);
+      // setSegmentFocus(index + 1); // TODO: figure out how to focus on a particular segment
     }
     buildQueries();
   }

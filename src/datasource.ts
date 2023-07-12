@@ -753,7 +753,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         )
       )
       .then((result) => {
-        console.log(queryResults.data.length);
         return queryResults;
       })
       .catch((err) => {
