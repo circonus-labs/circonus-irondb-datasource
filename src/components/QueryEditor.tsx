@@ -718,7 +718,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the tag cats endpoint with the current metric name to get 
    * an array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getStandardCategoryOptions(index: number, search: string): Promise<SelectableValue[]> {
     const isPlusSegment = segments[index]?.type === SegmentType.TagPlus;
@@ -750,7 +750,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the tag vals endpoint with the current metric name and tag 
    * category to get an array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getStandardValueOptions(index: number, search: string): Promise<SelectableValue[]> {
     const metricSegment = segments.find((s) => s.type === SegmentType.MetricName);
@@ -793,7 +793,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the tag query endpoint with the current [incomplete] search 
    * to get an array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getStandardDefaultOptions(index: number, search = ''): Promise<SelectableValue[]> {
       const isMetricSegment = segments[index]?.type === SegmentType.MetricName;
@@ -827,7 +827,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the tag cats endpoint with the current metric name to get an 
    * array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getGraphiteCategoryOptions(index: number, search = ''): Promise<SelectableValue[]> {
     const isPlusSegment = gSegments[index]?.type === SegmentType.TagPlus;
@@ -860,7 +860,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the tag vals endpoint with the current metric name and
    * tag category to get an array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getGraphiteValueOptions(index: number, search = ''): Promise<SelectableValue[]> {
     const metricName = getGraphiteSegmentPath()
@@ -891,7 +891,7 @@ export function QueryEditor(props: Props) {
   /**
    * This queries the graphite endpoint with the current [incomplete] query 
    * path to get an array of options for the next segment.
-   * TODO: debounce this
+   * TODO: debounce this if possible
    */
   async function getGraphiteDefaultOptions(index: number, search = ''): Promise<SelectableValue[]> {
     const isFirst = 0 === index;
