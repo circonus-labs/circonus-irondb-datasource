@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
+	"github.com/circonus/circonus-irondb-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/circonus/circonus-irondb-datasource/pkg/plugin"
 )
 
 func main() {
