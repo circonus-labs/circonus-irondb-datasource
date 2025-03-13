@@ -1,10 +1,10 @@
-# Circonus Datasource
+# Apica Circonus IRONdb Datasource
 
-This is the plugin for hosted Circonus or standalone IRONdb 0.17.1 and newer. It is evolving and we continue to track its API.
+This is the plugin for hosted Apica Circonus or standalone IRONdb 0.17.1 and newer. It was originally built expecting Grafana 7 and should work up through Grafana 12 with [angular support enabled](https://github.com/grafana/grafana/blob/d61bcdf4ca5e69489e0067c56fbe7f0bfdf84ee4/conf/defaults.ini#L362).
 
-Read more about Circonus IRONdb here:
+Read more about Apica IRONdb here:
 
-[https://www.circonus.com/irondb/](https://www.circonus.com/irondb/)
+[https://www.apica.io/time-series-database/](https://www.apica.io/time-series-database/)
 
 ## Installation
 * The default location for the plugins directory is `/var/lib/grafana/plugins`, though the location may be different in your installation, see [http://docs.grafana.org/plugins/installation/](http://docs.grafana.org/plugins/installation/) for more plugin information.
@@ -15,13 +15,19 @@ Read more about Circonus IRONdb here:
 
 2. Unzip into plugins directory.
 
-3. Run the following commands in your shell to sign the plugin (node js is required):
+3. Run the following commands in your shell to sign the plugin (node js is required) 
+    * in Grafana 7:
     ```shell
         export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY> 
         npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
     ```
+    * in later versions:
+    ```shell
+        export GRAFANA_ACCESS_POLICY_TOKEN=<YOUR_GRAFANA_API_KEY> 
+        npx @grafana/sign-plugin@latest plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
+    ```
 
-### From GitHub
+### From GitHub (Grafana 7)
 1. Please install the following prerequisites:
    * [Node.js](https://nodejs.org/en/download/) > 14.04
    * [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
@@ -69,7 +75,7 @@ These instructions will build and run a Docker container with a Grafana instance
 The Account ID associated with the account to pull metrics from.
 
 ### API Token
-The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://www.circonus.com/](https://login.circonus.com/).
+The API Token associated with the account to pull metrics from. This can be found on your API Tokens page after logging in at [https://login.circonus.com/](https://login.circonus.com/).
 
 ## Usage
 
@@ -80,7 +86,7 @@ For normal queries, use the metric browser to navigate your metric hierarchy or 
 ![](img/irondb-graph-metric-browser.png)
 
 ### CAQL Queries
-[CAQL queries](https://login.circonus.com/resources/docs/user/CAQL.html) must be entered manually by selecting the *CAQL* checkbox or switching manually to the editor mode.
+[CAQL queries](https://docs.circonus.com/caql/reference/) must be entered manually by selecting the *CAQL* checkbox or switching manually to the editor mode.
 ![](img/irondb-graph-caql-editor.png)
 
 ### Histograms
