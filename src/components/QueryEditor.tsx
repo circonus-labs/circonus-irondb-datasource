@@ -66,11 +66,7 @@ export function QueryEditor(props: Props) {
     rollupType,
     metricRollup,
     format,
-    queryDisplay,
-    alertId,
-    localFilterMatch,
-    localFilter,
-    alertCountQueryType
+    queryDisplay
   } = query;
   let {
     labelType,
@@ -98,9 +94,7 @@ export function QueryEditor(props: Props) {
   // options for dropdowns
   const queryTypeOptions = [
     { value: 'caql', label: 'CAQL' },
-    { value: 'basic', label: 'Standard' },
-    { value: 'alerts', label: 'Alerts' },
-    { value: 'alert_counts', label: 'Alert Counts' }
+    { value: 'basic', label: 'Standard' }
   ];
   if (datasource.canShowGraphite()) {
     queryTypeOptions.splice(2, 0, { value: 'graphite', label: 'Graphite Style' });
@@ -130,14 +124,6 @@ export function QueryEditor(props: Props) {
     { value: 'ts', label: 'Time Series' },
     { value: 'table', label: 'Table' },
     { value: 'heatmap', label: 'Heatmap' },
-  ];
-  const localFilterMatchOptions = [
-    { value: 'all', label: 'ALL' },
-    { value: 'any', label: 'ANY' },
-  ];
-  const alertCountQueryTypeOptions = [
-    { value: 'instant', label: 'instant' },
-    { value: 'range', label: 'range' },
   ];
   const minPeriodOptions = getMinPeriodOptions(minPeriod);
 
@@ -205,10 +191,6 @@ export function QueryEditor(props: Props) {
       convertGraphiteToStandard();
       checkForPlusAndSelect();
       buildStandardQuery();
-    }
-    // Alerts
-    else if (newQueryType === 'alerts' || newQueryType === 'alert_counts') {
-      query.queryDisplay = '';
     }
     if ('caql' === newQueryType) {
       setLastCaql(query.queryDisplay);
@@ -1341,8 +1323,6 @@ export function QueryEditor(props: Props) {
   const isCaqlQuery = query.queryType === 'caql';
   const isStandardQuery = query.queryType === 'basic';
   const isGraphiteQuery = query.queryType === 'graphite';
-  const isAlertsQuery = query.queryType === 'alerts';
-  const isAlertCountQuery = query.queryType === 'alert_counts';
   const isCustomLabelType = labelType === 'custom';
   const isHeatmapFormat = format === 'heatmap';
   const isAutoRollupType = rollupType === 'automatic';
@@ -1527,90 +1507,6 @@ export function QueryEditor(props: Props) {
         : <></>
       }
       {
-        isAlertsQuery || isAlertCountQuery
-        ? <>
-            <InlineFieldRow>
-              <InlineField
-                label={<Label className={cx(styles.labels)}>Alert ID</Label>}
-                >
-                <Input
-                  value={alertId}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    let value = event.target.value.trim();
-                    updateField('alertId', query.alertId = value ? Number(value) : undefined);
-                    if (value) {
-                      updateField('query', query.query = '');
-                      updateField('queryDisplay', query.queryDisplay = '');
-                    }
-                  }}
-                  autoFocus={lastFieldChanged === 'labelType'}
-                  />
-              </InlineField>
-              <div className={cx(styles.fillFlex)}></div>
-            </InlineFieldRow>
-            <InlineFieldRow>
-              <InlineField
-                label={<Label className={cx(styles.labels)}>Alert Query</Label>}
-                >
-                <Input
-                  value={query.query}
-                  placeholder="(metric:available)(active:1)"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    let value = event.target.value;
-                    updateField('query', query.query = value);
-                  }}
-                  autoFocus={lastFieldChanged === 'labelType'}
-                  />
-              </InlineField>
-              <div className={cx(styles.fillFlex)}></div>
-            </InlineFieldRow>
-            <InlineFieldRow>
-              <InlineField
-                label={<Label className={cx(styles.labels)}>Local Filter</Label>}
-                >
-                <Select
-                  options={localFilterMatchOptions}
-                  value={localFilterMatch}
-                  onChange={(obj: SelectableValue<string>) => {
-                    updateField('localFilterMatch', query.localFilterMatch = obj.value as typeof localFilterMatch);
-                  }}
-                  />
-              </InlineField>
-              <InlineField
-                grow={true}
-                >
-                <Input
-                  value={localFilter}
-                  placeholder="tag:cluster:core-central*,acknowleged:false"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    let value = event.target.value;
-                    updateField('localFilter', query.localFilter = value);
-                  }}
-                  autoFocus={lastFieldChanged === 'localFilterMatch'}
-                  />
-              </InlineField>
-            </InlineFieldRow>
-            {
-              isAlertCountQuery
-              ? <InlineFieldRow>
-                  <InlineField
-                    label={<Label className={cx(styles.labels)}>Query Type</Label>}
-                    >
-                    <Select
-                      options={alertCountQueryTypeOptions}
-                      value={alertCountQueryType}
-                      onChange={(obj: SelectableValue<string>) => {
-                        updateField('alertCountQueryType', query.alertCountQueryType = obj.value);
-                      }}
-                      />
-                  </InlineField>
-                </InlineFieldRow>
-              : <></>
-            }
-          </>
-        : <></>
-      }
-      {
         isStandardQuery && !isHeatmapFormat
         ? <InlineFieldRow>
             <InlineField
@@ -1643,27 +1539,6 @@ export function QueryEditor(props: Props) {
                 </InlineField>
               : <></>
             }
-            <div className={cx(styles.fillFlex)}></div>
-          </InlineFieldRow>
-        : <></>
-      }
-      {
-        isAlertCountQuery
-        ? <InlineFieldRow>
-            <InlineField
-              label={<Label className={cx(styles.labels)}>Label</Label>}
-              >
-              <Input
-                value={metricLabel}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                  let value = event.target.value;
-                  updateField('metricLabel', query.metricLabel = value);
-                  if (!value.trim() && labelType === 'custom') {
-                    updateField('labelType', query.labelType = 'default');
-                  }
-                }}
-                />
-            </InlineField>
             <div className={cx(styles.fillFlex)}></div>
           </InlineFieldRow>
         : <></>
