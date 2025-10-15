@@ -149,14 +149,16 @@ export function QueryEditor(props: Props) {
   /**
    * This updates a query field value when the field changes.
    */
-  function updateField(field: string, value: any) {
+  function updateField(field: string, value: any, runQuery = true) {
     setLastFieldChanged(field);
     onChange({
       ...query,
       [field]: value,
     });
-    // executes the query
-    onRunQuery();
+    if (runQuery) {
+      // executes the query
+      onRunQuery();
+    }
   }
 
   /**
@@ -318,7 +320,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This takes a tag/search filter like `and(foo:bar)` or just a list of tags 
+   * This takes a tag/search filter like `and(foo:bar)` or just a list of tags
    * like `foo:bar,baz:quux` and converts it to a segments array.
    */
   function parseTagFilter(tagFilter = '') {
@@ -333,7 +335,7 @@ export function QueryEditor(props: Props) {
       }
       if (first) {
         first = false;
-      } 
+      }
       else {
         newSegments.push({ type: SegmentType.TagSep, value: ',' });
       }
@@ -344,7 +346,7 @@ export function QueryEditor(props: Props) {
       if (tagCat.startsWith('and(') || tagCat.startsWith('not(')) {
         newSegments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, 4) });
         tagCat = tagCat.slice(4);
-      } 
+      }
       else if (tagCat.startsWith('or(')) {
         newSegments.push({ type: SegmentType.TagOp, value: tagCat.slice(0, 3) });
         tagCat = tagCat.slice(3);
@@ -371,7 +373,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This converts the standard segments array (or another arbitrary string) 
+   * This converts the standard segments array (or another arbitrary string)
    * to the graphite segments array.
    */
   function convertStandardToGraphite(metricName = '') {
@@ -456,7 +458,7 @@ export function QueryEditor(props: Props) {
         }
         return isOp;
       });
-      // if there's a tag filter and the outer operator is `and()`, 
+      // if there's a tag filter and the outer operator is `and()`,
       // then insert the UUID at the end of that operator
       if (hasTagFilter && firstOpIsAnd) {
         const lastSegment = segments[segments.length - 1];
@@ -481,7 +483,7 @@ export function QueryEditor(props: Props) {
           );
         }
       }
-      // if there's a tag filter but the outer operator is not `and()`, 
+      // if there's a tag filter but the outer operator is not `and()`,
       // then wrap the filter in an `and()` operator.
       else if (hasTagFilter && !firstOpIsAnd) {
         const firstOpIndex = segments.findIndex((segment) => segment.type === SegmentType.TagOp);
@@ -513,11 +515,11 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This returns either the entire graphite metric segment path (not including 
+   * This returns either the entire graphite metric segment path (not including
    * any tag filter), or the path up to the specified index if one is passed.
    */
   function getGraphiteSegmentPath(index?: number) {
-    // if an index isn't passed, get the segment path up to the first 
+    // if an index isn't passed, get the segment path up to the first
     // non-metric name segment
     if (!_.isNumber(index)) {
       index = gSegments.findIndex((el) => (el.type != null && el.type !== SegmentType.MetricName));
@@ -672,15 +674,15 @@ export function QueryEditor(props: Props) {
         q1.refCount = refCount;
       });
 
-      // Keep interpolating until there are no query placeholder references 
-      // (the loop is because the referenced query might contain a reference 
+      // Keep interpolating until there are no query placeholder references
+      // (the loop is because the referenced query might contain a reference
       // to another query).
       while (renderedQuery!.match(placeholderRegex) !== null) {
         const updatedQuery: string = renderedQuery!.replace(placeholderRegex, _refProcessor);
         // end this cycle if nothing was replaced
         if (updatedQuery === renderedQuery) {
           break;
-        } 
+        }
         else {
           renderedQuery = updatedQuery;
         }
@@ -698,7 +700,7 @@ export function QueryEditor(props: Props) {
         if (!q) {
           return entireMatch;
         }
-        // if there are no more references to this query, 
+        // if there are no more references to this query,
         // remove it from the ref object.
         if (q.refCount && q.refCount <= 0) {
           delete queriesByRefId[refIdOnly];
@@ -716,7 +718,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This queries the tag cats endpoint with the current metric name to get 
+   * This queries the tag cats endpoint with the current metric name to get
    * an array of options for the next segment.
    * TODO: debounce this if possible
    */
@@ -748,7 +750,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This queries the tag vals endpoint with the current metric name and tag 
+   * This queries the tag vals endpoint with the current metric name and tag
    * category to get an array of options for the next segment.
    * TODO: debounce this if possible
    */
@@ -791,7 +793,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This queries the tag query endpoint with the current [incomplete] search 
+   * This queries the tag query endpoint with the current [incomplete] search
    * to get an array of options for the next segment.
    * TODO: debounce this if possible
    */
@@ -825,7 +827,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This queries the tag cats endpoint with the current metric name to get an 
+   * This queries the tag cats endpoint with the current metric name to get an
    * array of options for the next segment.
    * TODO: debounce this if possible
    */
@@ -889,7 +891,7 @@ export function QueryEditor(props: Props) {
   }
 
   /**
-   * This queries the graphite endpoint with the current [incomplete] query 
+   * This queries the graphite endpoint with the current [incomplete] query
    * path to get an array of options for the next segment.
    * TODO: debounce this if possible
    */
@@ -988,7 +990,7 @@ export function QueryEditor(props: Props) {
       // setSegmentFocus(index + 3); // TODO: figure out how to focus on a particular segment
     }
     else {
-      // if this is at least the fourth segment, then we have at least one tag 
+      // if this is at least the fourth segment, then we have at least one tag
       // before us, and we need a separator (comma)
       if (startIndex >= 3) {
         segs.splice(startIndex, 0, { type: SegmentType.TagSep, value: ',' });
@@ -1002,8 +1004,8 @@ export function QueryEditor(props: Props) {
         { type: SegmentType.TagPair, value: ':' },
         { type: SegmentType.TagVal, value: '*' }
       );
-      // if index is 1 (the first segment after the metric name), it's the 
-      // first addition and we're a tagCat so that means we need to add in 
+      // if index is 1 (the first segment after the metric name), it's the
+      // first addition and we're a tagCat so that means we need to add in
       // the implicit "and(" at the beginning and ")" at the end
       if (startIndex === 1) {
         segs.splice(startIndex, 0, {
@@ -1036,8 +1038,8 @@ export function QueryEditor(props: Props) {
       let readIndex = startIndex + 1;
       let endsNeeded = 1;
       const lastIndex = segs.length;
-      // We need to remove ourself (as well as every other segment) until our 
-      // TagEnd. For every TagOp we hit, we need to wait until we hit one more 
+      // We need to remove ourself (as well as every other segment) until our
+      // TagEnd. For every TagOp we hit, we need to wait until we hit one more
       // TagEnd, to remove any sub-ops.
       while (endsNeeded > 0 && readIndex < lastIndex) {
         const type = segs[readIndex].type;
@@ -1082,7 +1084,7 @@ export function QueryEditor(props: Props) {
    */
   function updateStandardSegmentValue(index: number, segment: CirconusSegment) {
     updateSegmentValueAndUpdateState(segment, index);
-    // if we changed the start metric, then we remove all the filters 
+    // if we changed the start metric, then we remove all the filters
     // because they're invalid now
     if (0 === index) {
       removeSegmentsAndUpdateState(index + 1);
@@ -1100,12 +1102,12 @@ export function QueryEditor(props: Props) {
 
     updateSegmentValueAndUpdateState(segment, index);
 
-    // if we changed the first metric segment, we remove all the filters 
+    // if we changed the first metric segment, we remove all the filters
     // because they're in a different namespace now
     if (0 === index) {
       removeSegmentsAndUpdateState(index + 1);
     }
-    // if they've entered multiple segments, we need to reconstruct the 
+    // if they've entered multiple segments, we need to reconstruct the
     // name segments by using the entire name entered so far
     if (isMultiSegment) {
       const graphiteName = getGraphiteSegmentPath().replace(/\.$/, '');
@@ -1219,7 +1221,7 @@ export function QueryEditor(props: Props) {
     let queryString = `${findFunction}('${metricPrefix}${metric}'`;
     if (filter) {
       queryString += `, '${filter}')${caqlTransform}${caqlLabel}`;
-    } 
+    }
     else {
       if ('*' === metric) {
         queryString += ', limit=10';
@@ -1250,7 +1252,7 @@ export function QueryEditor(props: Props) {
     }
     if (query.queryType === 'graphite') {
         buildGraphiteQuery();
-    } 
+    }
     else if (query.queryType === 'basic') {
         buildStandardQuery();
     }
@@ -1348,7 +1350,7 @@ export function QueryEditor(props: Props) {
   return (
     <>
       <InlineFieldRow>
-        <InlineField 
+        <InlineField
           label={<Label className={cx(styles.labels)}>Query Type</Label>}
           >
           <Select
@@ -1512,11 +1514,11 @@ export function QueryEditor(props: Props) {
       {
         isCaqlQuery
         ? <TextArea
-            value={queryDisplay}
+            defaultValue={queryDisplay}
             placeholder="find('metric','and(tag:val)') | stats:sum()"
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+            onBlur={(event: ChangeEvent<HTMLTextAreaElement>) => {
               let value = event.target.value;
-              updateField('queryDisplay', query.queryDisplay = value);
+              updateField('queryDisplay', query.queryDisplay = value, false);
               buildQueries();
               updateField('query', query.query);
             }}
@@ -1547,7 +1549,7 @@ export function QueryEditor(props: Props) {
               <div className={cx(styles.fillFlex)}></div>
             </InlineFieldRow>
             <InlineFieldRow>
-              <InlineField 
+              <InlineField
                 label={<Label className={cx(styles.labels)}>Alert Query</Label>}
                 >
                 <Input
@@ -1563,7 +1565,7 @@ export function QueryEditor(props: Props) {
               <div className={cx(styles.fillFlex)}></div>
             </InlineFieldRow>
             <InlineFieldRow>
-              <InlineField 
+              <InlineField
                 label={<Label className={cx(styles.labels)}>Local Filter</Label>}
                 >
                 <Select
@@ -1574,7 +1576,7 @@ export function QueryEditor(props: Props) {
                   }}
                   />
               </InlineField>
-              <InlineField 
+              <InlineField
                 grow={true}
                 >
                 <Input
@@ -1591,7 +1593,7 @@ export function QueryEditor(props: Props) {
             {
               isAlertCountQuery
               ? <InlineFieldRow>
-                  <InlineField 
+                  <InlineField
                     label={<Label className={cx(styles.labels)}>Query Type</Label>}
                     >
                     <Select
@@ -1611,7 +1613,7 @@ export function QueryEditor(props: Props) {
       {
         isStandardQuery && !isHeatmapFormat
         ? <InlineFieldRow>
-            <InlineField 
+            <InlineField
               label={<Label className={cx(styles.labels)}>Label</Label>}
               >
               <Select
@@ -1624,7 +1626,7 @@ export function QueryEditor(props: Props) {
             </InlineField>
             {
               isCustomLabelType
-              ? <InlineField 
+              ? <InlineField
                   grow={true}
                   >
                   <Input
@@ -1648,7 +1650,7 @@ export function QueryEditor(props: Props) {
       {
         isAlertCountQuery
         ? <InlineFieldRow>
-            <InlineField 
+            <InlineField
               label={<Label className={cx(styles.labels)}>Label</Label>}
               >
               <Input
@@ -1669,7 +1671,7 @@ export function QueryEditor(props: Props) {
       {
         (isStandardQuery || isGraphiteQuery) && !isHeatmapFormat
         ? <InlineFieldRow>
-            <InlineField 
+            <InlineField
               label={<Label className={cx(styles.labels)}>Value Type</Label>}
               >
               <Select
@@ -1685,7 +1687,7 @@ export function QueryEditor(props: Props) {
         : <></>
       }
       <InlineFieldRow>
-        <InlineField 
+        <InlineField
           label={<Label className={cx(styles.labels)}>Resolution</Label>}
           >
           <Select
@@ -1698,7 +1700,7 @@ export function QueryEditor(props: Props) {
         </InlineField>
         {
           !isAutoRollupType
-          ? <InlineField 
+          ? <InlineField
               grow={true}
               >
               <Input
@@ -1720,7 +1722,7 @@ export function QueryEditor(props: Props) {
       {
         isCaqlQuery
         ? <InlineFieldRow>
-            <InlineField 
+            <InlineField
               label={<Label className={cx(styles.labels)}>Force Min Period</Label>}
               >
               <Select
@@ -1736,7 +1738,7 @@ export function QueryEditor(props: Props) {
         : <></>
       }
       <InlineFieldRow>
-        <InlineField 
+        <InlineField
           label={<Label className={cx(styles.labels)}>Format</Label>}
           >
           <Select
