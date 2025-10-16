@@ -341,11 +341,11 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      * This builds a CAQL item into the prepped items.
      */
     function _buildCaqlItem(target: any) {
-      const { query, rolluptype, metricrollup, format, refId, min_period = '' } = target;
+      const { query, rolluptype, metricrollup, format, refId, minPeriod = '' } = target;
 
       preppedItems.caql.names.push({
         leaf_name: query,
-        leaf_data: { rolluptype, metricrollup, format, refId, min_period },
+        leaf_data: { rolluptype, metricrollup, format, refId, minPeriod },
       });
 
       return Promise.resolve();
@@ -581,7 +581,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           preppedItems.caql.names[i].leaf_name,
           preppedItems.scopedVars
         );
-        const minPeriod = preppedItems.caql.names[i].leaf_data?.min_period;
+        const minPeriod = preppedItems.caql.names[i].leaf_data?.minPeriod;
         // prefix with the target's min_period if min_period isn't in the query already
         const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
         // render start, end, & period
