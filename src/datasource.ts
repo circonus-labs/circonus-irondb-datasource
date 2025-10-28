@@ -341,11 +341,11 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      * This builds a CAQL item into the prepped items.
      */
     function _buildCaqlItem(target: any) {
-      const { query, rolluptype, metricrollup, format, refId, minPeriod = '' } = target;
+      const { query, rollupType, metricRollup, format, refId, minPeriod = '' } = target;
 
       preppedItems.caql.names.push({
         leaf_name: query,
-        leaf_data: { rolluptype, metricrollup, format, refId, minPeriod },
+        leaf_data: { rollupType, metricRollup, format, refId, minPeriod },
       });
 
       return Promise.resolve();
@@ -435,9 +435,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         data[i].leaf_data.metricLabel = templateSrv.replace(interpolatedLabel, scopedVars);
         // wrap things up
         data[i].leaf_data.check_tags = data[i].check_tags;
-        if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
-          data[i].leaf_data.rolluptype = target.rolluptype;
-          data[i].leaf_data.metricrollup = target.metricrollup;
+        if (target.rollupType !== 'automatic' && !_.isEmpty(target.metricRollup)) {
+          data[i].leaf_data.rollupType = target.rollupType;
+          data[i].leaf_data.metricRollup = target.metricRollup;
         }
         // return the item
         return {
@@ -725,13 +725,13 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
    * This determines the data period for a request.
    */
   getRollupSpan(preppedItems: DataRequestItems, start: number, end: number, isCaql: boolean, leafData: any) {
-    let rolluptype = leafData.rolluptype;
-    const metricrollup = leafData.metricrollup;
-    if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
-      rolluptype = 'automatic';
+    let rollupType = leafData.rollupType;
+    const metricRollup = leafData.metricRollup;
+    if (rollupType !== 'automatic' && _.isEmpty(metricRollup)) {
+      rollupType = 'automatic';
     }
-    if (rolluptype === 'exact') {
-      const exactMs = parseDurationMS(metricrollup);
+    if (rollupType === 'exact') {
+      const exactMs = parseDurationMS(metricRollup);
       const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
       if (exactDatapoints > (preppedItems.maxDataPoints || 1000000) * MAX_EXACT_DATAPOINTS_THRESHOLD) {
         this.throwerr('Too many datapoints requested.');
@@ -754,8 +754,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
     else {
       let minimumMs = isCaql ? MIN_DURATION_MS_CAQL : MIN_DURATION_MS_FETCH;
-      if (rolluptype === 'minimum') {
-        minimumMs = parseDurationMS(metricrollup);
+      if (rollupType === 'minimum') {
+        minimumMs = parseDurationMS(metricRollup);
       }
       const intervalMs = Math.max(preppedItems.intervalMs, minimumMs);
       let interval = _nudgeInterval(_forceRollupAlignment(intervalMs) / 1000, -1);
