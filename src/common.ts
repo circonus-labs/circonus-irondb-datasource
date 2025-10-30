@@ -19,7 +19,7 @@ export const DEFAULT_QUERY: Partial<CirconusQuery> = {
   queryType: 'graphite',
   labelType: 'default',
   metricLabel: '',
-  egressOverride: 'automatic',
+  egressOverride: 'average',
   rollupType: 'automatic',
   metricRollup: '',
   minPeriod: '',
@@ -57,8 +57,8 @@ export const ROLLUP_ALIGN_MS = _.map([1, 60, 3600, 86400], (x) => x * 1000);
 export const ROLLUP_ALIGN_MS_1DAY = 86400 * 1000;
 
 /**
- * Use this to test and see if a tag piece (cat or val) contains invalid chars 
- * and needs to be base64 encoded. Normally `*` isn't a valid char but it is 
+ * Use this to test and see if a tag piece (cat or val) contains invalid chars
+ * and needs to be base64 encoded. Normally `*` isn't a valid char but it is
  * for searching purposes.
  */
 export const INVALID_TAG_CHARS_REGEXP = /[^`+A-Za-z0-9!@#\$%^&"'\/\?\._\*-]/;
@@ -76,7 +76,7 @@ export const DURATION_UNITS = {
 };
 
 /**
- * This takes a duration string and converts it to milliseconds. If no units 
+ * This takes a duration string and converts it to milliseconds. If no units
  * are specified, seconds are the assumed unit.
  */
 export function parseDurationMS(duration: string): number {
@@ -89,7 +89,7 @@ export function parseDurationMS(duration: string): number {
 }
 
 /**
- * This takes an array of tags and compiles them into a TagSet (an object keyed 
+ * This takes an array of tags and compiles them into a TagSet (an object keyed
  * by tag), so there's a list of all tag vals for each tag cat.
  */
 export function splitTags(tags: string, decode = true): TagSet {
@@ -228,7 +228,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   function _metaTagDiff(meta: any[], tag: string) {
     let keycnt = 0;
     const seen = new Map();
-    
+
     for (let i = 0; i < meta.length; i++) {
       const tags = taglessNameAndTags(meta[i].metric_name)[1];
       const tagSet = splitTags(tags);
@@ -304,13 +304,13 @@ export function decodeTagsInLabel(label: string): string {
 }
 
 /**
- * This looks at a canonical metric name and determines whether it is a statsd 
+ * This looks at a canonical metric name and determines whether it is a statsd
  * counter metric.
  */
 export function isStatsdCounter(name: string): boolean {
     const rawTags = taglessNameAndTags(name)[1];
     const tagSet = splitTags(rawTags);
-    
+
     return tagSet['statsd_type']?.includes('count');
 }
 
@@ -323,7 +323,7 @@ export function escapeStringForRegExp(regexpString = '') {
 }
 
 /**
- * This takes a string and prepares it for being turned into a 
+ * This takes a string and prepares it for being turned into a
  * Regular Expression.
  */
 export function prepStringForRegExp(regexpString = ''): string {
@@ -354,7 +354,7 @@ export function prepStringForRegExp(regexpString = ''): string {
 
 /**
  * This removes tags from an array of data object names. Graphite-style finding
- * results in names like this (if they have tags): 
+ * results in names like this (if they have tags):
  * 2ff643a7-c9de-4c24-9f59-3fdb3baa6a38.automation.example-service...refresh;collector=statsd;source=circonus-agent;statsd_type=timing
  * and it won't work if the tags are on there.
  */
@@ -478,20 +478,20 @@ export function setupCache(useCaching = false, backendSrv: any, datasourceInstan
 export const md5 = (function (global) {
   const hex_chr = '0123456789abcdef'.split('');
   let use_alternate_add32 = false;
-  
+
   /* Some IEs are the only ones I know of that need the alternate function */
   if (md5('hello') !== '5d41402abc4b2a76b9719d911017c592') {
       use_alternate_add32 = true;
   }
-  
+
   return md5;
-  
-  
+
+
   function md5(s: any) {
       return hex(md51(s));
   }
-  
-  
+
+
   function md5cycle(x: any, k: any) {
       let a = x[0],
           b = x[1],
@@ -571,39 +571,39 @@ export const md5 = (function (global) {
       x[2] = add32(c, x[2]);
       x[3] = add32(d, x[3]);
   }
-  
-  
+
+
   function cmn(q: any, a: any, b: any, x: any, s: any, t: any) {
       a = add32(add32(a, q), add32(x, t));
       return add32((a << s) | (a >>> (32 - s)), b);
   }
-  
-  
+
+
   function ff(a: any, b: any, c: any, d: any, x: any, s: any, t: any) {
       return cmn((b & c) | ((~b) & d), a, b, x, s, t);
   }
-  
-  
+
+
   function gg(a: any, b: any, c: any, d: any, x: any, s: any, t: any) {
       return cmn((b & d) | (c & (~d)), a, b, x, s, t);
   }
-  
-  
+
+
   function hh(a: any, b: any, c: any, d: any, x: any, s: any, t: any) {
       return cmn(b ^ c ^ d, a, b, x, s, t);
   }
-  
-  
+
+
   function ii(a: any, b: any, c: any, d: any, x: any, s: any, t: any) {
       return cmn(c ^ (b | (~d)), a, b, x, s, t);
   }
-  
-  
+
+
   function md51(s: any) {
       let n     = s.length,
           state = [1732584193, -271733879, -1732584194, 271733878],
           i;
-     
+
       for (i = 64; i <= s.length; i += 64) {
           md5cycle(state, md5blk(s.substring(i - 64, i)));
       }
@@ -621,7 +621,7 @@ export const md5 = (function (global) {
       }
       tail[14] = n * 8;
       md5cycle(state, tail);
-      
+
       return state;
   }
 
@@ -643,44 +643,44 @@ export const md5 = (function (global) {
   function md5blk(s: any) { /* I figured global was faster.   */
       let md5blks = [],
           i; /* Andy King said do it this way. */
-     
+
       for (i = 0; i < 64; i += 4) {
           md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
       }
-      
+
       return md5blks;
   }
-  
-  
+
+
   function rhex(n: any) {
       let s = '',
           j = 0;
-      
+
       for (; j < 4; j++) {
           s += hex_chr[(n >> (j * 8 + 4)) & 0x0F] + hex_chr[(n >> (j * 8)) & 0x0F];
       }
-      
+
       return s;
   }
-  
+
 
   function hex(x: any) {
       for (let i = 0; i < x.length; i++) {
           x[i] = rhex(x[i]);
       }
-      
+
       return x.join('');
   }
-  
+
 
   /* the standard function is much faster, so if possible, use it. */
   function add32(a: any, b: any) {
       return (use_alternate_add32 ? alternate : standard)();
-      
+
       function standard() {
           return (a + b) & 0xFFFFFFFF;
       }
-      
+
       function alternate() {
           let lsw = (a & 0xFFFF) + (b & 0xFFFF),
               msw = (a >> 16) + (b >> 16) + (lsw >> 16);

@@ -410,14 +410,16 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           target,
           isGraphite,
         };
-        // set the transform (egressoverride)
-        const egressoverride = thisType === 'histogram' ? 'histogram' : target.egressoverride;
-        if (egressoverride && egressoverride !== 'average') {
-          if (egressoverride === 'automatic' && isStatsdCounter(leafName)) {
-            data[i].leaf_data.egress_function = 'counter';
+        // set the transform (egressOverride)
+        const egressOverride = thisType === 'histogram' ? 'histogram' : target.egressOverride;
+        if (egressOverride && egressOverride !== 'average') {
+          if (egressOverride === 'automatic') {
+            if (isStatsdCounter(leafName)) {
+              data[i].leaf_data.egress_function = 'counter';
+            }
           }
           else {
-            data[i].leaf_data.egress_function = egressoverride;
+            data[i].leaf_data.egress_function = egressOverride;
           }
         }
         // set the label
