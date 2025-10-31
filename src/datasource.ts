@@ -2,7 +2,6 @@ import {
   AnnotationQueryRequest,
   AnnotationEvent,
   ArrayVector,
-  DataFrame,
   DataSourceInstanceSettings,
   DataSourceApi,
   DataQueryResponse,
@@ -44,12 +43,9 @@ import {
   encodeTag,
   getTimeField,
   getNumberField,
-  getTextField,
-  getOtherField,
   metaInterpolateLabel,
   mergeTags,
   parseDurationMS,
-  prepStringForRegExp,
   setupCache,
   splitTags,
   taglessName,
@@ -79,7 +75,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     super(instanceSettings);
     this.backendSrv = getBackendSrv();
     this.templateSrv = getTemplateSrv();
-    
+
     this.dataSourceOptions = instanceSettings.jsonData;
     _.defaults(this.dataSourceOptions, DEFAULT_OPTIONS);
 
@@ -129,7 +125,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     //   for (let t = 0; t < duration; t += step) {
     //     frame.add({ time: from + t, value: Math.sin((2 * Math.PI * t) / duration) });
     //   }
-    //   return frame;      
+    //   return frame;
     // });
     // return Promise.resolve({ data });
     // -------------------------------------------------------------------------
@@ -268,8 +264,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   }
 
   /**
-   * This indicates whether we should ignore the Check UUID at the beginning 
-   * of the the first segment in graphite-style queries (they always start with 
+   * This indicates whether we should ignore the Check UUID at the beginning
+   * of the the first segment in graphite-style queries (they always start with
    * check UUIDs as the first segment if no query prefix is used).
    */
   ignoreGraphiteUUIDs() {
@@ -277,8 +273,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   }
 
   /**
-   * This performs metric searches and performs other tasks as necessary to 
-   * build the metric streams, CAQL queries, alert queries, et al which are 
+   * This performs metric searches and performs other tasks as necessary to
+   * build the metric streams, CAQL queries, alert queries, et al which are
    * necessary for the main data requests.
    */
   buildDataRequestItems(options: any) {
@@ -329,9 +325,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         if (target.isCaql || target.queryType === 'caql') {
           promise = _buildCaqlItem(target);
         }
-        else if (target.queryType === 'alerts' || target.queryType === 'alert_counts') {
-          promise = _buildAlertItem(target);
-        }
         else {
           promise = _buildMetricItems(target);
         }
@@ -343,41 +336,17 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       .catch((err) => {
         log(() => `buildIrondbParamsAsync() error = ${JSON.stringify(err)}`);
       });
-    
+
     /**
      * This builds a CAQL item into the prepped items.
      */
     function _buildCaqlItem(target: any) {
-      const { query, rolluptype, metricrollup, format, refId, min_period = '' } = target;
+      const { query, rollupType, metricRollup, format, refId, minPeriod = '' } = target;
 
       preppedItems.caql.names.push({
         leaf_name: query,
-        leaf_data: { rolluptype, metricrollup, format, refId, min_period },
+        leaf_data: { rollupType, metricRollup, format, refId, minPeriod },
       });
-
-      return Promise.resolve();
-    }
-    
-    /**
-     * This builds an alert item into the prepped items.
-     */
-    function _buildAlertItem(target: any) {
-      let rawQuery = templateSrv.replace(target.query, preppedItems.scopedVars);
-
-      if (target.alertId !== '') {
-        rawQuery = `alert_id:${templateSrv.replace(target.alertId, preppedItems.scopedVars)}`;
-      }
-      preppedItems.alert.names.push(rawQuery);
-      preppedItems.alert.localFilters.push(
-        templateSrv.replace(target.localFilter, preppedItems.scopedVars)
-      );
-      preppedItems.alert.localFilterMatches.push(target.localFilterMatch);
-      preppedItems.alert.countsOnly = target.queryType === 'alert_counts';
-      preppedItems.alert.queryType = target.alertCountQueryType;
-      preppedItems.alert.labels.push(
-        templateSrv.replace(target.metricLabel, preppedItems.scopedVars)
-      );
-      preppedItems.alert.target = target;
 
       return Promise.resolve();
     }
@@ -395,7 +364,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       const promise = isGraphite ?
         metricGraphiteQuery.call(ds, rawQuery, false, start, end, tagFilter) :
         metricTagsQuery.call(ds, rawQuery, false, start, end);
-  
+
       return promise
         .then((result: any) => {
           // filter out text metrics
@@ -411,9 +380,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             );
           });
         });
-      
+
       /**
-       * This builds a data fetch stream for each metric stream returned 
+       * This builds a data fetch stream for each metric stream returned
        * from the query.
        */
       function _buildFetchStream(target: any, data: any[], i: number) {
@@ -421,10 +390,10 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         let leafName = data[i].metric_name || data[i].name;
         let leafUuid = data[i].leaf_data?.uuid;
         let leafMetricName = data[i].leaf_data?.name;
-    
+
         // get the metric type
-        const baseType = ('heatmap' === target.format 
-          ? 'histogram' 
+        const baseType = ('heatmap' === target.format
+          ? 'histogram'
           : (data[i].metric_type || data[i].type || data[i].leaf_data?.metric_type || data[i].leaf_data.type));
         let types = (baseType || 'numeric').split(',');
         let thisType;
@@ -441,14 +410,16 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           target,
           isGraphite,
         };
-        // set the transform (egressoverride)
-        const egressoverride = thisType === 'histogram' ? 'histogram' : target.egressoverride;
-        if (egressoverride && egressoverride !== 'average') {
-          if (egressoverride === 'automatic' && isStatsdCounter(leafName)) {
-            data[i].leaf_data.egress_function = 'counter';
+        // set the transform (egressOverride)
+        const egressOverride = thisType === 'histogram' ? 'histogram' : target.egressOverride;
+        if (egressOverride && egressOverride !== 'average') {
+          if (egressOverride === 'automatic') {
+            if (isStatsdCounter(leafName)) {
+              data[i].leaf_data.egress_function = 'counter';
+            }
           }
           else {
-            data[i].leaf_data.egress_function = egressoverride;
+            data[i].leaf_data.egress_function = egressOverride;
           }
         }
         // set the label
@@ -466,9 +437,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         data[i].leaf_data.metricLabel = templateSrv.replace(interpolatedLabel, scopedVars);
         // wrap things up
         data[i].leaf_data.check_tags = data[i].check_tags;
-        if (target.rolluptype !== 'automatic' && !_.isEmpty(target.metricrollup)) {
-          data[i].leaf_data.rolluptype = target.rolluptype;
-          data[i].leaf_data.metricrollup = target.metricrollup;
+        if (target.rollupType !== 'automatic' && !_.isEmpty(target.metricRollup)) {
+          data[i].leaf_data.rollupType = target.rollupType;
+          data[i].leaf_data.metricRollup = target.metricRollup;
         }
         // return the item
         return {
@@ -612,7 +583,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           preppedItems.caql.names[i].leaf_name,
           preppedItems.scopedVars
         );
-        const minPeriod = preppedItems.caql.names[i].leaf_data?.min_period;
+        const minPeriod = preppedItems.caql.names[i].leaf_data?.minPeriod;
         // prefix with the target's min_period if min_period isn't in the query already
         const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
         // render start, end, & period
@@ -705,17 +676,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
               this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
             }
-            if (!_.isUndefined(query.isAlert)) {
-              if (query.countsOnly) {
-                return this.countAlerts(result, query);
-              }
-              else {
-                return this.enrichAlertsWithRules(result, query).then((results) => {
-                  return this.convertAlertDataToGrafana(results);
-                });
-              }
-            }
-            else if (query.isGraphite) {
+            if (query.isGraphite) {
               return this.convertIrondbGraphiteDataToGrafana(result, query);
             }
             else {
@@ -766,13 +727,13 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
    * This determines the data period for a request.
    */
   getRollupSpan(preppedItems: DataRequestItems, start: number, end: number, isCaql: boolean, leafData: any) {
-    let rolluptype = leafData.rolluptype;
-    const metricrollup = leafData.metricrollup;
-    if (rolluptype !== 'automatic' && _.isEmpty(metricrollup)) {
-      rolluptype = 'automatic';
+    let rollupType = leafData.rollupType;
+    const metricRollup = leafData.metricRollup;
+    if (rollupType !== 'automatic' && _.isEmpty(metricRollup)) {
+      rollupType = 'automatic';
     }
-    if (rolluptype === 'exact') {
-      const exactMs = parseDurationMS(metricrollup);
+    if (rollupType === 'exact') {
+      const exactMs = parseDurationMS(metricRollup);
       const exactDatapoints = Math.floor(((end - start) * 1000) / exactMs);
       if (exactDatapoints > (preppedItems.maxDataPoints || 1000000) * MAX_EXACT_DATAPOINTS_THRESHOLD) {
         this.throwerr('Too many datapoints requested.');
@@ -795,8 +756,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
     else {
       let minimumMs = isCaql ? MIN_DURATION_MS_CAQL : MIN_DURATION_MS_FETCH;
-      if (rolluptype === 'minimum') {
-        minimumMs = parseDurationMS(metricrollup);
+      if (rollupType === 'minimum') {
+        minimumMs = parseDurationMS(metricRollup);
       }
       const intervalMs = Math.max(preppedItems.intervalMs, minimumMs);
       let interval = _nudgeInterval(_forceRollupAlignment(intervalMs) / 1000, -1);
@@ -864,16 +825,16 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
   /**
    * This is used to load variable values (in the dashboard config variable
-   * setup and also whenever refreshing variable values when viewing a 
+   * setup and also whenever refreshing variable values when viewing a
    * dashboard).
-   * 
+   *
    * Older versions of grafana had support for an experimental
-   * tag extraction feature which the older version of this datasource 
+   * tag extraction feature which the older version of this datasource
    * relied on. That experimental code was removed in Grafana 8.
-   * 
+   *
    * In order to support extraction of tag values we need to implement
    * our own variable query.
-   * 
+   *
    * There is code here (called out below) that attempts to migrate
    * the prior setup (that relied on the experimental feature) into
    * the new CirconusVariableQuery structure.
@@ -1043,7 +1004,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     return Promise.resolve([]);
 
     /**
-     * This manually finds the edit pane 'Preview' header and injects a 
+     * This manually finds the edit pane 'Preview' header and injects a
      * warning beforehand.
      */
     function _showResultWarning(result_count: number) {
@@ -1078,7 +1039,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     }
 
     /**
-     * This processes a variable value during the nested variable 
+     * This processes a variable value during the nested variable
      * replacement process.
      */
     function _processVariableValue(value: string | string[] = [], variable: any) {
@@ -1246,11 +1207,11 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   }
 
   /**
-   * This looks at the variables and checks for variable values which need 
-   * base64 encoding due to being used as tag values. (This is rather 
-   * brute-force, but since we can't fully parse the query here, it's all we 
+   * This looks at the variables and checks for variable values which need
+   * base64 encoding due to being used as tag values. (This is rather
+   * brute-force, but since we can't fully parse the query here, it's all we
    * can do.)
-   * We're basically looking at all the current variable values and encoding 
+   * We're basically looking at all the current variable values and encoding
    * them if they're preceded by a colon.
    */
   checkVariablesEncoding(query: string) {
@@ -1270,279 +1231,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     });
 
     return query;
-  }
-
-  /**
-   * This compares an alert to some filters and returns a boolean indicating
-   * whether there's NOT a match (no match = true).
-   */
-  alertDoesNotMatchFilter(filter_pairs: any[], match: string, alert: any) {
-    let doesNotMatch = true;
-
-    // nothing to filter on, everything matches
-    if (filter_pairs.length === 0) {
-      doesNotMatch = false;
-    }
-    else {
-      // ALL matches
-      if (match === 'all') {
-        let localNotMatch = false;
-        for (const pair of filter_pairs) {
-          if (!_doesMatch(pair, alert)) {
-            localNotMatch = true;
-          }
-        }
-        doesNotMatch = localNotMatch;
-      }
-      // ANY match
-      else {
-        let localNotMatch = true;
-        for (const pair of filter_pairs) {
-          if (_doesMatch(pair, alert)) {
-            localNotMatch = false;
-          }
-        }
-        doesNotMatch = localNotMatch;
-      }
-    }
-    
-    return doesNotMatch;
-
-    /**
-     * This checks an alert against a criteria and returns true if there's 
-     * a match.
-     * Supported pair.key: alert_id, tag, acknowledged, severities
-     */
-    function _doesMatch(pair: any, alert: any) {
-      let match = false;
-
-      switch (pair.key) {
-        case 'alert_id':
-          if (alert['_cid'].endsWith(`/${pair.value}`)) {
-            match = true;
-          }
-          break;
-
-        case 'acknowledged':
-          if (pair.value === 'true') {
-            match = alert['_acknowledgement'] !== null;
-          }
-          else if (pair.value === 'false') {
-            match = alert['_acknowledgement'] === null;
-          }
-          else {
-            match = true;
-          }
-          break;
-
-        case 'severities':
-          match = pair.value.indexOf(alert['_severity']) !== -1;
-          break;
-
-        case 'tag':
-          const tags: any[] = [];
-          const cn = alert['_canonical_metric_name'];
-          if (cn) {
-            const stream_tags = taglessNameAndTags(cn)[1];
-            const temptags = stream_tags.split(',');
-            for (const tag of temptags) {
-              const tagSep = tag.split(/:/g);
-              let tagCat = tagSep.shift() as string;
-              if (!tagCat.startsWith('__')) {
-                let tagVal = tagSep.join(':');
-                tags.push({ cat: decodeTag(tagCat), val: decodeTag(tagVal), });
-              }
-            }
-          }
-          for (const tag of alert['_tags']) {
-            const tagSep = tag.split(/:/g);
-            let tagCat = tagSep.shift();
-            if (!tagCat.startsWith('__') && tagCat !== '') {
-              let tagVal = tagSep.join(':');
-              tags.push({ cat: decodeTag(tagCat), val: decodeTag(tagVal), });
-            }
-          }
-          for (const tag of tags) {
-            const pp = pair.value.split(':');
-            const valRegExp = new RegExp(prepStringForRegExp(pp[1]), 'i');
-            if (tag.cat === pp[0] && valRegExp.test(tag.val)) {
-              match = true;
-            }
-          }
-          break;
-      }
-
-      return match;
-    }
-  }
-
-  /**
-   * This counts the alerts returned by a query, to be shown for "count only"
-   * alert queries.
-   */
-  countAlerts(alerts: any, query: any) {
-    const tempData: any[] = alerts.data;
-    let data = _.isArray(tempData) ? tempData : [tempData];
-
-    // if there's a local filter, parse it into match pairs 
-    // (a filter is a series of field:value tokens separated by commas)
-    let filter_pairs = [];
-    const filter_match = query.localFilterMatch;
-    if (query.localFilter) {
-      const tokens = query.localFilter.split(',');
-      for (const t of tokens) {
-        const x = t.trim();
-        const i = x.indexOf(':');
-        if (~i) {
-          const pair: any = {};
-          pair.key = x.slice(0, i);
-          pair.value = x.slice(i + 1);
-          filter_pairs.push(pair);
-        }
-      }
-    }
-
-    // for range queries, fill minute buckets with zeroes
-    const countBuckets: any = {};
-    if (query.queryType === 'range') {
-      let qs = query.start;
-      qs = qs - (qs % 60); // floor to the previous minute
-      let qe = query.end;
-      qe = qe - (qe % 60); // floor to the previous minute
-      for (let i = qs; i < qe; i += 60) {
-        countBuckets[String(i)] = 0;
-      }
-    }
-
-    // do the counting, either total or by minute
-    let count = 0;
-    for (let i=0; i<data.length; i++) {
-      if (this.alertDoesNotMatchFilter(filter_pairs, filter_match, data[i])) {
-        continue;
-      }
-      const alert = data[i];
-      let epoch = alert._occurred_on;
-      if (query.queryType === 'range') {
-        epoch = epoch - (epoch % 60); // floor to the previous minute
-        if (String(epoch) in countBuckets) {
-          countBuckets[String(epoch)]++;
-        }
-      }
-      else {
-        count = count + 1;
-      }
-    }
-
-    // compile the data frames
-    const label = query.label || 'Value';
-    const timeField: any = getTimeField();
-    timeField.refId = query.refId;
-    const valueField = getNumberField(label);
-    const dataFrames: DataFrame[] = [];
-    if (query.queryType === 'range') {
-      for (let [epoch, count] of Object.entries(countBuckets)) {
-        timeField.values.add(Number(epoch) * 1000);
-        valueField.values.add(count);
-      }
-      dataFrames.push({
-        length: timeField.values.length,
-        fields: [timeField, valueField],
-      });
-    }
-    else {
-      valueField.values.add(count);
-      dataFrames.push({
-        length: 1,
-        fields: [valueField],
-      });
-    }
-
-    return {
-      t: 'ts',
-      data: dataFrames,
-      target: query.target,
-      state: LoadingState.Done,
-    };
-  }
-
-  /**
-   * This pulls rulesets to add to alert data for enrichment. 
-   * Any local filters are applied.
-   */
-  enrichAlertsWithRules(alerts: any, query: any) {
-    const tempData = alerts.data;
-    let data = _.isArray(tempData) ? tempData : [tempData];
-    const queries = [];
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Circonus-Auth-Token': this.dataSourceOptions.apiToken,
-      'X-Circonus-App-Name': this.appName,
-      'Accept': 'application/json',
-    };
-    if ('hosted' !== this.dataSourceOptions.irondbType) {
-      this.throwerr('Alert queries are only supported on hosted IRONdb installations.');
-    }
-
-    // if there's a local filter, parse it into match pairs 
-    // (a filter is a series of field:value tokens separated by commas)
-    let filter_pairs = [];
-    const filter_match = query.localFilterMatch;
-    if (query.localFilter) {
-      const tokens = query.localFilter.split(',');
-      for (const t of tokens) {
-        const x = t.trim();
-        const i = x.indexOf(':');
-        if (~i) {
-          const pair: any = {};
-          pair.key = x.slice(0, i);
-          pair.value = x.slice(i + 1);
-          filter_pairs.push(pair);
-        }
-      }
-    }
-
-    // finish compiling the queries
-    for (let i = 0; i < data.length; i++) {
-      if (this.alertDoesNotMatchFilter(filter_pairs, filter_match, data[i])) {
-        continue;
-      }
-      let options: any = {
-        url: this.url,
-        method: 'GET',
-        headers: headers,
-        retry: 1,
-        alert_data: data[i],
-        withCredentials: this.basicAuth || this.withCredentials,
-      };
-      if ('hosted' === this.dataSourceOptions.irondbType) {
-        options.url += '/v2';
-      }
-      options.url += data[i]._rule_set;
-      if (this.basicAuth) {
-        options.headers.Authorization = this.basicAuth;
-      }
-      queries.push(options);
-    }
-
-    return Promise.all(queries.map((query) =>
-        this.datasourceRequest(query)
-        .then((result: any) => {
-          return {
-            alert: query.alert_data,
-            rule: result.data,
-          };
-        })
-        .catch((failed: any) => {
-          // skipping ruleset groups for now, as they would be hard to implement
-          return {
-            alert: query.alert_data,
-            rule: null,
-          };
-        })
-      ))
-      .then((results) => {
-        return results;
-      });
   }
 
   /**
@@ -1817,334 +1505,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   }
 
   /**
-   * This converts alert data to Grafana's format.
-   */
-  convertAlertDataToGrafana(enrichedResults: any[]) {
-    if (_.isUndefined(enrichedResults) || enrichedResults.length === 0) {
-      return { data: [] };
-    }
-
-    const dataFrames: DataFrame[] = [];
-    enrichedResults.forEach(_addAlert);
-
-    return {
-      t: 'table',
-      data: dataFrames,
-      state: LoadingState.Done,
-    };
-
-    /**
-     * This adds an alert result data frame.
-     */
-    function _addAlert(alertResult: any) {
-      const timeField = getTimeField();
-      const alternateTimeField = getTimeField('alert_timestamp');
-      const labelFields = new Set<MutableField>();
-      const valueFields = new Set<MutableField>();
-      const allValues: any = {};
-      const fields: any = {
-        _acknowledgement: getTextField('acknowledgement'),
-        _alert_url: getTextField('circonus_alert_url'),
-        _check_name: getTextField('check_name'),
-        _cleared_on: getTimeField('cleared_timestamp'),
-        _metric_link: getTextField('metric_link'),
-        _severity: getNumberField('severity'),
-        derive: getTextField('derive'),
-        metric_type: getTextField('metric_type'),
-        _value: getOtherField('alert_value'),
-        _cleared_value: getOtherField('cleared_value'),
-        _cid: getTextField('alert_id'),
-      };
-      const specialFields: any = {
-        _signature: getTextField('check_uuid'),
-        _canonical_metric_name: getTextField('metric_name'),
-        _metric_name: 1,
-        _tags: 1,
-      };
-      const thresholdFields: any = {
-        threshold_1: getNumberField('threshold_1'),
-        threshold_2: getNumberField('threshold_2'),
-        threshold_3: getNumberField('threshold_3'),
-        threshold_4: getNumberField('threshold_4'),
-        threshold_5: getNumberField('threshold_5'),
-      };
-      const alert = alertResult.alert;
-      const rule = alertResult.rule;
-      const tags: TagSet = {};
-
-      for (const key in alert) {
-        if (key === '_occurred_on') {
-          const epoch = alert[key];
-          timeField.values.add(epoch * 1000);
-          alternateTimeField.values.add(epoch * 1000);
-          // Also create a time window 30 minutes before the alert up to 30 mins 
-          // after `cleared_on`. If it's not a cleared alert, use 30 mins after 
-          // the alert timestamp as the window (or now if it's recent).
-          const before = epoch - 1800;
-          const cleared = alert._cleared_on;
-          let after = epoch + 1800;
-          if (cleared != null) {
-            after = cleared + 1800;
-          }
-          if (after > Math.floor(Date.now() / 1000)) {
-            after = Math.floor(Date.now() / 1000);
-          }
-          const window_start = getNumberField('alert_window_start');
-          const window_end = getNumberField('alert_window_end');
-          valueFields.add(window_start);
-          valueFields.add(window_end);
-          window_start.values.add(before * 1000);
-          window_end.values.add(after * 1000);
-          // special field called 'state' which contains "ALERTING" or "OK"
-          const state = getTextField('state');
-          valueFields.add(state);
-          if (cleared != null) {
-            state.values.add('OK');
-          }
-          else {
-            state.values.add('ALERTING');
-          }
-        }
-        else if (key === '_cid') {
-          const cid = alert[key];
-          fields[key].values.add(cid.replace('/alert/', ''));
-          valueFields.add(fields[key]);
-        }
-        else if (key === '_cleared_on') {
-          const epoch = alert[key];
-          if (epoch !== null) {
-            fields[key].values.add(epoch * 1000);
-          }
-          else {
-            fields[key].values.add(null);
-          }
-          if (!allValues[key]) {
-            allValues[key] = fields[key];
-            valueFields.add(fields[key]);
-          }
-        }
-        else if (fields[key] !== undefined) {
-          let val = alert[key];
-          if (key === '_cleared_value' && alert[key] === null) {
-            val = '';
-          }
-          if ((key === '_value' && alert[key] === null) || alert[key] === '') {
-            val = '';
-          }
-          fields[key].values.add(val);
-          if (!allValues[key]) {
-            allValues[key] = fields[key];
-            valueFields.add(fields[key]);
-          }
-        }
-        else if (specialFields[key] !== undefined) {
-          if (key === '_signature') {
-            const check_uuid = alert[key].substring(0, alert[key].indexOf('`'));
-            specialFields[key].values.add(check_uuid);
-            if (!allValues[key]) {
-              allValues[key] = specialFields[key];
-              valueFields.add(specialFields[key]);
-            }
-          }
-          else if (key === '_canonical_metric_name') {
-            const cn = alert[key];
-            if (cn !== undefined && cn !== '') {
-              const [n, stream_tags] = taglessNameAndTags(cn);
-              specialFields[key].values.add(n);
-              if (!allValues[key]) {
-                allValues[key] = specialFields[key];
-                valueFields.add(specialFields[key]);
-              }
-              const real_cn = getTextField('canonical_metric_name');
-              valueFields.add(real_cn);
-              real_cn.values.add(cn);
-              const st = splitTags(stream_tags);
-              mergeTags(tags, st);
-            }
-          }
-          else if (key === '_metric_name' && alert._canonical_metric_name === '') {
-            const name = alert[key];
-            specialFields._canonical_metric_name?.values?.add(name);
-            if (!allValues[key]) {
-              allValues[key] = specialFields._canonical_metric_name;
-              valueFields.add(specialFields._canonical_metric_name);
-            }
-          }
-          else if (key === '_tags') {
-            for (const tag of alert[key]) {
-              const tagSep = tag.split(/:/g);
-              let tagCat = tagSep.shift();
-              if (!tagCat.startsWith('__') && tagCat !== '') {
-                let tagVal = tagSep.join(':');
-                tagCat = decodeTag(tagCat);
-                tagVal = decodeTag(tagVal);
-                if (tags[tagCat] === undefined) {
-                  tags[tagCat] = [];
-                }
-                tags[tagCat].push(tagVal);
-              }
-            }
-          }
-        }
-      }
-
-      // deal with accumulated tags and make a single comma separated field of tags.
-      const tagField = getTextField('tags');
-      valueFields.add(tagField);
-      let i = 0;
-      let combinedTags = '';
-      for (const tag in tags) {
-        if (i) {
-          combinedTags += '|';
-        }
-        if (tag !== '' && !tag.startsWith('__')) {
-          i++;
-          combinedTags += `${tag}:${tags[tag][0]}`;
-          // also add a dedicated field per tag so people can split them out
-          // if they want to
-          const tf = getTextField(tag);
-          tf.values.add(tags[tag][0]);
-          valueFields.add(tf);
-        }
-      }
-      tagField.values.add(combinedTags);
-
-      // add the threshold fields even if there is no ruleset
-      for (let i = 1; i < 6; i++) {
-        const key = `threshold_${i}`;
-        if (!allValues[key]) {
-          allValues[key] = thresholdFields[key];
-          valueFields.add(thresholdFields[key]);
-        }
-      }
-
-      let doneMap: any = {};
-      if (rule?.metric_type === 'numeric') {
-        // add up to 5 thresholds (one for each severity) based on severity 
-        // from the `rule` object.
-        let d = rule.derive;
-        if (d === 'mixed') {
-          // find the first rule with a windowing_function
-          for (const r of rule.rules) {
-            d = r.windowing_function;
-            if (d != null) {
-              break;
-            }
-          }
-        }
-        const deriveField = getTextField('function');
-        valueFields.add(deriveField);
-        deriveField.values.add(d);
-        for (const r of rule.rules) {
-          const sev = r.severity;
-          // sev 0 means to clear the alert, ignore it for thresholding purposes
-          if (sev === 0) {
-            continue;
-          }
-          const key = `threshold_${sev}`;
-          thresholdFields[key].values.add(r.value);
-          doneMap[sev] = 1;
-        }
-      }
-
-      for (let i = 1; i < 6; i++) {
-        if (doneMap[i] === undefined) {
-          const key = `threshold_${i}`;
-          thresholdFields[key].values.add(-1);
-        }
-      }
-
-      /* Add a text based description of the rules that are attached to this 
-      alert, separated by pipes.
-      "rules": [
-        {
-          "severity": 1,
-          "criteria": "max value",
-          "wait": 0,
-          "windowing_duration": 120,
-          "value": "1000",
-          "windowing_min_duration": 0,
-          "windowing_function": "average"
-        }
-      */
-      const ruleField = getTextField('rule_text');
-      const notesField = getTextField('notes');
-      valueFields.add(ruleField);
-      valueFields.add(notesField);
-      if (rule != null) {
-        if (rule.notes?.length) {
-          notesField.values.add(rule.notes);
-        }
-        else {
-          // metric notes (from the alert object) is an embedded JSON string
-          const mn = alert.metric_notes;
-          if (mn?.length) {
-            try {
-              const notes = JSON.parse(mn);
-              notesField.values.add(notes.notes);
-            }
-            catch (err) {
-              notesField.values.add('');
-            }
-          }
-        }
-        let text = '';
-        let i = 0;
-        for (const r of rule.rules) {
-          let winfunc = r.windowing_function;
-          let duration = '';
-          if (winfunc === null) {
-            winfunc = 'value';
-          }
-          else {
-            duration = `(over ${r.windowing_duration} seconds) `;
-          }
-          let t = `if the ${winfunc} ${duration}`;
-          if (r.criteria === 'on absence') {
-            t += `is absent for ${r.value} seconds, `;
-          }
-          else if (r.criteria === 'max value') {
-            t += `is present and >= ${r.value}, `;
-          }
-          else if (r.criteria === 'min value') {
-            t += `is present and < ${r.value}, `;
-          }
-          else if (r.criteria === 'matches') {
-            t += `is present and matches '${r.value}', `;
-          }
-          else if (r.criteria === 'does not match') {
-            t += `is present and does not match '${r.value}', `;
-          }
-          if (i) {
-            t += "and prior rules aren't triggered, ";
-          }
-          if (r.severity === 0) {
-            t += 'clear the alert.';
-          }
-          else {
-            t += `trigger a sev ${r.severity} alert and wait ${r.wait} minutes before notifying.`;
-          }
-          if (i) {
-            text += '|';
-          }
-          text += t;
-          i++;
-        }
-        ruleField.values.add(text);
-      }
-      else {
-        ruleField.values.add('');
-        notesField.values.add('');
-      }
-
-      dataFrames.push({
-        length: timeField.values.length,
-        fields: [timeField, alternateTimeField, ...labelFields, ...valueFields],
-      });
-    }
-  }
-
-  /**
    * This pulls alerts to show as annotations.
    */
   annotationQuery(query: AnnotationQueryRequest<CirconusQuery>): Promise<AnnotationEvent[]> {
@@ -2196,9 +1556,6 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       queries.map((query) =>
         this.datasourceRequest(query)
         .then((result: any) => {
-          if (!_.isUndefined(query.isAlert)) {
-            return this.enrichAlertsWithRules(result, query);
-          }
           return Promise.resolve([]);
         })
         .then((results: any[]) => {
@@ -2341,7 +1698,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     ],
     "_value": "1091"
   }
-  
+
   and the `rule` field will look like:
   {
     "derive": "average",
@@ -2372,5 +1729,5 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       "1": ["/contact_group/5738"], "2": [], "3": [], "4": [], "5": []
     }
   }
-  */  
+  */
 }

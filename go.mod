@@ -2,16 +2,26 @@ module github.com/circonus/circonus-irondb-datasource
 
 go 1.19
 
-require github.com/grafana/grafana-plugin-sdk-go v0.165.0
+require (
+	github.com/grafana/grafana-plugin-sdk-go v0.165.0
+	github.com/pkg/errors v0.9.1
+)
+
+require (
+	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
+)
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/buger/jsonparser v1.1.1
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20220208224320-6efb837e6bc2 // indirect
+	github.com/circonus-labs/go-apiclient v0.7.17
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/elazarl/goproxy v0.0.0-20220115173737-adb46da277ac // indirect
 	github.com/fatih/color v1.15.0 // indirect
