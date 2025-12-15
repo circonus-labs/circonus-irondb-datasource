@@ -123,7 +123,9 @@ export function QueryEditor(props: Props) {
   const formatOptions = [
     { value: 'ts', label: 'Time Series' },
     { value: 'table', label: 'Table' },
-    { value: 'heatmap', label: 'Heatmap' },
+    // Disabling heatmap as it is not fully supported yet
+    // All code related to format: "heatmap" is still kept for future use
+    // { value: 'heatmap', label: 'Heatmap' },
   ];
   const minPeriodOptions = getMinPeriodOptions(minPeriod);
 
