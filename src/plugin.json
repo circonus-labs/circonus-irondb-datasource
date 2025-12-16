@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
-  "name": "Circonus Datasource",
+  "name": "Apica Circonus IRONdb Datasource",
   "id": "circonus-irondb-datasource",
   "metrics": true,
   "backend": true,
@@ -9,19 +9,19 @@
   "annotations": true,
   "executable": "gpx_circonus_irondb_datasource",
   "info": {
-    "description": "A data source for accessing Circonus metric and alert data.",
+    "description": "A data source for accessing Apica Circonus metric and alert data.",
     "author": {
-      "name": "Circonus",
-      "url": "https://www.circonus.com"
+      "name": "Apica Circonus",
+      "url": "https://www.apica.io"
     },
-    "keywords": ["datasource", "circonus", "irondb", "time series"],
+    "keywords": ["datasource", "circonus", "irondb", "time series", "apica"],
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
     },
     "links": [
-      { "name": "Project site", "url": "https://www.circonus.com" },
-      { "name": "License", "url": "https://github.com/circonus-labs/circonusllhist/blob/master/LICENSE" }
+      { "name": "Project site", "url": "https://github.com/circonus-labs/circonus-irondb-datasource" },
+      { "name": "License", "url": "https://github.com/circonus-labs/circonus-irondb-datasource/blob/master/LICENSE" }
     ],
     "screenshots": [],
     "version": "%VERSION%",
