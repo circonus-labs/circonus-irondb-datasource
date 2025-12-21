@@ -61,13 +61,12 @@ func newDatasource() datasource.ServeOpts {
 	ds := &CirconusDatasource{
 		im: im,
 	}
-
 	return datasource.ServeOpts{
 		QueryDataHandler:   ds,
 	}
 }
 
-func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+func newDataSourceInstance(ctx context.Context, setting backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 
 	irondbType, err := jsonp.GetString(setting.JSONData, "irondbType")
 	if err != nil {
@@ -94,9 +93,9 @@ func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instance
 		Timeouts: &httpclient.TimeoutOptions{
 			Timeout: time.Second * 30,
 		},
-		Headers: map[string]string{
-			"Content-Type": "application/json",
-			"Accept":       "application/json",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"Accept":       []string{"application/json"},
 		},
 		TLS: &httpclient.TLSOptions{
 			InsecureSkipVerify: skipTLSVerify,
@@ -109,7 +108,7 @@ func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instance
 				"error", err, "JSONData", string(setting.JSONData))
 			return nil, fmt.Errorf("unable to get accountId from configuration JSON: %w", err)
 		}
-		httpConfig.Headers["X-Circonus-Account"] = accountId
+		httpConfig.Header["X-Circonus-Account"] = []string{accountId}
 	} else {
 		key, err := jsonp.GetString(setting.JSONData, "apiToken")
 		if err != nil {
@@ -117,8 +116,8 @@ func newDataSourceInstance(setting backend.DataSourceInstanceSettings) (instance
 				"error", err, "JSONData", string(setting.JSONData))
 			return nil, fmt.Errorf("apiToken missing from configuration JSON: %w", err)
 		}
-		httpConfig.Headers["X-Circonus-Auth-Token"] = key
-		httpConfig.Headers["X-Circonus-App-Name"] = "circonus-irondb-datasource"
+		httpConfig.Header["X-Circonus-Auth-Token"] = []string{key}
+		httpConfig.Header["X-Circonus-App-Name"] = []string{"circonus-irondb-datasource"}
 	}
 
 	if setting.BasicAuthEnabled {
@@ -191,10 +190,6 @@ func (td *CirconusDatasource) QueryData(ctx context.Context, req *backend.QueryD
 		return nil, err
 	}
 	queryResults := td.dataRequest(ctx, req, preppedItems, settings)
-	log.DefaultLogger.Info("QueryData completed")
-	for refID, resp := range queryResults.Responses {
-		log.DefaultLogger.Info("QueryData response", "refID", refID, "frame count", len(resp.Frames), "response", resp)
-	}
 	// rmut := sync.Mutex{}
 	// wg := sync.WaitGroup{}
 
@@ -284,16 +279,12 @@ func (td *CirconusDatasource) buildDataRequestItems(req *backend.QueryDataReques
 	for _, q := range req.Queries {
 		isCaql, err := jsonp.GetBoolean(q.JSON, "isCaql")
 		if err != nil {
-			log.DefaultLogger.Error("unable to get isCaql from query JSON", "assuming isCaql is false")
 			isCaql = false
 		}
 		queryType, err := jsonp.GetString(q.JSON, "queryType")
 		if err != nil {
-			log.DefaultLogger.Error("unable to get queryType from query JSON",
-				"error", err, "query", string(q.JSON))
 			queryType = "caql"
 		}
-		log.DefaultLogger.Info("buildDataRequestItems", "isCaql", isCaql, "queryType", queryType)
 		if isCaql || queryType == "caql" {
 			preppedItems = td.buildCaqlItem(q, preppedItems)
 		} else {
@@ -301,10 +292,6 @@ func (td *CirconusDatasource) buildDataRequestItems(req *backend.QueryDataReques
 		}
 	}
 
-	log.DefaultLogger.Info("preppedItems std after build", "std names count", len(preppedItems.std.names))
-	for _, stdNameItem := range preppedItems.std.names {
-		log.DefaultLogger.Info("preppedItems std name item", "leaf_name", stdNameItem.leaf_name, "leaf_data.rollupType", stdNameItem.leaf_data.rollupType, "leaf_data.metricRollup", stdNameItem.leaf_data.metricRollup, "leaf_data.format", stdNameItem.leaf_data.format, "leaf_data.refId", stdNameItem.leaf_data.refId, "leaf_data.minPeriod", stdNameItem.leaf_data.minPeriod)
-	}
 	return preppedItems, nil
 }
 func (td *CirconusDatasource) buildMetricItems(q backend.DataQuery, preppedItems *DataRequestItems, start int, end int, settings *instanceSettings) (*DataRequestItems) {
@@ -370,7 +357,6 @@ func (td *CirconusDatasource) buildMetricItems(q backend.DataQuery, preppedItems
 			filteredResults = append(filteredResults, metric)
 		}
 	}
-	log.DefaultLogger.Info("buildMetricItems", "filteredResults", filteredResults)
 	for i, d := range filteredResults {
 		d.Target = q
 		preppedItems.std.names = append(preppedItems.std.names, td.buildFetchStream(q, filteredResults, i, isGraphite))
@@ -706,8 +692,6 @@ func (td *CirconusDatasource) searchRequest(url string, followLimit bool, isGrap
 	isFind := true
 	resultsLimitStr, err := jsonp.GetString(settings.JSONData, "resultsLimit")
 	if err != nil {
-		log.DefaultLogger.Info("unable to get resultsLimit from configuration JSON. Using 100 as default.",
-			"error", err, "JSONData", string(settings.JSONData))
 		resultsLimitStr = "100" // default
 	}
 	limit, err := strconv.Atoi(resultsLimitStr)
@@ -783,7 +767,6 @@ func (td *CirconusDatasource) searchRequest(url string, followLimit bool, isGrap
 		headers: headers,
 		retry: 1,
 	}
-	log.DefaultLogger.Info("searchRequest query url", "url", options.url)
 	return settings.httpClient.Get(options.url)
 }
 
@@ -904,8 +887,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 
 	resultsLimitStr, err := jsonp.GetString(settings.JSONData, "resultsLimit")
 	if err != nil {
-		log.DefaultLogger.Info("unable to get resultsLimit from configuration JSON. Using 100 as default.",
-			"error", err, "JSONData", string(settings.JSONData))
 		resultsLimitStr = "100" // default
 	}
 	resultsLimit, err := strconv.Atoi(resultsLimitStr)
@@ -1116,7 +1097,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 
 	queryResponses := map[string][]DF4GrafanaData{}
 	for _, query := range queries {
-		log.DefaultLogger.Info("Prepared Query", "query.url", query.url, "method", query.method, "isCaql", query.isCaql, "data", query.data)
 		reqBody, err := td.buildBody(query.data)
 		if err != nil {
 			queryResponses[query.refId] = append(queryResponses[query.refId], DF4GrafanaData{
@@ -1149,7 +1129,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 
 		defer response.Body.Close()
 
-		log.DefaultLogger.Info("dataRequest response", "response.Status", response.Status, "response.StatusCode", response.StatusCode)
 
 		responseDataBytes, err := io.ReadAll(response.Body)
 		if err != nil {
@@ -1177,7 +1156,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 			// }
 			continue
 		}
-		log.DefaultLogger.Info("responseData", "responseData", responseData, "query.refId", query.refId)
 
 		hideCAQLWarnings, err := jsonp.GetBoolean(settings.JSONData, "hideCAQLWarnings")
 		if err != nil {
@@ -1221,7 +1199,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 	}
 
 	for refId, respArr := range queryResponses {
-		log.DefaultLogger.Info("testing queryResponses", "refId", refId, "respArr", respArr, "len(respArr)", len(respArr))
 		errorCount := 0
 		for _, resp := range respArr {
 			if resp.Error != nil {
@@ -1244,7 +1221,6 @@ func (td *CirconusDatasource) dataRequest(ctx context.Context, req *backend.Quer
 		}
 	}
 
-	log.DefaultLogger.Info("finalResponse", "finalResponse.Responses", finalResponse.Responses)
 	return finalResponse
 }
 
@@ -1430,7 +1406,7 @@ func (td *CirconusDatasource) convertIrondbDf4DataToGrafana(responseData Respons
 					}
 				}
 			}
-			valueField := grafanadata.NewField(lname, nil, []float64{})
+			valueField := grafanadata.NewField(lname, nil, []*float64{})
 			_, exists := lnameDuplicateCounter[lname]
 			if exists {
 				lnameDuplicateCounter[lname] += 1
@@ -1444,10 +1420,13 @@ func (td *CirconusDatasource) convertIrondbDf4DataToGrafana(responseData Respons
 					ts := (start + dataIndex * period) * 1000
 					timeField.Append(time.UnixMilli(int64(ts)))
 				}
-				valueField.Append(data[si][dataIndex])
+				vptr := data[si][dataIndex]
+				valueField.Append(vptr)
 			}
+			log.DefaultLogger.Info("BSR single valueField.Len()", "valueField.Len()", valueField.Len())
 			valueFields = append(valueFields, valueField)
 		}
+		log.DefaultLogger.Info("BSR fields", "timeField.Len()", timeField.Len(), "len(valueFields)", len(valueFields), "data", data)
 		allFields := append([]*grafanadata.Field{timeField}, valueFields...)
 		frame := grafanadata.NewFrame(name, allFields...)
 		dataFrames = append(dataFrames, frame)
