@@ -1423,10 +1423,8 @@ func (td *CirconusDatasource) convertIrondbDf4DataToGrafana(responseData Respons
 				vptr := data[si][dataIndex]
 				valueField.Append(vptr)
 			}
-			log.DefaultLogger.Info("BSR single valueField.Len()", "valueField.Len()", valueField.Len())
 			valueFields = append(valueFields, valueField)
 		}
-		log.DefaultLogger.Info("BSR fields", "timeField.Len()", timeField.Len(), "len(valueFields)", len(valueFields), "data", data)
 		allFields := append([]*grafanadata.Field{timeField}, valueFields...)
 		frame := grafanadata.NewFrame(name, allFields...)
 		dataFrames = append(dataFrames, frame)
