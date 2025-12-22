@@ -542,6 +542,7 @@ func (td *CirconusDatasource) metaInterpolateLabel(metricLabel string, results [
 	})
 
 	// case %t
+	noTags := false
 	tPattern := regexp.MustCompile(`%t-?{[^}]*}`)
 	label = tPattern.ReplaceAllStringFunc(label, func(match string) string {
 		elide := match[2]
@@ -563,13 +564,21 @@ func (td *CirconusDatasource) metaInterpolateLabel(metricLabel string, results [
 				}
 			}
 			sort.Strings(tagCats)
+			if len(tagCats) == 0 {
+				noTags = true
+			}
 			return strings.Join(tagCats, ",")
 		}
 		if tagSet[tag] != nil && tag != "" && choose(results, tag) {
 			return tag + ":" + tagSet[tag][0]
 		}
+		noTags = true
 		return ""
 	})
+	if noTags {
+		label = strings.TrimSpace(label)
+		label = label[:len(label)-2]
+	}
 	return label
 }
 
@@ -1633,10 +1642,10 @@ func (td *CirconusDatasource) taglessName(name string) string {
 
 func (td *CirconusDatasource) taglessNameAndTags(name string) ([]string) {
 	tags := ""
-	tagStart := strings.Index(name, "ST[")
+	tagStart := strings.Index(name, "|ST[")
 	if tagStart != -1 {
-		tags = name[tagStart+3 : len(name)-1]
-		name = name[:tagStart-1]
+		tags = name[tagStart+4 : len(name)-1]
+		name = name[:tagStart]
 	}
 	return []string{name, tags}
 }

@@ -1103,7 +1103,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     if (!query || (!allowEmptyWildcard && query === 'and(__name:*)')) {
       return Promise.resolve({ data: [] });
     }
-    let queryUrl = `/find${this.getAccountIdForApiPath()}/tags?query=${query}`;
+    // query needs to have __type
+    let queryUrl = `/find${this.getAccountIdForApiPath()}/tags?query=and(__type:numeric,${query})`;
     if (this.dataSourceOptions.activityTracking && from && to) {
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
       queryUrl += `&activity_end_secs=${_.toInteger(to)}`;
