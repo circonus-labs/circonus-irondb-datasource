@@ -15,24 +15,24 @@ Read more about Apica IRONdb here:
 
 2. Unzip into plugins directory.
 
-3. Run the following commands in your shell to sign the plugin (node js is required) 
-    * in Grafana 7:
+3. Run the following commands in your shell to sign the plugin (node.js is required) 
+    * in current versions:
+    ```shell
+   export GRAFANA_ACCESS_POLICY_TOKEN=<YOUR_GRAFANA_API_KEY> 
+   npx @grafana/sign-plugin@latest plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
+    ```
+    * in Grafana 7 or earlier:
     ```shell
         export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY> 
         npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
     ```
-    * in later versions:
-    ```shell
-        export GRAFANA_ACCESS_POLICY_TOKEN=<YOUR_GRAFANA_API_KEY> 
-        npx @grafana/sign-plugin@latest plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
-    ```
 
-### From GitHub (Grafana 7)
+### From GitHub 
 1. Please install the following prerequisites:
-   * [Node.js](https://nodejs.org/en/download/) > 14.04
-   * [Yarn](https://www.npmjs.com/package/yarn) > 1.22.10
-   * [Go](https://golang.org/doc/install) > 1.16
-   * [Mage](https://github.com/magefile/mage) > 1.11.0
+   * [Node.js](https://nodejs.org/en/download/) 
+   * [Yarn](https://www.npmjs.com/package/yarn) 
+   * [Go](https://golang.org/doc/install) 
+   * [Mage](https://github.com/magefile/mage) 
 2. Run the following from a privileged shell:
    ```shell
    cd /var/lib/grafana/plugins # or the location of your Grafana plugins directory
@@ -42,9 +42,14 @@ Read more about Apica IRONdb here:
    yarn install
    yarn build
    mage -v
+   export GRAFANA_ACCESS_POLICY_TOKEN=<YOUR_GRAFANA_API_KEY> 
+   npx @grafana/sign-plugin@latest plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
+   sudo systemctl start grafana-server # restart if already running
+   ```
+   NOTE:  For Grafana 7 or earlier, use the old style of signing:
+   ```
    export GRAFANA_API_KEY=<YOUR_GRAFANA_API_KEY>
    npx @grafana/toolkit plugin:sign --rootUrls https://example.com/grafana # Change to match the URL of your Grafana install
-   sudo systemctl start grafana-server # restart if already running
    ```
    
 #### Docker Quick Start From Github

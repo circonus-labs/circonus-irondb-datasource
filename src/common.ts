@@ -130,10 +130,10 @@ export function mergeTags(dest: TagSet, source: TagSet) {
  */
 export function taglessNameAndTags(name: string): [string, string] {
   let tags = '';
-  const tagStart = name.indexOf('ST[');
+  const tagStart = name.indexOf('|ST[');
   if (~tagStart) {
-    tags = name.substring(tagStart + 3, name.length - 1);
-    name = name.substring(0, tagStart - 1);
+    tags = name.substring(tagStart + 4, name.length - 1);
+    name = name.substring(0, tagStart);
   }
   return [name, tags];
 }
@@ -198,6 +198,7 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
   });
 
   // case %t
+  let noTags = false;
   label = label.replace(/%t-?{([^}]*)}/g, (x) => {
     const elide = x.substring(2, 3);
     const choose = elide === '-' ? _metaTagDiff : () => true;
@@ -211,13 +212,20 @@ export function metaInterpolateLabel(fmt: string, metaIn: any[], idx: number): s
         }
       }
       tagCats.sort();
+      if (tagCats.length === 0) {
+        noTags = true;
+      }
       return tagCats.join(',');
     }
     if (tagSet[tag] !== undefined && tag !== '' && choose(metaIn, tag)) {
       return tag + ':' + tagSet[tag][0];
     }
+    noTags = true;
     return '';
   });
+  if (noTags) {
+    label = label.trim().substring(0, label.length - 3);
+  }
 
   return label;
 
