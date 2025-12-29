@@ -10,8 +10,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx .",
     "lint:fix": "yarn run lint --fix",
-    "e2e": "yarn exec cypress install && yarn exec grafana-e2e run",
-    "e2e:update": "yarn exec cypress install && yarn exec grafana-e2e run --update-screenshots",
     "server": "docker-compose up --build",
     "sign": "npx --yes @grafana/sign-plugin@latest"
   },
@@ -19,7 +17,6 @@
   "license": "BSD-3-Clause",
   "devDependencies": {
     "@babel/core": "^7.21.4",
-    "@grafana/e2e": "9.5.3",
     "@grafana/e2e-selectors": "9.5.3",
     "@grafana/eslint-config": "^6.0.0",
     "@grafana/tsconfig": "^1.2.0-rc1",
