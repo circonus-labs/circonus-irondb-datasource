@@ -59,6 +59,7 @@
     "@grafana/data": "9.5.3",
     "@grafana/runtime": "9.5.3",
     "@grafana/ui": "9.5.3",
+    "dompurify": "^2.5.4",
     "memoizee": "^0.4.15",
     "mustache": "^4.2.0",
     "react": "17.0.2",
