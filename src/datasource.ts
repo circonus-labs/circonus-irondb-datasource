@@ -1,7 +1,6 @@
 import {
   AnnotationQueryRequest,
   AnnotationEvent,
-  ArrayVector,
   DataSourceInstanceSettings,
   DataSourceApi,
   DataQueryResponse,
@@ -12,10 +11,7 @@ import {
   MutableDataFrame,
   MutableField,
 } from '@grafana/data';
-import {
-  getBackendSrv,
-  getTemplateSrv
-} from '@grafana/runtime';
+import { getBackendSrv, getTemplateSrv } from '@grafana/runtime';
 import _ from 'lodash';
 import Log from './logger';
 import { Memoized } from 'memoizee';
@@ -50,7 +46,7 @@ import {
   splitTags,
   taglessName,
   taglessNameAndTags,
-  md5
+  md5,
 } from './common';
 const log = Log('Circonus DataSource');
 
@@ -79,25 +75,25 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     this.dataSourceOptions = instanceSettings.jsonData;
     _.defaults(this.dataSourceOptions, DEFAULT_OPTIONS);
 
-    this.id                 = instanceSettings.id;
-    this.name               = instanceSettings.name;
-    this.type               = 'Circonus';
-    this.userHash           = '';
-    this.url                = instanceSettings.url;
-    this.appName            = 'Grafana';
+    this.id = instanceSettings.id;
+    this.name = instanceSettings.name;
+    this.type = 'Circonus';
+    this.userHash = '';
+    this.url = instanceSettings.url;
+    this.appName = 'Grafana';
     this.supportAnnotations = false;
-    this.supportMetrics     = true;
-    this.datasourceRequest  = setupCache(this.dataSourceOptions.useCaching, this.backendSrv, this);
+    this.supportMetrics = true;
+    this.datasourceRequest = setupCache(this.dataSourceOptions.useCaching, this.backendSrv, this);
 
     // TODO: support old queries using old snake-case properties
 
     if (!this.dataSourceOptions.disableUsageStatistics) {
       this.backendSrv
-          .get('/api/user')
-          .then((info: any) => {
-              this.userHash = md5(info.email);
-          })
-          .catch((e: Error) => log(() => 'error fetching Circonus user info: ' + JSON.stringify(e)));
+        .get('/api/user')
+        .then((info: any) => {
+          this.userHash = md5(info.email);
+        })
+        .catch((e: Error) => log(() => 'error fetching Circonus user info: ' + JSON.stringify(e)));
     }
   }
 
@@ -181,15 +177,15 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         const error = _.get(results, 'results[0].error');
         const success = 'Data source is working';
         return error
-          ? { status:'error', message:error, title:'Error' }
-          : { status:'success', message:success, title:'Success' };
+          ? { status: 'error', message: error, title: 'Error' }
+          : { status: 'success', message: success, title: 'Success' };
       })
       .catch((error: any) => {
         let message = error.data?.message;
         if (!message) {
           message = `Error ${error.status || ''} ${error.statusText || ''}`;
         }
-        return { status:'error', message:message, title:'Error' };
+        return { status: 'error', message: message, title: 'Error' };
       });
   }
 
@@ -208,34 +204,29 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         let message;
         try {
           message = JSON.parse(error.data.message || error.data);
-        }
-        catch (error) {
+        } catch (error) {
           log(() => `throwerr() failed to parse json from error.data.message. error: ${error}`);
         }
         // This is from the API, which wrapped the IRONdb message in JSON
         if (message?.user_error) {
           throw `${message.user_error.message}, in query: ${message.arguments.q}`;
-        }
-        else if (error.statusText === 'Not Found') {
+        } else if (error.statusText === 'Not Found') {
           throw `Circonus IRONdb Error: ${error.statusText}`;
         }
         // IRONdb will sometimes return errors with messages avilable here
         else if (typeof error.data.message === 'string') {
           throw error.data.message;
-        }
-        else if (error.statusText && error.status > 0) {
+        } else if (error.statusText && error.status > 0) {
           throw `Network Error: ${error.statusText} (${error.status})`;
         }
       }
       // IRONdb direct 520 errors will look like this
       else if (error.data?.user_error?.message) {
         throw `${error.data.user_error.message}, in query: ${error.data.arguments.q}`;
-      }
-      else {
+      } else {
         throw String(error);
       }
-    }
-    else {
+    } else {
       throw error ? error.toString() : 'unknown';
     }
   }
@@ -286,9 +277,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     const start = new Date(options.range.from).getTime() / 1000;
     const end = new Date(options.range.to).getTime() / 1000;
     const { scopedVars, meta, refId, maxDataPoints } = options;
-    const intervalMs = Math.round(
-      (options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints
-    );
+    const intervalMs = Math.round((options.range.to.valueOf() - options.range.from.valueOf()) / options.maxDataPoints);
     // these are the prepped items
     const stdNames: any[] = [];
     const caqlNames: any[] = [];
@@ -302,9 +291,19 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       refId,
       maxDataPoints,
       intervalMs,
-      std:   { start, end, names:stdNames },
-      caql:  { start, end, names:caqlNames },
-      alert: { start, end, names:alertNames, localFilters, localFilterMatches, labels, countsOnly: false, queryType: '', target: null },
+      std: { start, end, names: stdNames },
+      caql: { start, end, names: caqlNames },
+      alert: {
+        start,
+        end,
+        names: alertNames,
+        localFilters,
+        localFilterMatches,
+        labels,
+        countsOnly: false,
+        queryType: '',
+        target: null,
+      },
     };
     // filter out hidden or empty queries
     const targets = _.reject(options.targets, (target) => {
@@ -318,18 +317,18 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       return Promise.resolve(preppedItems);
     }
 
-    return Promise
-      .allSettled(targets.map((target) => {
+    return Promise.allSettled(
+      targets.map((target) => {
         let promise: Promise<any>;
         preppedItems.refId = target.refId;
         if (target.isCaql || target.queryType === 'caql') {
           promise = _buildCaqlItem(target);
-        }
-        else {
+        } else {
           promise = _buildMetricItems(target);
         }
         return promise;
-      }))
+      })
+    )
       .then((result) => {
         return preppedItems;
       })
@@ -355,31 +354,25 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      * This builds standard or graphite metric items into the prepped items.
      */
     function _buildMetricItems(target: any) {
-      const rawQuery = checkVariablesEncoding.call(
-        ds,
-        templateSrv.replace(target.query, preppedItems.scopedVars)
-      );
+      const rawQuery = checkVariablesEncoding.call(ds, templateSrv.replace(target.query, preppedItems.scopedVars));
       const isGraphite = 'graphite' === target.queryType;
       const tagFilter = target.tagFilter || '';
-      const promise = isGraphite ?
-        metricGraphiteQuery.call(ds, rawQuery, false, start, end, tagFilter) :
-        metricTagsQuery.call(ds, rawQuery, false, start, end);
+      const promise = isGraphite
+        ? metricGraphiteQuery.call(ds, rawQuery, false, start, end, tagFilter)
+        : metricTagsQuery.call(ds, rawQuery, false, start, end);
 
-      return promise
-        .then((result: any) => {
-          // filter out text metrics
-          result.data = _.filter(result.data, (metric) => {
-            const metricTypes = (metric?.type || '').split(',');
-            return !metricTypes.includes('text');
-          });
-          // build the streams
-          result.data.forEach((d: any, i: number) => {
-            d.target = target; // keep target references
-            preppedItems.std.names.push(
-              _buildFetchStream(target, result.data, i)
-            );
-          });
+      return promise.then((result: any) => {
+        // filter out text metrics
+        result.data = _.filter(result.data, (metric) => {
+          const metricTypes = (metric?.type || '').split(',');
+          return !metricTypes.includes('text');
         });
+        // build the streams
+        result.data.forEach((d: any, i: number) => {
+          d.target = target; // keep target references
+          preppedItems.std.names.push(_buildFetchStream(target, result.data, i));
+        });
+      });
 
       /**
        * This builds a data fetch stream for each metric stream returned
@@ -392,9 +385,10 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         let leafMetricName = data[i].leaf_data?.name;
 
         // get the metric type
-        const baseType = ('heatmap' === target.format
-          ? 'histogram'
-          : (data[i].metric_type || data[i].type || data[i].leaf_data?.metric_type || data[i].leaf_data.type));
+        const baseType =
+          'heatmap' === target.format
+            ? 'histogram'
+            : data[i].metric_type || data[i].type || data[i].leaf_data?.metric_type || data[i].leaf_data.type;
         let types = (baseType || 'numeric').split(',');
         let thisType;
         while (!thisType) {
@@ -417,8 +411,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             if (isStatsdCounter(leafName)) {
               data[i].leaf_data.egress_function = 'counter';
             }
-          }
-          else {
+          } else {
             data[i].leaf_data.egress_function = egressOverride;
           }
         }
@@ -426,11 +419,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         let metricLabel = target.metricLabel;
         if (target.labelType === 'default') {
           metricLabel = '%n | %t{*}';
-        }
-        else if (target.labelType === 'name') {
+        } else if (target.labelType === 'name') {
           metricLabel = '%n';
-        }
-        else if (target.labelType === 'cardinality') {
+        } else if (target.labelType === 'cardinality') {
           metricLabel = '%n | %t-{*}';
         }
         const interpolatedLabel = metaInterpolateLabel(metricLabel || '', data, i);
@@ -444,7 +435,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         // return the item
         return {
           leaf_name: leafName,
-          leaf_data: data[i].leaf_data
+          leaf_data: data[i].leaf_data,
         };
       }
     }
@@ -455,19 +446,18 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
    */
   dataRequest(preppedItems: DataRequestItems, followLimit = true) {
     let queries: any = [];
-    let queryResults: any = { data:[], t:'ts' };
+    let queryResults: any = { data: [], t: 'ts' };
 
     // headers
     let headers: any = {
       'Content-Type': 'application/json',
       'X-Snowth-Advisory-Limit': followLimit ? this.dataSourceOptions.resultsLimit : 100,
-      'Accept': 'application/json',
+      Accept: 'application/json',
     };
     if ('hosted' === this.dataSourceOptions.irondbType) {
       headers['X-Circonus-Auth-Token'] = this.dataSourceOptions.apiToken;
       headers['X-Circonus-App-Name'] = this.appName;
-    }
-    else {
+    } else {
       headers['X-Circonus-Account'] = this.dataSourceOptions.accountId;
     }
 
@@ -511,19 +501,30 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           period: interval,
           start: start,
           count: Math.round((end - start) / interval),
-          reduce: [{
-            label: '',
-            method: paneltype === 'heatmap' ? 'merge' : 'pass'
-          }],
+          reduce: [
+            {
+              label: '',
+              method: paneltype === 'heatmap' ? 'merge' : 'pass',
+            },
+          ],
         };
         // check the transform
         let transform = thisLeafData.egress_function;
         if (thisLeafData.metrictype === 'histogram') {
           if (paneltype === 'heatmap') {
             transform = 'none';
-          }
-          else {
-            transform = HistogramTransforms[transform as 'count' || 'average' || 'stddev' || 'derive' || 'derive_stddev' || 'counter' || 'counter_stddev' || 'histogram'];
+          } else {
+            transform =
+              HistogramTransforms[
+                (transform as 'count') ||
+                  'average' ||
+                  'stddev' ||
+                  'derive' ||
+                  'derive_stddev' ||
+                  'counter' ||
+                  'counter_stddev' ||
+                  'histogram'
+              ];
             const leafName = preppedItems.std.names[i].leaf_name;
             let transformMode = 'default';
             if (isStatsdCounter(leafName)) {
@@ -555,7 +556,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
     // CAQL queries
     if (preppedItems.caql.names.length) {
-      for (let i=0; i<preppedItems.caql.names.length; i++) {
+      for (let i = 0; i < preppedItems.caql.names.length; i++) {
         let options = {
           url: this.url,
           method: 'POST',
@@ -579,18 +580,14 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         }
         options.url += '/caql_v1';
         // render CAQL query
-        const caqlQuery = this.templateSrv.replace(
-          preppedItems.caql.names[i].leaf_name,
-          preppedItems.scopedVars
-        );
+        const caqlQuery = this.templateSrv.replace(preppedItems.caql.names[i].leaf_name, preppedItems.scopedVars);
         const minPeriod = preppedItems.caql.names[i].leaf_data?.minPeriod;
         // prefix with the target's min_period if min_period isn't in the query already
-        const caqlQueryMP = (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
+        const caqlQueryMP =
+          (minPeriod && !/^#min_period=/.test(caqlQuery) ? `#min_period=${minPeriod} ` : '') + caqlQuery;
         // render start, end, & period
         const minPeriodMatches = caqlQueryMP.match(/#min_period=(\d+\w{0,2}?)\s/i);
-        const minPeriodDirective = minPeriodMatches ?
-          Math.round(parseDurationMS(minPeriodMatches[1]) / 1000) :
-          null;
+        const minPeriodDirective = minPeriodMatches ? Math.round(parseDurationMS(minPeriodMatches[1]) / 1000) : null;
         const calculatedInterval = this.getRollupSpan(
           preppedItems,
           options.start,
@@ -600,9 +597,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         );
         // any min_period directive overrides the resolution here if it's lower and we're already at the min resolution
         const intervalIsMin = calculatedInterval === Math.round(MIN_DURATION_MS_CAQL / 1000);
-        const interval = minPeriodDirective && intervalIsMin
-          ? Math.min(calculatedInterval, minPeriodDirective)
-          : calculatedInterval;
+        const interval =
+          minPeriodDirective && intervalIsMin ? Math.min(calculatedInterval, minPeriodDirective) : calculatedInterval;
         // when shifting the range to truncate the end, never shift less than minTruncation
         const end_shift = Math.max(interval, parseInt(this.dataSourceOptions.minTruncation || '0', 10));
         // if the range ends within 1s, it's "now"
@@ -649,14 +645,10 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           refId: preppedItems.refId,
         };
         // finish URL
-        const alertQuery = this.templateSrv.replace(
-          preppedItems.alert.names[i],
-          preppedItems.scopedVars
-        );
+        const alertQuery = this.templateSrv.replace(preppedItems.alert.names[i], preppedItems.scopedVars);
         if (alertQuery.startsWith('alert_id:')) {
           options.url += `/${alertQuery.split(':')[1]}`;
-        }
-        else {
+        } else {
           options.url += `?search=${encodeURIComponent(alertQuery)}&size=1000`;
         }
         // basic auth (not sure if this is actually set anywhere...?)
@@ -674,23 +666,23 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           .then((result: any) => {
             const warning = result.data?.head?.warning;
             if (query.isCaql && warning && !this.dataSourceOptions.hideCAQLWarnings) {
-              this.throwerr(`Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`);
+              this.throwerr(
+                `Warning: ${result.data.head.warning} - Graph not rendered. To render the potentially incomplete data, check "Hide CAQL Warnings" in the datasource settings.`
+              );
             }
             if (query.isGraphite) {
               return this.convertIrondbGraphiteDataToGrafana(result, query);
-            }
-            else {
+            } else {
               return this.convertIrondbDf4DataToGrafana(result, query);
             }
           })
           .then((result: any) => {
             const query = result.query;
             if (_.isArray(result.data)) {
-              for (let i=0; i<result.data.length; i++) {
+              for (let i = 0; i < result.data.length; i++) {
                 if ('target' in result && 'refId' in result.target) {
                   result.data[i].target = result.target.refId;
-                }
-                else if (query && query.refId) {
+                } else if (query && query.refId) {
                   result.data[i].target = query.refId;
                 }
                 queryResults.data.push(result.data[i]);
@@ -699,8 +691,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             if (_.isObject(result.data)) {
               if ('target' in result && 'refId' in result.target) {
                 result.data.target = result.target.refId;
-              }
-              else if (query && query.refId) {
+              } else if (query && query.refId) {
                 result.data.target = query.refId;
               }
               queryResults.data.push(result.data);
@@ -711,8 +702,8 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
             return queryResults;
           })
-        )
       )
+    )
       .then((result) => {
         return queryResults;
       })
@@ -753,8 +744,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       }
 
       return _forceRollupAlignment(exactMs) / 1000;
-    }
-    else {
+    } else {
       let minimumMs = isCaql ? MIN_DURATION_MS_CAQL : MIN_DURATION_MS_FETCH;
       if (rollupType === 'minimum') {
         minimumMs = parseDurationMS(metricRollup);
@@ -802,8 +792,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
             if (input > set[idx]) {
               if (dir === -1) {
                 return set[idx];
-              }
-              else {
+              } else {
                 return set[idx - 1];
               }
             }
@@ -851,7 +840,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       to = range.to.valueOf() / 1000;
       if (!_.isUndefined(this.queryRange) && !_.isEqual(range, this.queryRange)) {
         if (this.dataSourceOptions.useCaching) {
-          const requestCache = this.datasourceRequest as unknown as Memoized <(options: any) => any>;
+          const requestCache = this.datasourceRequest as unknown as Memoized<(options: any) => any>;
           requestCache.clear();
         }
       }
@@ -862,24 +851,25 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     if (_.isString(query)) {
       // attempt to translate variable.useTags into the new CirconusVariableQuery structure
       q = {
-        queryType: variable?.useTags && variable.tagValuesQuery
-          ? 'tag values'
-          : 'metric names',
+        queryType: variable?.useTags && variable.tagValuesQuery ? 'tag values' : 'metric names',
         metricFindQuery: query,
         tagCategory: variable?.useTags ? variable.tagValuesQuery : '',
         resultsLimit: 100,
       };
-    }
-    else {
+    } else {
       q = query as CirconusVariableQuery;
     }
 
     if (q !== undefined) {
       const queryType = (q && q.queryType) || (q.tagCategory ? 'tag values' : 'metric names');
       const resultsLimit = (q && q.resultsLimit) || 100;
-      let metricQuery = this.templateSrv.replace(q.metricFindQuery, null, (value: string | string[] = [], variable: any) => {
-        return _processVariableValue(value, variable);
-      });
+      let metricQuery = this.templateSrv.replace(
+        q.metricFindQuery,
+        null,
+        (value: string | string[] = [], variable: any) => {
+          return _processVariableValue(value, variable);
+        }
+      );
 
       if (
         'graphite style' !== queryType &&
@@ -891,114 +881,104 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
       // tag values w/ an optional metric filter
       if ('tag values' === queryType) {
-        return this.metricTagValsQuery(metricQuery, q.tagCategory, from, to, resultsLimit)
-          .then((results: any) => {
-            let result_count = results.headers.get('X-Snowth-Search-Result-Count');
-            if (result_count > 1000) {
-              setTimeout(function () {
-                _showResultWarning(result_count);
-              }, 100);
-            }
-            else {
-              _removeResultWarning();
-            }
-            return _.map(results.data, (result) => {
-              return {
-                value: decodeTag(result)
-              };
-            });
+        return this.metricTagValsQuery(metricQuery, q.tagCategory, from, to, resultsLimit).then((results: any) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              _showResultWarning(result_count);
+            }, 100);
+          } else {
+            _removeResultWarning();
+          }
+          return _.map(results.data, (result) => {
+            return {
+              value: decodeTag(result),
+            };
           });
+        });
       }
       // tag categories w/ a metric filter
       else if ('tag categories' === queryType) {
-        return this.metricTagCatsQuery(metricQuery, from, to, resultsLimit)
-          .then((results: any) => {
-            let result_count = results.headers.get('X-Snowth-Search-Result-Count');
-            if (result_count > 1000) {
-              setTimeout(function () {
-                _showResultWarning(result_count);
-              }, 100);
-            }
-            else {
-              _removeResultWarning();
-            }
-            return _.map(results.data, (result) => {
-              return {
-                value: decodeTag(result)
-              };
-            });
+        return this.metricTagCatsQuery(metricQuery, from, to, resultsLimit).then((results: any) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              _showResultWarning(result_count);
+            }, 100);
+          } else {
+            _removeResultWarning();
+          }
+          return _.map(results.data, (result) => {
+            return {
+              value: decodeTag(result),
+            };
           });
+        });
       }
       // graphite-style metric names
       else if ('graphite style' === queryType) {
-        return this.metricGraphiteQuery(metricQuery, false, from, to, '', resultsLimit)
-          .then((results: any) => {
-            let result_count = results.headers.get('X-Snowth-Search-Result-Count');
-            if (result_count > 1000) {
-              setTimeout(function () {
-                _showResultWarning(result_count);
-              }, 100);
+        return this.metricGraphiteQuery(metricQuery, false, from, to, '', resultsLimit).then((results: any) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              _showResultWarning(result_count);
+            }, 100);
+          } else {
+            _removeResultWarning();
+          }
+          let deduped: any[] = [];
+          results.data.forEach((result: any) => {
+            const name = (result.name || '')
+              .replace(/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\./)
+              .split('.')
+              .pop()
+              .split(';')
+              .shift();
+            if (!deduped.find((obj) => obj.value === name)) {
+              deduped.push({
+                value: name,
+              });
             }
-            else {
-              _removeResultWarning();
-            }
-            let deduped: any[] = [];
-            results.data.forEach((result: any) => {
-              const name = (result.name || '')
-                .replace(/^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\./)
-                .split('.')
-                .pop()
-                .split(';')
-                .shift();
-              if (!deduped.find((obj) => obj.value === name)) {
-                deduped.push({
-                  value: name
-                });
-              }
-            });
-            return deduped;
           });
+          return deduped;
+        });
       }
       // last metric values
       else if ('last value' === queryType) {
-        return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit, true)
-          .then((results: any) => {
-            let result_count = results.headers.get('X-Snowth-Search-Result-Count');
-            if (result_count > 1000) {
-              setTimeout(function () {
-                _showResultWarning(result_count);
-              }, 100);
-            }
-            else {
-              _removeResultWarning();
-            }
-            return _.map(results.data, (result) => {
-              let latest = (result.latest.text || result.latest.numeric || []).slice(-1)[0];
-              return {
-                value: latest[1] || ''
-              };
-            });
+        return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit, true).then((results: any) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              _showResultWarning(result_count);
+            }, 100);
+          } else {
+            _removeResultWarning();
+          }
+          return _.map(results.data, (result) => {
+            let latest = (result.latest.text || result.latest.numeric || []).slice(-1)[0];
+            return {
+              value: latest[1] || '',
+            };
           });
+        });
       }
       // metric names
       else {
-        return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit)
-          .then((results: any) => {
-            let result_count = results.headers.get('X-Snowth-Search-Result-Count');
-            if (result_count > 1000) {
-              setTimeout(function () {
-                _showResultWarning(result_count);
-              }, 100);
-            }
-            else {
-              _removeResultWarning();
-            }
-            return _.map(results.data, (result) => {
-              return {
-                value: result.metric_name
-              };
-            });
+        return this.metricTagsQuery(metricQuery, false, from, to, resultsLimit).then((results: any) => {
+          let result_count = results.headers.get('X-Snowth-Search-Result-Count');
+          if (result_count > 1000) {
+            setTimeout(function () {
+              _showResultWarning(result_count);
+            }, 100);
+          } else {
+            _removeResultWarning();
+          }
+          return _.map(results.data, (result) => {
+            return {
+              value: result.metric_name,
+            };
           });
+        });
       }
     }
     return Promise.resolve([]);
@@ -1009,15 +989,15 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      */
     function _showResultWarning(result_count: number) {
       let form = document.querySelector('[aria-label="Variable editor Form"]');
-      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : [])
-        .find((el: any) => /^Preview\s/.test(el['innerText']));
+      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : []).find((el: any) =>
+        /^Preview\s/.test(el['innerText'])
+      );
       if (header) {
         let span = document.createElement('span');
         span.className = 'result-warning';
         span.style.color = 'rgb(235, 123, 24)';
         span.style.marginBottom = '1rem';
-        span.innerHTML =
-          `<strong>Warning:</strong> ${result_count} results found.<br />Only the first 1000 results are used&hellip;please refine your query.`;
+        span.innerHTML = `<strong>Warning:</strong> ${result_count} results found.<br />Only the first 1000 results are used&hellip;please refine your query.`;
         let parent = header.parentElement as HTMLElement;
         let grandparent = parent?.parentElement as HTMLElement;
         Array.from(grandparent?.getElementsByClassName('result-warning')).forEach((el) => el.remove());
@@ -1030,7 +1010,9 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
      */
     function _removeResultWarning() {
       let form = document.querySelector('[aria-label="Variable editor Form"]');
-      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : []).find((el: any) => /^Preview\s/.test(el['innerText']));
+      let header = Array.from(form ? form.querySelectorAll('h3,h4,h5') : []).find((el: any) =>
+        /^Preview\s/.test(el['innerText'])
+      );
       if (header) {
         const parent = header.parentElement as HTMLElement;
         const grandparent = parent.parentElement as HTMLElement;
@@ -1049,8 +1031,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       }
       if (typeof value === 'string') {
         return encodeTag(SegmentType.MetricName, value as string);
-      }
-      else if (value.length === 1) {
+      } else if (value.length === 1) {
         return encodeTag(SegmentType.MetricName, value[0] as string);
       }
 
@@ -1119,13 +1100,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   /**
    * This performs a tag vals query.
    */
-  metricTagValsQuery(
-    metricQuery: string,
-    cat: string,
-    from?: number,
-    to?: number,
-    customLimit?: number
-  ) {
+  metricTagValsQuery(metricQuery: string, cat: string, from?: number, to?: number, customLimit?: number) {
     let queryUrl = `/find${this.getAccountIdForApiPath()}/tag_vals?category=${cat}&query=${metricQuery}`;
     if (this.dataSourceOptions.activityTracking && from && to) {
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
@@ -1138,12 +1113,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
   /**
    * This performs a tag cats query.
    */
-  metricTagCatsQuery(
-    metricQuery: string,
-    from?: number,
-    to?: number,
-    customLimit?: number
-  ) {
+  metricTagCatsQuery(metricQuery: string, from?: number, to?: number, customLimit?: number) {
     let queryUrl = `/find${this.getAccountIdForApiPath()}/tag_cats?query=${metricQuery}`;
     if (this.dataSourceOptions.activityTracking && from && to) {
       queryUrl += `&activity_start_secs=${_.toInteger(from)}`;
@@ -1174,8 +1144,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
     if ('hosted' !== this.dataSourceOptions.irondbType) {
       headers['X-Circonus-Account'] = this.dataSourceOptions.accountId;
-    }
-    else if ('hosted' === this.dataSourceOptions.irondbType && !isCaql) {
+    } else if ('hosted' === this.dataSourceOptions.irondbType && !isCaql) {
       baseUrl += `/irondb${isGraphite ? '/graphite' : ''}`;
       if (!isFind) {
         baseUrl += '/series_multi';
@@ -1189,8 +1158,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         if (!isFind) {
           baseUrl += `/${this.dataSourceOptions.queryPrefix}/series_multi`;
         }
-      }
-      else if (!isFind) {
+      } else if (!isFind) {
         baseUrl += '/series_multi';
       }
     }
@@ -1294,8 +1262,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           if (check_tags[si] !== undefined) {
             if (tags === undefined) {
               tags = check_tags[si];
-            }
-            else {
+            } else {
               tags.push.apply(tags, check_tags[si]);
             }
           }
@@ -1313,7 +1280,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
                     config: { filterable: false },
                     type: FieldType.other,
                     refId: query.refId,
-                    values: new ArrayVector(),
+                    values: [],
                   };
                   allLabels[tagCat] = lfield;
                   labelFields.add(lfield);
@@ -1332,7 +1299,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
               },
               refId: query.refId,
               type: FieldType.number,
-              values: new ArrayVector(),
+              values: [],
             };
             allValues[lname] = vfield;
             valueFields.add(vfield);
@@ -1340,8 +1307,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
           const vfield = allValues[lname];
           if (data[si][i] !== null && data[si][i].constructor === Number) {
             vfield.values.add(data[si][i]);
-          }
-          else {
+          } else {
             vfield.values.add(null);
           }
         }
@@ -1362,7 +1328,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     // only supports one histogram
     const lookaside: any = {};
     for (let si = 0; si < data.length; si++) {
-      const dummy = `${name} [${si+1}]`;
+      const dummy = `${name} [${si + 1}]`;
       const tname = meta[si] ? meta[si].label : dummy;
       const explicitTags = tname.match(/\|ST\[[^\]]*\]/) != null;
       let lname = taglessName(tname);
@@ -1397,7 +1363,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       }
       lname = decodeTagsInLabel(lname);
       let dname = lname;
-      if ((!metricLabel || !_.isString(metricLabel)) && (decoded_tags.length > 0 && explicitTags)) {
+      if ((!metricLabel || !_.isString(metricLabel)) && decoded_tags.length > 0 && explicitTags) {
         dname += ` { ${decoded_tags.join(', ')} }`;
       }
 
@@ -1424,7 +1390,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
         if (null === data[si][i] || _.isNumber(data[si][i])) {
           frame.add({
             Time: ts,
-            Value: data[si][i]
+            Value: data[si][i],
           });
         }
         // if it's an object, process it for a heatmap
@@ -1440,15 +1406,14 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
                 title: vstr,
                 tags: labels,
                 datapoints: [],
-                _ts: {}
+                _ts: {},
               };
               dataFrames.push(lookaside[vstr]);
             }
             if (_.isUndefined(lookaside[vstr]._ts[tsstr])) {
               lookaside[vstr]._ts[tsstr] = [cnt, ts];
               lookaside[vstr].datapoints.push(lookaside[vstr]._ts[tsstr]);
-            }
-            else {
+            } else {
               lookaside[vstr]._ts[tsstr][0] += cnt;
             }
           }
@@ -1474,7 +1439,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
 
     if (!data || !data.series) {
       return {
-        data: cleanData
+        data: cleanData,
       };
     }
     if (data.series && data.step && data.from && data.to) {
@@ -1543,8 +1508,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
       const alertQuery = this.templateSrv.replace(query.annotation.annotationQueryText);
       if (alertId !== '') {
         options.url += `/${alertId}`;
-      }
-      else {
+      } else {
         options.url += `?search=${encodeURIComponent(alertQuery)}&size=500`;
       }
       if (this.basicAuth) {
@@ -1556,114 +1520,116 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     return Promise.all(
       queries.map((query) =>
         this.datasourceRequest(query)
-        .then((result: any) => {
-          return Promise.resolve([]);
-        })
-        .then((results: any[]) => {
-          // this is a list of objects with "alert" and "rule" fields.
-          const events: AnnotationEvent[] = [];
-          for (const a of results) {
-            const alert = a['alert'];
-            const rule = a['rule'];
-            const tags: TagSet = {};
+          .then((result: any) => {
+            return Promise.resolve([]);
+          })
+          .then((results: any[]) => {
+            // this is a list of objects with "alert" and "rule" fields.
+            const events: AnnotationEvent[] = [];
+            for (const a of results) {
+              const alert = a['alert'];
+              const rule = a['rule'];
+              const tags: TagSet = {};
 
-            if (alert['_occurred_on'] < query.start || alert['_occurred_on'] > query.end) {
-              continue;
-            }
-
-            const cn = alert['_canonical_metric_name'];
-            const metric = alert['_metric_name'];
-            if (cn !== undefined && cn !== '') {
-              const stream_tags = taglessNameAndTags(cn)[1];
-              const st = splitTags(stream_tags);
-              mergeTags(tags, st);
-            }
-            for (const tag of alert['_tags']) {
-              const tagSep = tag.split(/:/g);
-              let tagCat = tagSep.shift();
-              if (!tagCat.startsWith('__') && tagCat !== '') {
-                let tagVal = tagSep.join(':');
-                tagCat = decodeTag(tagCat);
-                tagVal = decodeTag(tagVal);
-                if (tags[tagCat] === undefined) {
-                  tags[tagCat] = [];
-                }
-                tags[tagCat].push(tagVal);
+              if (alert['_occurred_on'] < query.start || alert['_occurred_on'] > query.end) {
+                continue;
               }
-            }
 
-            const annotationTags = [];
-            for (const tagCat in tags) {
-              annotationTags.push(tagCat + ':' + tags[tagCat][0]);
-            }
+              const cn = alert['_canonical_metric_name'];
+              const metric = alert['_metric_name'];
+              if (cn !== undefined && cn !== '') {
+                const stream_tags = taglessNameAndTags(cn)[1];
+                const st = splitTags(stream_tags);
+                mergeTags(tags, st);
+              }
+              for (const tag of alert['_tags']) {
+                const tagSep = tag.split(/:/g);
+                let tagCat = tagSep.shift();
+                if (!tagCat.startsWith('__') && tagCat !== '') {
+                  let tagVal = tagSep.join(':');
+                  tagCat = decodeTag(tagCat);
+                  tagVal = decodeTag(tagVal);
+                  if (tags[tagCat] === undefined) {
+                    tags[tagCat] = [];
+                  }
+                  tags[tagCat].push(tagVal);
+                }
+              }
 
-            // each circonus alert can produce 2 events, one for the alert and one for the clear.
-            // alert first.
-            const alert_match: any = {};
-            alert_match.metric = metric;
-            alert_match.value = alert['_value'];
+              const annotationTags = [];
+              for (const tagCat in tags) {
+                annotationTags.push(tagCat + ':' + tags[tagCat][0]);
+              }
 
-            const data: any = {};
-            data.evalMatches = [];
-            data.evalMatches.push(alert_match);
-
-            let notes =
-              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
-              rule['notes'] :
-              'Oh no!';
-
-            notes = Mustache.render(notes, tags);
-
-            const event: any = {
-              time: alert['_occurred_on'] * 1000,
-              title: 'ALERTING',
-              text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />`+
-                (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
-                  ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
-                  : ''),
-              tags: annotationTags,
-              alertId: alert['_cid'].replace('/alert/', ''),
-              newState: 'alerting',
-              source: query.annotation,
-              data: data,
-            };
-
-            events.push(event);
-
-            notes =
-              rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== '' ?
-              rule['notes'] :
-              'Yay!';
-
-            notes = Mustache.render(notes, tags);
-
-            // clear if it's cleared:
-            if (alert['_cleared_on'] !== null) {
+              // each circonus alert can produce 2 events, one for the alert and one for the clear.
+              // alert first.
               const alert_match: any = {};
               alert_match.metric = metric;
-              alert_match.value = alert['_cleared_value'];
+              alert_match.value = alert['_value'];
+
               const data: any = {};
               data.evalMatches = [];
               data.evalMatches.push(alert_match);
 
+              let notes =
+                rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                  ? rule['notes']
+                  : 'Oh no!';
+
+              notes = Mustache.render(notes, tags);
+
               const event: any = {
-                time: alert['_cleared_on'] * 1000,
-                title: 'OK',
-                text: `<br />${notes}<br />Sev: ${alert['_severity']}<br />` +
+                time: alert['_occurred_on'] * 1000,
+                title: 'ALERTING',
+                text:
+                  `<br />${notes}<br />Sev: ${alert['_severity']}<br />` +
                   (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
                     ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
                     : ''),
                 tags: annotationTags,
                 alertId: alert['_cid'].replace('/alert/', ''),
-                newState: 'ok',
+                newState: 'alerting',
                 source: query.annotation,
                 data: data,
               };
+
               events.push(event);
+
+              notes =
+                rule !== undefined && rule !== null && rule['notes'] !== null && rule['notes'] !== ''
+                  ? rule['notes']
+                  : 'Yay!';
+
+              notes = Mustache.render(notes, tags);
+
+              // clear if it's cleared:
+              if (alert['_cleared_on'] !== null) {
+                const alert_match: any = {};
+                alert_match.metric = metric;
+                alert_match.value = alert['_cleared_value'];
+                const data: any = {};
+                data.evalMatches = [];
+                data.evalMatches.push(alert_match);
+
+                const event: any = {
+                  time: alert['_cleared_on'] * 1000,
+                  title: 'OK',
+                  text:
+                    `<br />${notes}<br />Sev: ${alert['_severity']}<br />` +
+                    (alert['_metric_link'] !== null && alert['_metric_link'] !== ''
+                      ? `<a href="${alert['_metric_link']}" target="_blank">Info</a><br />`
+                      : ''),
+                  tags: annotationTags,
+                  alertId: alert['_cid'].replace('/alert/', ''),
+                  newState: 'ok',
+                  source: query.annotation,
+                  data: data,
+                };
+                events.push(event);
+              }
             }
-          }
-          return events;
-        })
+            return events;
+          })
       )
     ).then((results) => {
       return results;
