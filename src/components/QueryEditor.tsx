@@ -1406,6 +1406,7 @@ export function QueryEditor(props: Props) {
                         return <SegmentAsync
                           value={segment.value}
                           allowCustomValue={true}
+                          reloadOptionsOnChange={true}
                           loadOptions={(search) => getStandardDefaultOptions(index, search as string)}
                           inputMinWidth={150}
                           onChange={(item: SelectableValue) => updateStandardSegmentValue(index, { type:segment.type, value:item.value })}
@@ -1480,6 +1481,7 @@ export function QueryEditor(props: Props) {
                         return <SegmentAsync
                           value={segment.value}
                           allowCustomValue={true}
+                          reloadOptionsOnChange={true}
                           loadOptions={(search) => getGraphiteDefaultOptions(index, search as string)}
                           inputMinWidth={150}
                           onChange={(item: SelectableValue) => updateGraphiteSegmentValue(index, { type:segment.type, value:item.value }, item.leaf)}
