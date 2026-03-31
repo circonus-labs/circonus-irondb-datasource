@@ -75,7 +75,7 @@ export class DataSource extends DataSourceApi<CirconusQuery, CirconusDataSourceO
     this.dataSourceOptions = instanceSettings.jsonData;
     _.defaults(this.dataSourceOptions, DEFAULT_OPTIONS);
 
-    this.id = instanceSettings.id;
+    this.id = instanceSettings.id ?? 0;
     this.name = instanceSettings.name;
     this.type = 'Circonus';
     this.userHash = '';

@@ -29,7 +29,7 @@ Read more about Apica IRONdb here:
 
 ### From GitHub 
 1. Please install the following prerequisites:
-   * [Node.js](https://nodejs.org/en/download/) 
+   * [Node.js](https://nodejs.org/en/download/) >= v24
    * [Yarn](https://www.npmjs.com/package/yarn) 
    * [Go](https://golang.org/doc/install) 
    * [Mage](https://github.com/magefile/mage) 

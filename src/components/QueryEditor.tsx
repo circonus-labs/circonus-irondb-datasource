@@ -1638,7 +1638,7 @@ function getStyles(theme: GrafanaTheme2) {
   return {
     labels: css`
       display: flex;
-      color: ${theme.colors.primary.text};
+      color: ${(theme as any).colors.primary.text};
       -moz-box-align: center;
       align-items: center;
       -moz-box-pack: justify;
@@ -1647,24 +1647,24 @@ function getStyles(theme: GrafanaTheme2) {
       padding: 0px ${theme.spacing(1)};
       font-weight: 500;
       font-size: 12px;
-      background-color: ${theme.colors.background.secondary};
-      height: ${theme.spacing(4)};
-      line-height: ${theme.spacing(4)};
-      margin-right: ${theme.spacing(0.5)};
+      background-color: ${(theme as any).colors.background.secondary};
+      height: ${(theme as any).spacing(4)};
+      line-height: ${(theme as any).spacing(4)};
+      margin-right: ${(theme as any).spacing(0.5)};
       margin-bottom: 0;
-      border-radius: ${theme.spacing(0.25)};
+      border-radius: ${(theme as any).spacing(0.25)};
       border: medium none;
       width: 128px;
     `,
     plusButton: css`
-      background-color: ${theme.colors.background.secondary};
-      margin-right: ${theme.spacing(0.5)};
+      background-color: ${(theme as any).colors.background.secondary};
+      margin-right: ${(theme as any).spacing(0.5)};
     `,
     fillFlex: css`
       display: flex;
       flex: 1 1 auto;
-      background-color: ${theme.colors.background.secondary};
-      margin-bottom: ${theme.spacing(0.5)};
+      background-color: ${(theme as any).colors.background.secondary};
+      margin-bottom: ${(theme as any).spacing(0.5)};
     `,
     flexWrap: css`
       display: flex;
@@ -1679,17 +1679,17 @@ function getStyles(theme: GrafanaTheme2) {
     `,
     tagCat: css`
       color: #598;
-      padding-right: ${theme.spacing(0.5)};
+      padding-right: ${(theme as any).spacing(0.5)};
       margin-right: 0;
     `,
     tagVal: css`
       color: #5ca;
-      padding-left: ${theme.spacing(0.5)};
+      padding-left: ${(theme as any).spacing(0.5)};
     `,
     tagPair: css`
       color: #888;
-      padding-right: ${theme.spacing(0.5)};
-      padding-left: ${theme.spacing(0.5)};
+      padding-right: ${(theme as any).spacing(0.5)};
+      padding-left: ${(theme as any).spacing(0.5)};
       margin-right: 0;
     `,
     tagSep: css`
