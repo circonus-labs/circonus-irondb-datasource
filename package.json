@@ -16,7 +16,7 @@
   "author": "Circonus",
   "license": "BSD-3-Clause",
   "devDependencies": {
-    "@babel/core": "^7.21.4",
+    "@babel/core": "^7.29.6",
     "@grafana/e2e-selectors": "9.5.21",
     "@grafana/eslint-config": "^6.0.0",
     "@grafana/tsconfig": "^1.2.0-rc1",
